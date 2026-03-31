@@ -1,4 +1,9 @@
 node_modules/
-server/.env
-server/node_modules/
+apps/*/node_modules/
+apps/*/dist/
+packages/*/node_modules/
+packages/*/dist/
+coverage/
+*.tsbuildinfo
 .DS_Store
+apps/api/.env

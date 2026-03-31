@@ -1,0 +1,20 @@
+{
+  "name": "@plainlist/db",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "db:migrate": "tsx migrate.ts",
+    "db:seed": "tsx seed.ts",
+    "lint": "eslint . --ext .ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "dotenv": "^16.6.1",
+    "mysql2": "^3.15.2"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.6"
+  }
+}

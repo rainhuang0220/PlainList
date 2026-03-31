@@ -1,0 +1,235 @@
+import type { PluginManifest, ThemeDefinition, ThemeVars } from '../types';
+
+export const THEME_PLUGIN_ID = 'theme-pack';
+export const LANGUAGE_PLUGIN_ID = 'lang-zh';
+
+export const USER_SETTING_KEYS = {
+  activeTheme: 'active_theme',
+  installedPlugins: 'installed_plugins',
+} as const;
+
+export const DEFAULT_THEME_ID = 'default';
+
+export const DEFAULT_THEME_VARS: ThemeVars = {
+  '--bg': '#F7F7F7',
+  '--surface': '#FFFFFF',
+  '--dark': '#111111',
+  '--mid': '#555555',
+  '--muted': '#999999',
+  '--faint': '#E4E4E4',
+  '--faint2': '#EFEFEF',
+};
+
+const themePackThemes: ThemeDefinition[] = [
+  {
+    id: 'default',
+    name: 'Default',
+    vars: DEFAULT_THEME_VARS,
+  },
+  {
+    id: 'dark',
+    name: 'Dark',
+    vars: {
+      '--bg': '#0F0F0F',
+      '--surface': '#1A1A1A',
+      '--dark': '#EFEFEF',
+      '--mid': '#AAAAAA',
+      '--muted': '#666666',
+      '--faint': '#2C2C2C',
+      '--faint2': '#222222',
+    },
+  },
+  {
+    id: 'warm',
+    name: 'Warm',
+    vars: {
+      '--bg': '#F5F0E8',
+      '--surface': '#FDFAF4',
+      '--dark': '#2C1F0E',
+      '--mid': '#6B5744',
+      '--muted': '#A08C78',
+      '--faint': '#E2D8CC',
+      '--faint2': '#EDE8DF',
+    },
+  },
+  {
+    id: 'cool',
+    name: 'Cool',
+    vars: {
+      '--bg': '#EEF2F7',
+      '--surface': '#F8FAFD',
+      '--dark': '#0D1B2A',
+      '--mid': '#3D5A80',
+      '--muted': '#7A9BBF',
+      '--faint': '#D4DDE8',
+      '--faint2': '#E4EBF2',
+    },
+  },
+  {
+    id: 'hc',
+    name: 'High Contrast',
+    vars: {
+      '--bg': '#FFFFFF',
+      '--surface': '#FFFFFF',
+      '--dark': '#000000',
+      '--mid': '#000000',
+      '--muted': '#444444',
+      '--faint': '#BBBBBB',
+      '--faint2': '#EEEEEE',
+    },
+  },
+  {
+    id: 'solarized',
+    name: 'Solarized',
+    vars: {
+      '--bg': '#FDF6E3',
+      '--surface': '#EEE8D5',
+      '--dark': '#073642',
+      '--mid': '#586E75',
+      '--muted': '#93A1A1',
+      '--faint': '#D3CBB8',
+      '--faint2': '#E8E2D0',
+    },
+  },
+  {
+    id: 'nord',
+    name: 'Nord',
+    vars: {
+      '--bg': '#2E3440',
+      '--surface': '#3B4252',
+      '--dark': '#ECEFF4',
+      '--mid': '#D8DEE9',
+      '--muted': '#7B88A1',
+      '--faint': '#434C5E',
+      '--faint2': '#3B4252',
+    },
+  },
+  {
+    id: 'rose',
+    name: 'Rose',
+    vars: {
+      '--bg': '#FDF2F4',
+      '--surface': '#FFF8F9',
+      '--dark': '#3D0A14',
+      '--mid': '#8B3A4A',
+      '--muted': '#C4849A',
+      '--faint': '#F0D4DA',
+      '--faint2': '#F7E5E9',
+    },
+  },
+];
+
+export const PLUGIN_CATALOG: PluginManifest[] = [
+  {
+    id: LANGUAGE_PLUGIN_ID,
+    name: 'Chinese Language Pack',
+    version: '2.0.0',
+    category: 'language',
+    author: 'PlainList',
+    description: 'Simplified Chinese translation bundle.',
+    longDescription:
+      'Uses a manifest-only translation bundle and no longer executes arbitrary plugin scripts.',
+    features: [
+      'Translates navigation, sections, stats, and plugin center labels',
+      'Provides localized month and weekday labels',
+      'Applies immediately after installation',
+    ],
+    translation: {
+      lists: {
+        DAYS: ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'],
+        MONTHS: ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月'],
+        MONTHS_S: ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'],
+        WDAYS_S: ['日', '一', '二', '三', '四', '五', '六'],
+        WDAYS_M: ['一', '二', '三', '四', '五', '六', '日'],
+      },
+      messages: {
+        'nav.now': '当下',
+        'nav.day': '今日',
+        'nav.month': '月度',
+        'nav.year': '年度',
+        'nav.week': '周回顾',
+        'nav.lock': '锁定',
+        'section.now': '当下',
+        'section.day': '今日计划',
+        'section.month': '月度追踪',
+        'section.year': '年度视图',
+        'section.week': '周回顾',
+        'clock.motto': '每一秒都不可逆。',
+        'prog.year': '年',
+        'prog.month': '月',
+        'prog.today': '今日',
+        'group.morning_early': '清晨 · 9:00 前',
+        'group.morning': '上午 · 9:00-13:00',
+        'group.afternoon': '下午 · 13:00-18:00',
+        'group.evening': '晚上 · 18:00 后',
+        'plan.empty': '还没有计划，在下方添加第一个习惯或任务',
+        'plan.type.habit': '每日习惯',
+        'plan.type.todo': '任务',
+        'plan.add_btn': '添加习惯或任务',
+        'plan.add_name_ph': '名称',
+        'plan.add_habit': '习惯',
+        'plan.add_task': '任务',
+        'plan.add_cancel': '取消',
+        'plan.add_save': '添加',
+        'stat.done': '已完成',
+        'stat.remaining': '未完成',
+        'stat.completion': '完成率',
+        'tracker.today': '今天',
+        'tracker.task_habit': '任务 / 习惯',
+        'tracker.done_col': '完成',
+        'tracker.group.habits': '习惯 · 每日重复',
+        'tracker.group.tasks': '任务 · 一次性事项',
+        'tracker.empty': '在 Day 区域添加计划后开始追踪',
+        'tracker.week_prefix': '第',
+        'year.summary.completion': '月完成率',
+        'year.summary.total': '打卡总数',
+        'year.summary.perfect': '完美天数',
+        'year.summary.best': '最佳习惯',
+        'week.prefix': '第',
+        'week.insight.avg': '平均完成率',
+        'week.insight.active': '活跃天数',
+        'week.insight.best_day': '最佳日期',
+        'week.insight.streak': '当前连续',
+        'plugins.title': '插件',
+        'plugins.tab.all': '全部',
+        'plugins.tab.theme': '主题',
+        'plugins.tab.language': '语言',
+        'plugins.installed': '已安装',
+        'plugins.install': '安装',
+        'plugins.uninstall': '卸载',
+        'plugins.restart_hint': '变更会立即生效并自动保存',
+        'plugins.hint': '变更会立即生效并自动保存',
+      },
+    },
+    runtime: 'manifest',
+  },
+  {
+    id: THEME_PLUGIN_ID,
+    name: 'Theme Pack',
+    version: '2.0.0',
+    category: 'theme',
+    author: 'PlainList',
+    description: 'Curated color themes with config-driven preview and persistence.',
+    longDescription:
+      'All theme variants now live in the manifest catalog and are resolved without executing plugin JavaScript.',
+    themes: themePackThemes,
+    features: [
+      'Preview and save built-in themes',
+      'Theme selection persists per user',
+      'No arbitrary runtime script execution',
+    ],
+    runtime: 'manifest',
+  },
+];
+
+export function findPluginManifest(pluginId: string): PluginManifest | undefined {
+  return PLUGIN_CATALOG.find((plugin) => plugin.id === pluginId);
+}
+
+export function getThemeDefinitions(): ThemeDefinition[] {
+  return findPluginManifest(THEME_PLUGIN_ID)?.themes ?? themePackThemes;
+}
+
+export function findThemeById(themeId: string): ThemeDefinition | undefined {
+  return getThemeDefinitions().find((theme) => theme.id === themeId);
+}
