@@ -1,5 +1,5 @@
 export type PlanType = 'habit' | 'todo';
-export type PluginCategory = 'language' | 'theme';
+export type PluginCategory = 'language' | 'theme' | 'widget';
 export type ThemeVars = Record<string, string>;
 
 export interface AuthenticatedUser {
@@ -106,5 +106,7 @@ export interface PluginManifest {
   features?: string[];
   themes?: ThemeDefinition[];
   translation?: PluginTranslationBundle;
+  widgetUrl?: string;
+  repoUrl?: string;
   runtime: 'manifest';
 }

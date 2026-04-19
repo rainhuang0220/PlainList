@@ -133,7 +133,7 @@ const plugins = usePluginsStore();
 const i18n = useI18nStore();
 
 const filterQ = ref('');
-const filterCat = ref<'all' | 'theme'>('all');
+const filterCat = ref<'all' | 'theme' | 'widget'>('all');
 const activeId = ref<string | null>(null);
 const selectedThemeId = ref<string | null>(null);
 const previewTheme = ref<ThemeDefinition | null>(null);
@@ -143,12 +143,15 @@ function t(key: string, fallback: string) {
   return i18n.t(key, fallback);
 }
 
-const categories = computed<Array<{ key: 'all' | 'theme'; label: string }>>(() => {
-  const base: Array<{ key: 'all' | 'theme'; label: string }> = [
+const categories = computed<Array<{ key: 'all' | 'theme' | 'widget'; label: string }>>(() => {
+  const base: Array<{ key: 'all' | 'theme' | 'widget'; label: string }> = [
     { key: 'all', label: t('plugins.tab.all', 'All') },
   ];
   if (plugins.available.some((plugin) => plugin.category === 'theme')) {
     base.push({ key: 'theme', label: t('plugins.tab.theme', 'Theme') });
+  }
+  if (plugins.available.some((plugin) => plugin.category === 'widget')) {
+    base.push({ key: 'widget', label: t('plugins.tab.widget', 'Widget') });
   }
   return base;
 });
@@ -246,3 +249,14 @@ onMounted(async () => {
   await Promise.all([plugins.loadAvailable(), plugins.loadInstalled()]);
 });
 </script>
+
+<style scoped>
+.pv-widget-frame {
+  width: 100%;
+  height: 520px;
+  border: none;
+  border-radius: 8px;
+  background: var(--surface);
+  margin-top: 8px;
+}
+</style>

@@ -392,6 +392,13 @@
       line-height: 1; padding: 3px 8px; border-radius: var(--r); transition: all .15s;
     }
     #nav-plugins:hover { border-color: color-mix(in srgb, var(--mid) 45%, var(--surface)); color: var(--dark); }
+    .nav-widget-btn {
+      background: none; border: 1px solid var(--faint); cursor: pointer;
+      font-size: 10px; font-family: var(--font); color: var(--muted);
+      letter-spacing: .06em; text-transform: uppercase;
+      padding: 3px 10px; border-radius: var(--r); transition: all .15s;
+    }
+    .nav-widget-btn:hover { border-color: color-mix(in srgb, var(--mid) 45%, var(--surface)); color: var(--dark); }
 
     /* ── Plugin View — full screen ────────────────────────────── */
     #plugin-view {
@@ -859,7 +866,8 @@
     }
     #nav-locale,
     #nav-plugins,
-    #nav-logout { min-height: 28px; }
+    #nav-logout,
+    .nav-widget-btn { min-height: 28px; }
     #nav-plugins {
       min-width: 34px;
       padding: 3px 9px;
@@ -1869,7 +1877,8 @@
       .nav-right { gap: 8px; }
       #nav-locale,
       #nav-plugins,
-      #nav-logout {
+      #nav-logout,
+      .nav-widget-btn {
         padding: 4px 8px;
       }
       .day-primary-title,

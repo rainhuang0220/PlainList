@@ -40,6 +40,15 @@
             {{ localeStore.switchLabel }}
           </button>
           <button
+            v-for="widget in installedWidgets"
+            :key="widget.id"
+            class="nav-widget-btn"
+            :title="widget.name"
+            @click="activeWidget = widget.id"
+          >
+            {{ widget.name }}
+          </button>
+          <button
             id="nav-plugins"
             :title="t('plugins.title', 'Plugins')"
             @click="pluginStoreOpen = true"
@@ -59,6 +68,14 @@
       <CalendarSection id="s5" class="app-section" style="--section-delay: 280ms" />
 
       <PluginStore v-if="pluginStoreOpen" @close="onPluginStoreClose" />
+      <template v-for="widget in installedWidgets" :key="widget.id">
+        <WidgetPanel
+          v-if="activeWidget === widget.id && widget.widgetUrl"
+          :title="widget.name"
+          :src="widget.widgetUrl"
+          @close="activeWidget = null"
+        />
+      </template>
     </template>
   </div>
 </template>
@@ -77,6 +94,7 @@ import { useI18nStore } from '@/shared/i18n/useI18nStore';
 import AuthTerminal from '@/widgets/auth/AuthTerminal.vue';
 import ShowcaseHome from '@/widgets/auth/ShowcaseHome.vue';
 import PluginStore from '@/widgets/plugins/PluginStore.vue';
+import WidgetPanel from '@/widgets/plugins/WidgetPanel.vue';
 import CalendarSection from '@/widgets/sections/CalendarSection.vue';
 import ClockSection from '@/widgets/sections/ClockSection.vue';
 import PlansSection from '@/widgets/sections/PlansSection.vue';
@@ -92,6 +110,13 @@ const i18n = useI18nStore();
 const { get, post } = useApi();
 
 const pluginStoreOpen = ref(false);
+const activeWidget = ref<string | null>(null);
+
+const installedWidgets = computed(() =>
+  pluginsStore.available.filter(
+    (p) => p.category === 'widget' && pluginsStore.installedIds.has(p.id),
+  ),
+);
 const entryMode = ref<'showcase' | 'terminal'>('showcase');
 const activeSection = ref('s1');
 const isDashboardLoading = ref(false);

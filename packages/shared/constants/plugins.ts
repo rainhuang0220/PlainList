@@ -136,6 +136,25 @@ export const PLUGIN_CATALOG: PluginManifest[] = [
     ],
     runtime: 'manifest',
   },
+  {
+    id: 'fishtime',
+    name: 'Fishtime',
+    version: '1.0.0',
+    category: 'widget',
+    author: 'LynngNAN',
+    description: '应用使用时间追踪，实时监控活动窗口，支持图表与多格式导出。',
+    longDescription:
+      'Fishtime 记录每个应用的使用时长，提供柱状图分析、应用时间限额提醒，并支持导出为 XLSX / CSV / PDF。',
+    features: [
+      '实时进程监控',
+      '使用时长图表',
+      '导出 XLSX / CSV / PDF',
+      '应用时间限额与通知',
+    ],
+    widgetUrl: 'http://localhost:5174',
+    repoUrl: 'https://github.com/nanlingyin/fishtime',
+    runtime: 'manifest',
+  },
 ];
 
 export function findPluginManifest(pluginId: string): PluginManifest | undefined {

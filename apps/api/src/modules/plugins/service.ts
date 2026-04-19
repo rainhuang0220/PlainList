@@ -10,6 +10,7 @@ import {
 } from '@plainlist/shared';
 import { activeThemeSchema, installPluginSchema } from '@plainlist/shared';
 import { pool } from '../../db/pool';
+import { installWidget, uninstallWidget } from './widgetRunner';
 
 function serviceError(status: number, message: string): Error & { status: number } {
   return Object.assign(new Error(message), { status });
@@ -90,6 +91,11 @@ export async function installPlugin(userId: number, payload: unknown): Promise<v
   });
 
   await setUserSetting(userId, USER_SETTING_KEYS.installedPlugins, JSON.stringify(installed));
+
+  const manifest = findPluginManifest(pluginId);
+  if (manifest?.category === 'widget' && manifest.repoUrl) {
+    await installWidget(pluginId, manifest.repoUrl);
+  }
 }
 
 export async function uninstallPlugin(userId: number, pluginId: string): Promise<void> {
@@ -99,6 +105,11 @@ export async function uninstallPlugin(userId: number, pluginId: string): Promise
 
   if (pluginId === THEME_PLUGIN_ID) {
     await setUserSetting(userId, USER_SETTING_KEYS.activeTheme, DEFAULT_THEME_ID);
+  }
+
+  const manifest = findPluginManifest(pluginId);
+  if (manifest?.category === 'widget') {
+    uninstallWidget(pluginId);
   }
 }
 

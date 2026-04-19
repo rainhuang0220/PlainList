@@ -1,5 +1,5 @@
-/// <reference types="D:/jisuanjisheji/PlainList/node_modules/@vue/language-core/types/template-helpers.d.ts" />
-/// <reference types="D:/jisuanjisheji/PlainList/node_modules/@vue/language-core/types/props-fallback.d.ts" />
+/// <reference types="../../../../node_modules/@vue/language-core/types/template-helpers.d.ts" />
+/// <reference types="../../../../node_modules/@vue/language-core/types/props-fallback.d.ts" />
 import { DEMO_ACCOUNT } from '@plainlist/shared';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useAuthStore } from '@/features/auth/model/useAuthStore';
@@ -12,6 +12,7 @@ import { useI18nStore } from '@/shared/i18n/useI18nStore';
 import AuthTerminal from '@/widgets/auth/AuthTerminal.vue';
 import ShowcaseHome from '@/widgets/auth/ShowcaseHome.vue';
 import PluginStore from '@/widgets/plugins/PluginStore.vue';
+import WidgetPanel from '@/widgets/plugins/WidgetPanel.vue';
 import CalendarSection from '@/widgets/sections/CalendarSection.vue';
 import ClockSection from '@/widgets/sections/ClockSection.vue';
 import PlansSection from '@/widgets/sections/PlansSection.vue';
@@ -25,6 +26,8 @@ const pluginsStore = usePluginsStore();
 const i18n = useI18nStore();
 const { get, post } = useApi();
 const pluginStoreOpen = ref(false);
+const activeWidget = ref(null);
+const installedWidgets = computed(() => pluginsStore.available.filter((p) => p.category === 'widget' && pluginsStore.installedIds.has(p.id)));
 const entryMode = ref('showcase');
 const activeSection = ref('s1');
 const isDashboardLoading = ref(false);
@@ -292,13 +295,31 @@ else {
         title: (__VLS_ctx.t('nav.language', 'Language')),
     });
     (__VLS_ctx.localeStore.switchLabel);
+    for (const [widget] of __VLS_vFor((__VLS_ctx.installedWidgets))) {
+        __VLS_asFunctionalElement1(__VLS_intrinsics.button, __VLS_intrinsics.button)({
+            ...{ onClick: (...[$event]) => {
+                    if (!!(!__VLS_ctx.auth.isLoggedIn))
+                        return;
+                    __VLS_ctx.activeWidget = widget.id;
+                    // @ts-ignore
+                    [localeStore, t, installedWidgets, activeWidget,];
+                } },
+            key: (widget.id),
+            ...{ class: "nav-widget-btn" },
+            title: (widget.name),
+        });
+        /** @type {__VLS_StyleScopedClasses['nav-widget-btn']} */ ;
+        (widget.name);
+        // @ts-ignore
+        [];
+    }
     __VLS_asFunctionalElement1(__VLS_intrinsics.button, __VLS_intrinsics.button)({
         ...{ onClick: (...[$event]) => {
                 if (!!(!__VLS_ctx.auth.isLoggedIn))
                     return;
                 __VLS_ctx.pluginStoreOpen = true;
                 // @ts-ignore
-                [localeStore, t, pluginStoreOpen,];
+                [pluginStoreOpen,];
             } },
         id: "nav-plugins",
         title: (__VLS_ctx.t('plugins.title', 'Plugins')),
@@ -388,8 +409,40 @@ else {
         var __VLS_51;
         var __VLS_52;
     }
+    for (const [widget] of __VLS_vFor((__VLS_ctx.installedWidgets))) {
+        (widget.id);
+        if (__VLS_ctx.activeWidget === widget.id && widget.widgetUrl) {
+            const __VLS_55 = WidgetPanel;
+            // @ts-ignore
+            const __VLS_56 = __VLS_asFunctionalComponent1(__VLS_55, new __VLS_55({
+                ...{ 'onClose': {} },
+                title: (widget.name),
+                src: (widget.widgetUrl),
+            }));
+            const __VLS_57 = __VLS_56({
+                ...{ 'onClose': {} },
+                title: (widget.name),
+                src: (widget.widgetUrl),
+            }, ...__VLS_functionalComponentArgsRest(__VLS_56));
+            let __VLS_60;
+            const __VLS_61 = ({ close: {} },
+                { onClose: (...[$event]) => {
+                        if (!!(!__VLS_ctx.auth.isLoggedIn))
+                            return;
+                        if (!(__VLS_ctx.activeWidget === widget.id && widget.widgetUrl))
+                            return;
+                        __VLS_ctx.activeWidget = null;
+                        // @ts-ignore
+                        [t, t, installedWidgets, activeWidget, activeWidget, pluginStoreOpen, logout, onPluginStoreClose,];
+                    } });
+            var __VLS_58;
+            var __VLS_59;
+        }
+        // @ts-ignore
+        [];
+    }
 }
 // @ts-ignore
-[t, t, pluginStoreOpen, logout, onPluginStoreClose,];
+[];
 const __VLS_export = (await import('vue')).defineComponent({});
 export default {};

@@ -1,5 +1,5 @@
-/// <reference types="D:/jisuanjisheji/PlainList/node_modules/@vue/language-core/types/template-helpers.d.ts" />
-/// <reference types="D:/jisuanjisheji/PlainList/node_modules/@vue/language-core/types/props-fallback.d.ts" />
+/// <reference types="../../../../../node_modules/@vue/language-core/types/template-helpers.d.ts" />
+/// <reference types="../../../../../node_modules/@vue/language-core/types/props-fallback.d.ts" />
 import { computed, onMounted, ref, watch } from 'vue';
 import { usePluginsStore } from '@/features/plugins/model/usePluginsStore';
 import { useI18nStore } from '@/shared/i18n/useI18nStore';
@@ -21,6 +21,9 @@ const categories = computed(() => {
     ];
     if (plugins.available.some((plugin) => plugin.category === 'theme')) {
         base.push({ key: 'theme', label: t('plugins.tab.theme', 'Theme') });
+    }
+    if (plugins.available.some((plugin) => plugin.category === 'widget')) {
+        base.push({ key: 'widget', label: t('plugins.tab.widget', 'Widget') });
     }
     return base;
 });
