@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>方案D: 单层浮雕地形 - 拼图v2</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --dark: #111;
+    --bg: #F4F3F0;        /* warm paper, not pure white */
+    --muted: #8c8c88;
+    --surface: #fff;
+    --faint: #e3e1dc;
+    --ink: #1a1a1a;
+  }
+
+  body {
+    font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+    background: var(--bg);
+    color: var(--dark);
+    min-height: 100vh;
+    padding: 40px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .header { margin-bottom: 28px; max-width: 720px; }
+  .header h1 { font-size: 30px; font-weight: 600; letter-spacing: -.01em; margin-bottom: 10px; }
+  .header p { color: var(--muted); font-size: 13px; line-height: 1.6; }
+
+  .container { display: flex; gap: 24px; align-items: flex-start; }
+
+  /* The carved "specimen" — contained, framed like a relief print, NOT full bleed */
+  .stage {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--faint);
+    border-radius: 16px;
+    padding: 28px;
+    box-shadow: 0 18px 50px rgba(17,17,17,.05);
+  }
+
+  .stage-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 18px;
+  }
+
+  .stage-head h2 {
+    font-size: 11px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: .18em;
+  }
+
+  .seg {
+    display: inline-flex;
+    border: 1px solid var(--faint);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .seg button {
+    border: 0; background: transparent;
+    font-family: inherit; font-size: 11px;
+    letter-spacing: .08em; text-transform: uppercase;
+    color: var(--muted); padding: 7px 13px; cursor: pointer;
+    transition: background .15s, color .15s;
+  }
+  .seg button + button { border-left: 1px solid var(--faint); }
+  .seg button.active { background: var(--dark); color: var(--bg); }
+
+  .relief-frame {
+    position: relative;
+    width: 100%;
+    /* contained "plate" — reads as an object on a page, not a wallpaper */
+    max-width: 620px;
+    margin: 0 auto;
+    aspect-ratio: 1 / 1;
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--bg);
+    box-shadow:
+      inset 0 0 0 1px rgba(17,17,17,.06),
+      inset 0 1px 22px rgba(17,17,17,.05);
+  }
+  #relief { width: 100%; height: 100%; display: block; }
+  .relief-frame.fade #relief { animation: plateIn .6s ease; }
+  @keyframes plateIn { from { opacity: 0; } to { opacity: 1; } }
+
+  /* engraved labels live in the SAME plane as the surface (no card chrome) */
+  .labels { position: absolute; inset: 0; pointer-events: none; opacity: 1; transition: opacity .5s ease; }
+  .label {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    white-space: nowrap;
+    max-width: 42%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .label .lmark { display: block; font-size: 9px; line-height: 1; margin-bottom: 3px; opacity: .8; }
+  .label .lname {
+    display: block;
+    font-size: 12px; font-weight: 600; letter-spacing: .01em;
+    overflow: hidden; text-overflow: ellipsis;
+  }
+  .label .ltime {
+    display: block;
+    font-family: inherit; font-size: 8.5px;
+    letter-spacing: .14em; opacity: .7; margin-top: 2px;
+  }
+  /* deboss on light land (undone): dark ink pressed in, light bottom edge */
+  .label.on-light .lname { color: #2a2a2a; text-shadow: 0 1px 0 rgba(255,255,255,.65), 0 -1px 1px rgba(0,0,0,.28); }
+  .label.on-light .ltime, .label.on-light .lmark { color: #4a4a48; }
+  /* emboss on dark land (done): light ink raised, dark top edge */
+  .label.on-dark .lname { color: #f2f1ee; text-shadow: 0 -1px 0 rgba(0,0,0,.7), 0 1px 1px rgba(255,255,255,.22); }
+  .label.on-dark .ltime, .label.on-dark .lmark { color: #cfcdc8; }
+  /* contour: clean dark ink with paper knockout halo for legibility over line art */
+  .label.contour .lname {
+    color: #161616;
+    text-shadow: -1px -1px 0 #F4F3F0, 1px -1px 0 #F4F3F0, -1px 1px 0 #F4F3F0, 1px 1px 0 #F4F3F0,
+                 0 -2px 0 #F4F3F0, 0 2px 0 #F4F3F0, -2px 0 0 #F4F3F0, 2px 0 0 #F4F3F0, 0 0 5px #F4F3F0;
+  }
+  .label.contour .ltime { color: #555; text-shadow: 0 0 4px #F4F3F0, 0 0 4px #F4F3F0; }
+  .label.contour .lmark { color: #161616; text-shadow: 0 0 4px #F4F3F0, 0 0 3px #F4F3F0; }
+
+  .legend-line {
+    margin-top: 16px;
+    display: flex; gap: 22px; flex-wrap: wrap;
+    font-size: 10.5px; color: var(--muted);
+  }
+  .legend-line b { color: var(--ink); font-weight: 600; }
+
+  /* sidebar */
+  .sidebar {
+    width: 280px;
+    background: var(--surface);
+    border: 1px solid var(--faint);
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 18px 50px rgba(17,17,17,.05);
+  }
+  .sidebar h3 {
+    font-size: 11px; margin-bottom: 16px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: .18em;
+  }
+  .task-list { list-style: none; }
+  .task-item { padding: 11px 0; border-bottom: 1px solid var(--faint); display: flex; align-items: center; gap: 11px; }
+  .task-item:last-child { border-bottom: none; }
+  .chk { width: 16px; height: 16px; border: 1.5px solid var(--dark); border-radius: 50%; flex: none; position: relative; }
+  .chk.done { background: var(--dark); }
+  .chk.done::after { content: '✓'; position: absolute; inset: 0; display: grid; place-items: center; color: var(--bg); font-size: 10px; }
+  .task-info { flex: 1; min-width: 0; }
+  .task-name { font-size: 13px; font-weight: 500; }
+  .task-time { font-size: 10px; color: var(--muted); margin-top: 2px; letter-spacing: .06em; }
+  .task-done .task-name { text-decoration: line-through; opacity: .5; }
+
+  .controls { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--faint); }
+  .controls label { display: block; font-size: 10px; color: var(--muted); letter-spacing: .1em; text-transform: uppercase; margin-bottom: 6px; }
+  .controls input[type=range] { width: 100%; accent-color: var(--dark); }
+  .btn {
+    margin-top: 16px; width: 100%; padding: 11px;
+    background: var(--dark); color: var(--bg); border: 0; border-radius: 8px;
+    font-family: inherit; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; cursor: pointer;
+    transition: opacity .15s;
+  }
+  .btn:hover { opacity: .82; }
+</style>
+</head>
+<body>
+  <div class="header">
+    <h1>方案 D · 等高线群岛</h1>
+    <p>把一天刻成一张等高线海图：每个任务是一座<strong>岛</strong>，岛与岛之间的<strong>河流即空闲时间</strong>。已完成的任务隆起为山峰（`▲`，同心环上升），未完成的中心塌陷成<strong>湖</strong>（`○`，一天里的"洞"）。岛屿面积 ∝ 任务时长。单层、纯黑白灰、等高线由低到高逐圈描出。</p>
+  </div>
+
+  <div class="container">
+    <div class="stage">
+      <div class="stage-head">
+        <h2>Contour Chart</h2>
+      </div>
+
+      <div class="relief-frame">
+        <canvas id="relief"></canvas>
+        <div class="labels" id="labels"></div>
+      </div>
+
+      <div class="legend-line">
+        <span><b>山峰 ▲</b> 已完成</span>
+        <span><b>湖心岛 ○</b> 未完成</span>
+        <span><b>河流</b> 空闲时间</span>
+        <span><b>岛屿面积</b> 任务时长</span>
+      </div>
+    </div>
+
+    <div class="sidebar">
+      <h3>今日任务</h3>
+      <ul class="task-list" id="taskList"></ul>
+
+      <button class="btn" onclick="regenerate()">重新生成 Regenerate</button>
+    </div>
+  </div>
+
+<script>
+/* ----------------------------------------------------------------------------
+   单层浮雕地形 — 任务即地形
+   核心：所有任务共同定义一个高度场 H(x,y)。我们对同一个场做两种"刻法"：
+   (1) 浮雕 = 法线·光照 的 hillshade 灰度 + 岩石纹理
+   (2) 等高线 = marching squares 抽取等高线
+   关键点：没有"背景图层"。地形与任务是同一层，文字刻进表面。
+---------------------------------------------------------------------------- */
+
+let tasks = [
+  { id: 1, name: '晨间冥想', time: '07:00', duration: 30,  done: true  },
+  { id: 2, name: '深度阅读', time: '08:00', duration: 60,  done: true  },
+  { id: 3, name: '项目会议', time: '10:00', duration: 45,  done: false },
+  { id: 4, name: '代码审查', time: '11:00', duration: 90,  done: false },
+  { id: 5, name: '午餐',     time: '12:30', duration: 60,  done: true  },
+  { id: 6, name: '写文档',   time: '14:00', duration: 120, done: false },
+  { id: 7, name: '团队同步', time: '16:00', duration: 30,  done: false },
+  { id: 8, name: '健身',     time: '18:00', duration: 60,  done: true  },
+];
+
+let mapSeed = 8423;
+const mode = 'contour';
+const WARP = 18;   // 域扭曲幅度：海岸线不规则程度的主旋钮（越大越蜿蜒）
+
+/* ---------- value noise / fBm（用于扭曲边界 + 岩石纹理） ---------- */
+function hash(x, y, s) {
+  let h = s + x * 374761393 + y * 668265263;
+  h = (h ^ (h >> 13)) * 1274126177;
+  h = h ^ (h >> 16);
+  return (h & 0x7fffffff) / 0x7fffffff;
+}
+const sm = t => t * t * (3 - 2 * t);
+function noise(x, y, s) {
+  const ix = Math.floor(x), iy = Math.floor(y);
+  const fx = sm(x - ix), fy = sm(y - iy);
+  const a = hash(ix, iy, s),     b = hash(ix + 1, iy, s);
+  const c = hash(ix, iy + 1, s), d = hash(ix + 1, iy + 1, s);
+  return a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy;
+}
+function fbm(x, y, s, oct = 4) {
+  let v = 0, amp = 1, f = 1, m = 0;
+  for (let i = 0; i < oct; i++) { v += amp * noise(x * f, y * f, s + i * 57); m += amp; amp *= 0.5; f *= 2; }
+  return v / m;
+}
+function rand(s) { return hash(s & 65535, (s >> 16) & 65535, mapSeed); }
+
+/* ---------- 任务 → 省份种子（power diagram，面积≈时长） ---------- */
+function buildSeeds(W, H) {
+  const total = tasks.reduce((a, t) => a + t.duration, 0);
+  const cx = W / 2, cy = H / 2;
+  const golden = Math.PI * (3 - Math.sqrt(5));
+  const n = tasks.length;
+
+  let seeds = tasks.map((task, i) => {
+    const ratio = task.duration / total;
+    // 螺旋撒点，时长越长越靠外一点点，保证大省份有伸展空间
+    const ang = i * golden + (rand(i * 13 + 1) - 0.5) * 0.7;
+    const rad = Math.sqrt((i + 0.5) / n) * Math.min(W, H) * 0.36;
+    return {
+      task,
+      x: cx + Math.cos(ang) * rad,
+      y: cy + Math.sin(ang) * rad,
+      // power weight：时长越长，势力范围越大
+      weight: ratio * W * H * 0.20,
+      // 高原目标高度：完成=高山，未完成=浅盆地
+      peak: task.done ? 1.0 : 0.42,
+    };
+  });
+
+  // 几步 Lloyd 松弛，让省份分布更"地图化"、更均衡
+  for (let pass = 0; pass < 3; pass++) {
+    const ax = new Array(n).fill(0), ay = new Array(n).fill(0), cnt = new Array(n).fill(0);
+    const step = 6;
+    for (let y = 0; y < H; y += step) {
+      for (let x = 0; x < W; x += step) {
+        let best = 0, bd = Infinity;
+        for (let i = 0; i < n; i++) {
+          const dx = x - seeds[i].x, dy = y - seeds[i].y;
+          const d = dx * dx + dy * dy - seeds[i].weight;
+          if (d < bd) { bd = d; best = i; }
+        }
+        ax[best] += x; ay[best] += y; cnt[best]++;
+      }
+    }
+    for (let i = 0; i < n; i++) if (cnt[i]) {
+      seeds[i].x = seeds[i].x * 0.35 + (ax[i] / cnt[i]) * 0.65;
+      seeds[i].y = seeds[i].y * 0.35 + (ay[i] / cnt[i]) * 0.65;
+    }
+  }
+  return seeds;
+}
+
+let SEEDS = [], SAMPLE_W = 0, SAMPLE_H = 0;
+
+/* ---------- 高度场：单一连续地形 ----------
+   - 用扭曲后的坐标做 power-diagram，得到不规则（非光滑）边界
+   - 内部隆为高原(province.peak)，靠近省界处下沉 → 形成河谷(空闲)
+   - 外圈用噪声半径做"海岸线"，让整体是一座有机大陆，而不是铺满矩形 */
+function heightAt(x, y, W, H) {
+  // 海岸线 mask：到中心的归一化距离 + 噪声扰动
+  const cx = W / 2, cy = H / 2;
+  const nx = (x - cx) / (W * 0.5), ny = (y - cy) / (H * 0.5);
+  let rr = Math.sqrt(nx * nx + ny * ny);
+  const coastWarp = (fbm(x * 0.011, y * 0.011, mapSeed + 900, 3) - 0.5) * 0.55;
+  const land = 1 - sm(Math.min(1, Math.max(0, (rr + coastWarp - 0.62) / 0.34)));
+  if (land <= 0.001) return -0.15; // 海面（低于零，画成浅灰纸）
+
+  // 域扭曲：让省界蜿蜒不规则（幅度受控，避免折叠出碎岛）
+  const wx = x + (fbm(x * 0.016, y * 0.016, mapSeed + 11, 3) - 0.5) * WARP;
+  const wy = y + (fbm(x * 0.016, y * 0.016, mapSeed + 71, 3) - 0.5) * WARP;
+
+  // 找最近 / 次近 power 种子
+  let b0 = 0, b1 = 0, d0 = Infinity, d1 = Infinity;
+  for (let i = 0; i < SEEDS.length; i++) {
+    const dx = wx - SEEDS[i].x, dy = wy - SEEDS[i].y;
+    const d = dx * dx + dy * dy - SEEDS[i].weight;
+    if (d < d0) { d1 = d0; b1 = b0; d0 = d; b0 = i; }
+    else if (d < d1) { d1 = d; b1 = i; }
+  }
+  const sd = SEEDS[b0];
+  const s1 = SEEDS[b1];
+  const dist0 = Math.hypot(wx - sd.x, wy - sd.y);   // 到最近种子的真实距离
+  const dist1 = Math.hypot(wx - s1.x, wy - s1.y);   // 到次近种子
+  const edgeDist = (dist1 - dist0) * 0.5;           // 到最近省界的距离（界线上=0）
+
+  // 省界两侧 = 河流（空闲时间）。保证每座岛被水环绕，杜绝低矮"陆桥"挤出的黑条
+  const waterW = 11;
+  if (edgeDist < waterW) {
+    return Math.max(-0.12, (edgeDist - waterW) * 0.012) * land;   // 河流
+  }
+  const edge = sm(Math.min(1, (edgeDist - waterW) / 26));         // 河岸缓坡
+
+  // 每座岛 = 一个任务：完成=山峰（同心环上升），未完成=湖心岛
+  const reach = Math.sqrt(sd.weight) * 0.66 + 24;
+  const t = Math.min(1, dist0 / reach);
+  let prof;
+  if (sd.task.done) prof = 0.50 + (1 - t) * (1 - t) * 0.50;       // 山峰（已完成）
+  else              prof = 0.42 - Math.exp(-t * t * 3.0) * 0.56;  // 中心成湖（未完成 = 一天里的"洞"）
+
+  let h = prof * edge;                          // 河岸处降到水面
+  h += (fbm(x * 0.024, y * 0.024, mapSeed + 200, 3) - 0.5) * 0.03 * edge;  // 极轻噪声
+  h = h * land;                                 // 不 clamp，让盆地中心低于水面形成湖
+  return h;
+}
+
+/* ---------- 渲染 ---------- */
+let R = { ctx: null, W: 0, H: 0, cssScale: 1 };
+let contourGeom = null;
+let rafId = 0;
+
+const clamp01 = v => Math.max(0, Math.min(1, v));
+const easeOut = p => 1 - Math.pow(1 - p, 3);
+
+function setupCanvas() {
+  const canvas = document.getElementById('relief');
+  const rect = canvas.getBoundingClientRect();
+  const W = Math.max(1, Math.floor(rect.width));
+  const H = Math.max(1, Math.floor(rect.height));
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  R = { ctx, W, H, cssScale: rect.width / W };
+  SEEDS = buildSeeds(W, H); SAMPLE_W = W; SAMPLE_H = H;
+}
+
+function showLabels(on) {
+  document.getElementById('labels').style.opacity = on ? '1' : '0';
+}
+
+function render(animate = false) {
+  cancelAnimationFrame(rafId);
+  setupCanvas();
+  placeLabels(R.W, R.H, R.cssScale);
+  contourGeom = buildContourGeom(R.W, R.H);
+  if (animate) { showLabels(false); animateContour(); }
+  else { showLabels(true); drawContour(1); }
+}
+
+/* ---------- 水面填充：把河流（空闲）与海显性画出来 ---------- */
+function fillWater() {
+  const { ctx, W, H } = R;
+  const scale = 3;
+  const sw = Math.ceil(W / scale), sh = Math.ceil(H / scale);
+  const img = ctx.createImageData(sw, sh);
+  const d = img.data;
+  for (let sy = 0; sy < sh; sy++) {
+    for (let sx = 0; sx < sw; sx++) {
+      const h = heightAt(sx * scale, sy * scale, W, H);
+      const idx = (sy * sw + sx) * 4;
+      // 水（河流/海）= 略深的暖灰；陆地 = 纸色
+      const r = h < 0 ? 227 : 244, g = h < 0 ? 226 : 243, b = h < 0 ? 221 : 240;
+      d[idx] = r; d[idx+1] = g; d[idx+2] = b; d[idx+3] = 255;
+    }
+  }
+  const tmp = document.createElement('canvas');
+  tmp.width = sw; tmp.height = sh;
+  tmp.getContext('2d').putImageData(img, 0, 0);
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(tmp, 0, 0, W, H);
+}
+
+/* ---------- 等高线几何（一次性算好，动画只负责"描出来"） ---------- */
+const LEVEL_COUNT = 17;
+
+function centroidOf(pts) {
+  let x = 0, y = 0;
+  for (const p of pts) { x += p.x; y += p.y; }
+  return { x: x / pts.length, y: y / pts.length };
+}
+function lengthOf(pts) {
+  let L = 0;
+  for (let i = 1; i < pts.length; i++) L += Math.hypot(pts[i].x - pts[i-1].x, pts[i].y - pts[i-1].y);
+  return L;
+}
+function areaOf(pts) {
+  let a = 0;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++)
+    a += (pts[j].x + pts[i].x) * (pts[j].y - pts[i].y);
+  return Math.abs(a / 2);
+}
+
+function buildContourGeom(W, H) {
+  // 海岸线（含每座岛的岸线）；过滤掉极小/细长的碎岛（compact = 周长²/面积，越大越细长）
+  const coast = contourPaths(W, H, [0.012])
+    .map(pts => ({ pts, len: lengthOf(pts), area: areaOf(pts) }))
+    .filter(c => c.len > 30 && c.area > 900 && (c.len * c.len / c.area) < 50);
+  const levels = [];
+  for (let i = 1; i <= LEVEL_COUNT; i++) {
+    const lv = i / (LEVEL_COUNT + 1);
+    const paths = contourPaths(W, H, [lv]).map(pts => {
+      const c = centroidOf(pts);
+      const len = lengthOf(pts);
+      const closed = Math.hypot(pts[0].x - pts[pts.length-1].x, pts[0].y - pts[pts.length-1].y) < 7;
+      const area = closed ? areaOf(pts) : Infinity;
+      const compact = closed ? (len * len / area) : Infinity;   // 越小越圆
+      return { pts, len, area, compact, cx: c.x, cy: c.y };
+    }).filter(p => {
+      if (p.len < 22) return false;
+      if (p.area === Infinity) return true;                 // 开放折线（普通等高线）保留
+      if (p.area < 200) return false;                       // 太小
+      return p.compact < 45;                                // 去掉细长折叠环（黑条）
+    });
+    levels.push({ lv, paths, index: i % 4 === 0 });   // 每 4 条一根加粗 index 线
+  }
+  return { coast, levels };
+}
+
+function strokeReveal(pts, len, t) {
+  const ctx = R.ctx;
+  ctx.beginPath();
+  pts.forEach((pt, i) => i ? ctx.lineTo(pt.x, pt.y) : ctx.moveTo(pt.x, pt.y));
+  if (t < 1) { ctx.setLineDash([len, len]); ctx.lineDashOffset = len * (1 - t); }
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+function drawContour(progress) {
+  const { ctx, W, H } = R;
+  ctx.clearRect(0, 0, W, H);
+  fillWater();                       // 河流(空闲)/海 显性铺底
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+
+  // 海岸线最先描出（岛屿轮廓）
+  const ct = clamp01(progress / 0.14);
+  if (ct > 0) {
+    ctx.strokeStyle = 'rgba(17,17,17,.5)'; ctx.lineWidth = 1.7;
+    for (const c of contourGeom.coast) strokeReveal(c.pts, c.len, ct);
+  }
+
+  // 由低到高，逐层"涨潮"般描出
+  const N = contourGeom.levels.length;
+  contourGeom.levels.forEach((L, i) => {
+    const start = 0.10 + (i / N) * 0.78;
+    const t = clamp01((progress - start) / 0.20);
+    if (t <= 0) return;
+    const shade = Math.round(146 - L.lv * 120);
+    ctx.strokeStyle = `rgb(${shade},${shade},${shade})`;
+    const lw = L.index ? 1.45 : 0.8;
+    for (const p of L.paths) {
+      if (p.pts.length < 2) continue;
+      ctx.lineWidth = lw;
+      strokeReveal(p.pts, p.len, t);
+    }
+  });
+}
+
+function animateContour() {
+  const dur = 1600;
+  let t0 = null;
+  const step = now => {
+    if (t0 === null) t0 = now;            // 用 rAF 自带时间戳，保证时基一致
+    let p = (now - t0) / dur; if (p > 1) p = 1;
+    drawContour(p < 1 ? easeOut(p) : 1);
+    if (p >= 0.55) showLabels(true);
+    if (p < 1) rafId = requestAnimationFrame(step);
+    else showLabels(true);
+  };
+  rafId = requestAnimationFrame(step);
+}
+
+/* ---------- marching squares ---------- */
+function contourPaths(W, H, levels) {
+  const step = 4;
+  const cols = Math.floor(W / step), rows = Math.floor(H / step);
+  const grid = new Float32Array((cols + 1) * (rows + 1));
+  for (let j = 0; j <= rows; j++)
+    for (let i = 0; i <= cols; i++)
+      grid[j * (cols + 1) + i] = heightAt(i * step, j * step, W, H);
+
+  const segs = [];
+  const get = (i, j) => grid[j * (cols + 1) + i];
+  const interp = (a, b, t) => a + (b - a) * t;
+
+  for (const lv of levels) {
+    for (let j = 0; j < rows; j++) {
+      for (let i = 0; i < cols; i++) {
+        const x0 = i * step, y0 = j * step, x1 = x0 + step, y1 = y0 + step;
+        const tl = get(i, j), tr = get(i + 1, j), br = get(i + 1, j + 1), bl = get(i, j + 1);
+        let c = 0;
+        if (tl > lv) c |= 8; if (tr > lv) c |= 4; if (br > lv) c |= 2; if (bl > lv) c |= 1;
+        if (c === 0 || c === 15) continue;
+        const T = { x: interp(x0, x1, (lv - tl) / (tr - tl)), y: y0 };
+        const B = { x: interp(x0, x1, (lv - bl) / (br - bl)), y: y1 };
+        const L = { x: x0, y: interp(y0, y1, (lv - tl) / (bl - tl)) };
+        const R = { x: x1, y: interp(y0, y1, (lv - tr) / (br - tr)) };
+        const push = (a, b) => segs.push([a, b]);
+        switch (c) {
+          case 1: case 14: push(L, B); break;
+          case 2: case 13: push(B, R); break;
+          case 3: case 12: push(L, R); break;
+          case 4: case 11: push(T, R); break;
+          case 6: case 9:  push(T, B); break;
+          case 7: case 8:  push(L, T); break;
+          case 5: push(L, T); push(B, R); break;
+          case 10: push(T, R); push(L, B); break;
+        }
+      }
+    }
+  }
+  // 把零散线段拼成折线（按端点就近连接）
+  return stitch(segs);
+}
+
+function stitch(segs) {
+  const paths = [];
+  const used = new Array(segs.length).fill(false);
+  const key = p => `${Math.round(p.x)},${Math.round(p.y)}`;
+  const startMap = new Map();
+  segs.forEach((s, i) => {
+    (startMap.get(key(s[0])) || startMap.set(key(s[0]), []).get(key(s[0]))).push(i);
+    (startMap.get(key(s[1])) || startMap.set(key(s[1]), []).get(key(s[1]))).push(i);
+  });
+  for (let i = 0; i < segs.length; i++) {
+    if (used[i]) continue;
+    used[i] = true;
+    const path = [segs[i][0], segs[i][1]];
+    // 向前延伸
+    let grow = true;
+    while (grow) {
+      grow = false;
+      const tail = path[path.length - 1];
+      const cand = startMap.get(key(tail)) || [];
+      for (const ci of cand) {
+        if (used[ci]) continue;
+        const [a, b] = segs[ci];
+        if (key(a) === key(tail)) { path.push(b); used[ci] = true; grow = true; break; }
+        if (key(b) === key(tail)) { path.push(a); used[ci] = true; grow = true; break; }
+      }
+    }
+    if (path.length >= 2) paths.push(path);
+  }
+  return paths;
+}
+
+/* ---------- 刻字（与表面同层） ---------- */
+function placeLabels(W, H, cssScale) {
+  const box = document.getElementById('labels');
+  box.innerHTML = '';
+  // 用种子质心做标签锚点
+  const counts = new Array(SEEDS.length).fill(0);
+  const sxs = new Array(SEEDS.length).fill(0), sys = new Array(SEEDS.length).fill(0);
+  const step = 8;
+  for (let y = 0; y < H; y += step) {
+    for (let x = 0; x < W; x += step) {
+      const wx = x + (fbm(x * 0.016, y * 0.016, mapSeed + 11, 3) - 0.5) * WARP;
+      const wy = y + (fbm(x * 0.016, y * 0.016, mapSeed + 71, 3) - 0.5) * WARP;
+      if (heightAt(x, y, W, H) < 0.04) continue;
+      let best = 0, bd = Infinity;
+      for (let i = 0; i < SEEDS.length; i++) {
+        const dx = wx - SEEDS[i].x, dy = wy - SEEDS[i].y;
+        const d = dx * dx + dy * dy - SEEDS[i].weight;
+        if (d < bd) { bd = d; best = i; }
+      }
+      sxs[best] += x; sys[best] += y; counts[best]++;
+    }
+  }
+  SEEDS.forEach((sd, i) => {
+    if (!counts[i]) return;
+    const cx = sxs[i] / counts[i], cy = sys[i] / counts[i];
+    const el = document.createElement('div');
+    el.className = 'label ' + (mode === 'contour' ? 'contour' : (sd.task.done ? 'on-dark' : 'on-light'));
+    el.style.left = (cx * cssScale) + 'px';
+    el.style.top = (cy * cssScale) + 'px';
+    const mark = sd.task.done ? '▲' : '○';
+    el.innerHTML = `<span class="lmark">${mark}</span><span class="lname">${sd.task.name}</span><span class="ltime">${sd.task.time}</span>`;
+    box.appendChild(el);
+  });
+}
+
+/* ---------- 侧栏列表 ---------- */
+function renderList() {
+  document.getElementById('taskList').innerHTML = tasks.map(t => `
+    <li class="task-item ${t.done ? 'task-done' : ''}">
+      <div class="chk ${t.done ? 'done' : ''}"></div>
+      <div class="task-info">
+        <div class="task-name">${t.name}</div>
+        <div class="task-time">${t.time} · ${t.duration}分钟</div>
+      </div>
+    </li>`).join('');
+}
+
+function regenerate() {
+  mapSeed = Math.floor(Math.random() * 65536);
+  tasks = tasks.slice().sort(() => Math.random() - 0.5);
+  render(true); renderList();
+}
+
+const params = new URLSearchParams(location.search);
+if (params.get('seed')) mapSeed = +params.get('seed');
+const ENTRANCE = params.get('anim') !== '0';   // ?anim=0 关闭入场动画（用于静态预览）
+window.addEventListener('load', () => { renderList(); render(ENTRANCE); });
+let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => render(false), 140); });
+</script>
+</body>
+</html>

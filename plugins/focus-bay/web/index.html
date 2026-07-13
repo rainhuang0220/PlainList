@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Focus Bay</title>
+<style>
+  :root {
+    --bg:      #F7F7F7;
+    --surface: #FFFFFF;
+    --dark:    #111111;
+    --mid:     #555555;
+    --muted:   #999999;
+    --faint:   #E4E4E4;
+    --faint2:  #EFEFEF;
+    --alert:   #C0392B;
+    --alert-soft: #FBEDEB;
+    --font:    'Inter', system-ui, -apple-system, sans-serif;
+    --mono:    'JetBrains Mono', 'Courier New', monospace;
+    --r:       6px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  /* author display rules (e.g. display:flex) would otherwise beat the UA [hidden] style */
+  [hidden] { display: none !important; }
+
+  body {
+    background: var(--bg);
+    color: var(--dark);
+    font-family: var(--font);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 22px 20px 30px; }
+
+  /* ---------- header ---------- */
+  header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--faint);
+    margin-bottom: 18px;
+  }
+
+  .kicker {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .kicker span { color: var(--dark); font-weight: 600; }
+
+  h1 { font-size: 20px; font-weight: 700; letter-spacing: -.02em; }
+  .subtitle { margin-top: 3px; font-size: 12px; color: var(--mid); }
+
+  .head-right { display: flex; gap: 10px; align-items: center; }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    border: 1px solid var(--faint);
+    background: var(--surface);
+    border-radius: var(--r);
+    padding: 7px 12px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .04em;
+    color: var(--mid);
+  }
+  .chip .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
+  .chip.online .dot { background: var(--dark); }
+  .chip.offline { color: var(--alert); border-color: var(--alert); }
+  .chip.offline .dot { background: var(--alert); }
+  .chip .meta { color: var(--muted); }
+
+  .live-pct {
+    text-align: right;
+    border: 1px solid var(--faint);
+    background: var(--surface);
+    border-radius: var(--r);
+    padding: 5px 14px;
+  }
+  .live-pct .num { font-family: var(--mono); font-size: 20px; font-weight: 700; }
+  .live-pct .lbl { font-family: var(--mono); font-size: 9px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+  body.alert .live-pct .num { color: var(--alert); }
+
+  /* ---------- layout ---------- */
+  .grid { display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 16px; }
+  @media (max-width: 880px) { .grid { grid-template-columns: 1fr; } }
+
+  /* ---------- viewport ---------- */
+  .viewport {
+    position: relative;
+    background: var(--faint2);
+    border: 1px solid var(--faint);
+    border-radius: var(--r);
+    aspect-ratio: 4 / 3;
+    overflow: hidden;
+  }
+  body.alert .viewport { border-color: var(--alert); }
+
+  video, #overlay {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+  }
+  video.mirrored { transform: scaleX(-1); }
+  video.hidden { visibility: hidden; }
+  #overlay { z-index: 3; }
+
+  /* privacy backdrop shown when live preview is off */
+  .privacy-pane {
+    position: absolute; inset: 0; z-index: 2;
+    display: flex; align-items: center; justify-content: center;
+    background:
+      repeating-linear-gradient(45deg, transparent 0 14px, rgba(17,17,17,0.025) 14px 15px),
+      var(--faint2);
+  }
+  .privacy-pane .txt {
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .privacy-pane .txt strong { display: block; font-size: 13px; color: var(--mid); margin-bottom: 4px; }
+
+  .hud-bottom {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 6;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 14px;
+    pointer-events: none;
+  }
+  .hud-chip {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .06em;
+    background: rgba(255,255,255,0.9);
+    border: 1px solid var(--faint);
+    border-radius: var(--r);
+    padding: 3px 9px;
+    color: var(--mid);
+  }
+  .hud-status {
+    font-family: var(--mono);
+    font-size: 10px; font-weight: 600; letter-spacing: .12em;
+    padding: 4px 10px;
+    border-radius: var(--r);
+    border: 1px solid var(--faint);
+    background: rgba(255,255,255,0.9);
+    color: var(--muted);
+  }
+  .hud-status.live { color: var(--dark); border-color: var(--dark); }
+  .hud-status.alert { color: #fff; background: var(--alert); border-color: var(--alert); }
+  .hud-status.paused { color: var(--mid); border-color: var(--mid); }
+
+  /* preview toggle button on the viewport */
+  .preview-btn {
+    position: absolute; top: 10px; right: 10px; z-index: 7;
+    font-family: var(--mono); font-size: 10px; letter-spacing: .08em;
+    background: rgba(255,255,255,0.92);
+    border: 1px solid var(--faint);
+    border-radius: var(--r);
+    color: var(--mid);
+    padding: 5px 10px;
+    cursor: pointer;
+  }
+  .preview-btn:hover { color: var(--dark); border-color: var(--muted); }
+
+  /* placeholder */
+  .placeholder {
+    position: absolute; inset: 0; z-index: 8;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--faint2);
+  }
+  .ph-card { max-width: 360px; text-align: center; padding: 28px; }
+  .ph-title { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+  .ph-body { font-size: 12px; line-height: 1.7; color: var(--mid); margin-bottom: 18px; }
+
+  .cta {
+    font-family: var(--font); font-size: 13px; font-weight: 600;
+    color: #fff;
+    background: var(--dark);
+    border: none;
+    border-radius: var(--r);
+    padding: 10px 22px;
+    cursor: pointer;
+  }
+  .cta:hover { background: #333; }
+  .cta:disabled { opacity: .5; cursor: default; }
+  .cam-error { margin-top: 12px; color: var(--alert); font-size: 12px; }
+
+  .engine-banner {
+    position: absolute; left: 10px; right: 10px; bottom: 46px; z-index: 9;
+    background: var(--alert-soft);
+    border: 1px solid var(--alert);
+    border-radius: var(--r);
+    padding: 9px 13px;
+    font-size: 12px;
+    color: var(--dark);
+  }
+  .engine-banner button {
+    font-family: var(--mono); font-size: 11px;
+    background: none; border: 1px solid var(--alert); border-radius: 4px;
+    color: var(--alert); padding: 1px 9px; margin-left: 8px; cursor: pointer;
+  }
+  .engine-banner button:hover { background: var(--alert); color: #fff; }
+
+  /* ---------- side ---------- */
+  .side { display: flex; flex-direction: column; gap: 12px; }
+
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .stat {
+    border: 1px solid var(--faint);
+    background: var(--surface);
+    border-radius: var(--r);
+    padding: 11px 13px;
+  }
+  .stat .num { font-family: var(--mono); font-size: 18px; font-weight: 700; }
+  .stat .num.bad { color: var(--alert); }
+  .stat .lbl { margin-top: 2px; font-family: var(--mono); font-size: 9px; letter-spacing: .12em; color: var(--muted); text-transform: uppercase; }
+
+  .panel {
+    border: 1px solid var(--faint);
+    background: var(--surface);
+    border-radius: var(--r);
+    padding: 14px;
+  }
+  .controls { display: flex; flex-direction: column; gap: 13px; }
+
+  .btn-row { display: flex; gap: 8px; }
+  .btn {
+    flex: 1;
+    font-family: var(--font); font-size: 13px; font-weight: 600;
+    padding: 9px 8px;
+    background: var(--surface);
+    color: var(--dark);
+    border: 1px solid var(--faint);
+    border-radius: var(--r);
+    cursor: pointer;
+  }
+  .btn:hover:not(:disabled) { border-color: var(--muted); }
+  .btn:disabled { opacity: .4; cursor: default; }
+  .btn.primary { background: var(--dark); color: #fff; border-color: var(--dark); }
+  .btn.primary:hover:not(:disabled) { background: #333; }
+  .btn.danger { color: var(--alert); border-color: var(--faint); }
+  .btn.danger:hover:not(:disabled) { border-color: var(--alert); background: var(--alert-soft); }
+
+  .toggle { display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; }
+  .toggle input { display: none; }
+  .toggle .track {
+    width: 30px; height: 16px; flex-shrink: 0;
+    border-radius: 9px;
+    background: var(--faint);
+    position: relative;
+    transition: background .15s;
+  }
+  .toggle .track::after {
+    content: ''; position: absolute; top: 2px; left: 2px;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(0,0,0,.18);
+    transition: left .15s;
+  }
+  .toggle input:checked + .track { background: var(--dark); }
+  .toggle input:checked + .track::after { left: 16px; }
+  .toggle .txt { font-size: 12px; color: var(--mid); line-height: 1.45; }
+
+  .range-block .range-head { display: flex; justify-content: space-between; margin-bottom: 6px; }
+  .range-lbl { font-family: var(--mono); font-size: 9px; letter-spacing: .12em; color: var(--muted); text-transform: uppercase; }
+  .range-val { font-family: var(--mono); font-size: 11px; font-weight: 600; }
+
+  input[type="range"] {
+    width: 100%; -webkit-appearance: none; appearance: none;
+    height: 2px; background: var(--faint); outline: none; border-radius: 1px;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 13px; height: 13px; border-radius: 50%;
+    background: var(--dark); cursor: pointer;
+  }
+
+  .card-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+  .card-kicker { font-family: var(--mono); font-size: 10px; letter-spacing: .14em; color: var(--muted); text-transform: uppercase; }
+  .card-meta { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+
+  .hist-empty, .log-empty, .tl-empty-txt { font-size: 12px; color: var(--muted); }
+  .hist-row {
+    display: flex; justify-content: space-between; gap: 8px;
+    font-family: var(--mono); font-size: 11px;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--faint2);
+    color: var(--mid);
+  }
+  .hist-row:last-child { border-bottom: none; }
+  .hist-row .pct { font-weight: 700; color: var(--dark); }
+  .hist-row .pct.bad { color: var(--alert); }
+
+  /* ---------- bottom ---------- */
+  .bottom { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 16px; margin-top: 16px; }
+  @media (max-width: 880px) { .bottom { grid-template-columns: 1fr; } }
+
+  .timeline {
+    position: relative; height: 30px;
+    background: var(--faint2);
+    border: 1px solid var(--faint);
+    border-radius: var(--r);
+    overflow: hidden;
+  }
+  .tl-seg { position: absolute; top: 0; height: 100%; }
+  .tl-seg.focused { background: #C9C9C9; }
+  .tl-seg.distracted { background: var(--alert); }
+  .tl-cursor { position: absolute; top: 0; width: 1px; height: 100%; background: var(--dark); }
+  .tl-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+  .tl-axis { display: flex; justify-content: space-between; margin-top: 5px; font-family: var(--mono); font-size: 9px; color: var(--muted); letter-spacing: .08em; }
+
+  .log { list-style: none; max-height: 160px; overflow-y: auto; }
+  .log::-webkit-scrollbar { width: 4px; }
+  .log::-webkit-scrollbar-thumb { background: var(--faint); border-radius: 2px; }
+  .log li { display: flex; gap: 9px; padding: 3px 0; font-family: var(--mono); font-size: 11px; align-items: baseline; }
+  .log .t { color: var(--muted); flex-shrink: 0; }
+  .log .m { color: var(--mid); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .log li.phone-on .m { color: var(--alert); }
+  .log li.session-start .m, .log li.session-end .m { color: var(--dark); }
+
+  footer {
+    margin-top: 20px; padding-top: 12px;
+    border-top: 1px solid var(--faint);
+    font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: .08em;
+    display: flex; justify-content: space-between;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <div class="kicker"><span>Plugin</span>&nbsp;/&nbsp;Focus Bay</div>
+      <h1>手机监测</h1>
+      <div class="subtitle">摄像头对准桌面，检测到手机即计为分心。推理全部在本机完成，画面不会上传。</div>
+    </div>
+    <div class="head-right">
+      <div class="chip" id="engineChip">
+        <span class="dot"></span>
+        <span id="engineLabel">检测中…</span>
+        <span class="meta" id="engineMeta">— ms</span>
+      </div>
+      <div class="live-pct">
+        <div class="num" id="livePct">—</div>
+        <div class="lbl">Live focus</div>
+      </div>
+    </div>
+  </header>
+
+  <div class="grid">
+    <div>
+      <div class="viewport" id="viewport">
+        <video id="video" playsinline muted autoplay></video>
+        <div class="privacy-pane" id="privacyPane" hidden>
+          <div class="txt"><strong>隐私模式</strong>检测进行中 · 画面已隐藏</div>
+        </div>
+        <canvas id="overlay"></canvas>
+
+        <button class="preview-btn" id="previewBtn" hidden>显示画面</button>
+
+        <div class="hud-bottom">
+          <span class="hud-chip" id="clock">00:00</span>
+          <span class="hud-status" id="statusChip">IDLE</span>
+        </div>
+
+        <div class="placeholder" id="placeholder">
+          <div class="ph-card">
+            <div class="ph-title">把摄像头对准桌面</div>
+            <div class="ph-body">只检测手机，不识别其他内容。你可以随时隐藏实时画面，检测不受影响。</div>
+            <button class="cta" id="camBtn"><span id="camBtnTxt">开启摄像头</span></button>
+            <div class="cam-error" id="camError" hidden></div>
+          </div>
+        </div>
+
+        <div class="engine-banner" id="engineBanner" hidden>
+          推理服务未响应，请确认插件后台已启动。
+          <button id="retryBtn">重试</button>
+        </div>
+      </div>
+    </div>
+
+    <aside class="side">
+      <div class="stats">
+        <div class="stat"><div class="num" id="statFocus">0s</div><div class="lbl">专注</div></div>
+        <div class="stat"><div class="num bad" id="statDistract">0s</div><div class="lbl">分心</div></div>
+        <div class="stat"><div class="num" id="statPickups">0</div><div class="lbl">拿起手机</div></div>
+        <div class="stat"><div class="num" id="statBest">0s</div><div class="lbl">最长连续</div></div>
+      </div>
+
+      <div class="panel controls">
+        <div class="btn-row" id="btnRowIdle">
+          <button class="btn primary" id="startBtn" disabled>开始会话</button>
+        </div>
+        <div class="btn-row" id="btnRowRun" hidden>
+          <button class="btn" id="pauseBtn">暂停</button>
+          <button class="btn danger" id="endBtn">结束</button>
+        </div>
+
+        <label class="toggle">
+          <input type="checkbox" id="optPreview">
+          <span class="track"></span>
+          <span class="txt">显示实时画面（关闭则进入隐私模式，仅显示检测状态）</span>
+        </label>
+        <label class="toggle">
+          <input type="checkbox" id="optStrict" checked>
+          <span class="track"></span>
+          <span class="txt">检测到手机时自动暂停会话</span>
+        </label>
+        <label class="toggle">
+          <input type="checkbox" id="optMirror" checked>
+          <span class="track"></span>
+          <span class="txt">镜像画面</span>
+        </label>
+        <label class="toggle">
+          <input type="checkbox" id="optBeep">
+          <span class="track"></span>
+          <span class="txt">检测到手机时提示音</span>
+        </label>
+
+        <div class="range-block">
+          <div class="range-head">
+            <span class="range-lbl">采样率</span>
+            <span class="range-val" id="fpsVal">6 fps</span>
+          </div>
+          <input type="range" id="optFps" min="2" max="12" step="1" value="6">
+        </div>
+        <div class="range-block">
+          <div class="range-head">
+            <span class="range-lbl">置信度阈值</span>
+            <span class="range-val" id="confVal">40%</span>
+          </div>
+          <input type="range" id="optConf" min="20" max="80" step="5" value="40">
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="card-head">
+          <span class="card-kicker">最近会话</span>
+          <span class="card-meta" id="histMeta"></span>
+        </div>
+        <div id="histList"><div class="hist-empty">还没有完成过的会话。</div></div>
+      </div>
+    </aside>
+  </div>
+
+  <div class="bottom">
+    <div class="panel">
+      <div class="card-head">
+        <span class="card-kicker">时间轴</span>
+        <span class="card-meta" id="tlMeta">no session</span>
+      </div>
+      <div class="timeline" id="timeline">
+        <div class="tl-empty" id="tlEmpty"><span class="tl-empty-txt">开始一次会话后在这里记录专注与分心。</span></div>
+        <div class="tl-cursor" id="tlCursor" style="left:0%" hidden></div>
+      </div>
+      <div class="tl-axis"><span>00:00</span><span id="axisHalf">—</span><span id="axisEnd">—</span></div>
+    </div>
+
+    <div class="panel">
+      <div class="card-head">
+        <span class="card-kicker">事件记录</span>
+        <span class="card-meta"><span id="framesCount">0</span> 帧已分析</span>
+      </div>
+      <ul class="log" id="log"><li class="log-empty" id="logEmpty">等待摄像头信号…</li></ul>
+    </div>
+  </div>
+
+  <footer>
+    <span>FOCUS BAY 1.0.0 · 仅本机推理</span>
+    <span id="footModel">MODEL: —</span>
+  </footer>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  const $ = (id) => document.getElementById(id);
+
+  // ---------- settings & history persistence ----------
+  const SETTINGS_KEY = 'pl_focus_bay_settings';
+  const HISTORY_KEY = 'pl_focus_bay_history';
+  const DEFAULTS = { fps: 6, minConf: 0.4, imgsz: 480, pauseOnDistraction: true, mirror: true, beep: false, showPreview: true };
+
+  function loadJson(key, fallback) {
+    try {
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : fallback;
+    } catch { return fallback; }
+  }
+  const settings = Object.assign({}, DEFAULTS, loadJson(SETTINGS_KEY, {}));
+  let history = loadJson(HISTORY_KEY, []);
+  function saveSettings() { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch {} }
+  function saveHistory() { try { localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(-30))); } catch {} }
+
+  // ---------- session state ----------
+  const S = {
+    running: false, paused: false,
+    startedAt: null, lastTickAt: null,
+    focusMs: 0, distractMs: 0,
+    longestStreakMs: 0, streakStart: null,
+    pickups: 0,
+    phoneOn: false, phoneOnSince: null,
+    frames: 0,
+    engineOnline: null, latencyMs: null,
+    events: [], eventSeq: 1,
+  };
+
+  function pushEvent(type, message, extra = {}) {
+    S.events.unshift(Object.assign({ id: S.eventSeq++, type, ts: Date.now(), message }, extra));
+    if (S.events.length > 60) S.events.length = 60;
+    renderLog();
+  }
+
+  function flushTimers() {
+    const now = Date.now();
+    if (S.lastTickAt != null && S.running && !S.paused) {
+      const delta = now - S.lastTickAt;
+      if (S.phoneOn) S.distractMs += delta; else S.focusMs += delta;
+    }
+    S.lastTickAt = now;
+  }
+
+  function startSession() {
+    Object.assign(S, {
+      running: true, paused: false,
+      startedAt: Date.now(), lastTickAt: Date.now(),
+      focusMs: 0, distractMs: 0, longestStreakMs: 0,
+      streakStart: Date.now(), pickups: 0,
+      phoneOn: false, phoneOnSince: null, frames: 0,
+      events: [],
+    });
+    pushEvent('session-start', '会话开始');
+    renderControls();
+  }
+
+  function pauseSession(auto) {
+    if (!S.running || S.paused) return;
+    flushTimers();
+    S.paused = true;
+    pushEvent('session-pause', auto ? '自动暂停（检测到手机）' : '会话暂停');
+    renderControls();
+  }
+
+  function resumeSession(auto) {
+    if (!S.running || !S.paused) return;
+    S.paused = false;
+    S.lastTickAt = Date.now();
+    if (!S.phoneOn) S.streakStart = Date.now();
+    pushEvent('session-resume', auto ? '自动恢复' : '会话恢复');
+    renderControls();
+  }
+
+  function endSession() {
+    if (!S.running || S.startedAt == null) return;
+    flushTimers();
+    const now = Date.now();
+    if (S.streakStart != null && !S.phoneOn) {
+      S.longestStreakMs = Math.max(S.longestStreakMs, now - S.streakStart);
+    }
+    history.push({
+      startedAt: S.startedAt, endedAt: now,
+      totalMs: now - S.startedAt,
+      focusMs: S.focusMs, distractionMs: S.distractMs,
+      distractionCount: S.pickups,
+      longestStreakMs: S.longestStreakMs,
+      framesAnalysed: S.frames,
+    });
+    history = history.slice(-30);
+    saveHistory();
+    pushEvent('session-end', '会话结束 · ' + fmtDur(now - S.startedAt));
+    S.running = false;
+    S.paused = false;
+    renderControls();
+    renderHistory();
+  }
+
+  function reportDetection(detected, topConf, inferenceMs) {
+    S.latencyMs = Math.round(inferenceMs);
+    S.frames += 1;
+    if (!S.running || S.paused) return;
+    flushTimers();
+    const now = Date.now();
+    if (detected && !S.phoneOn) {
+      if (S.streakStart != null) S.longestStreakMs = Math.max(S.longestStreakMs, now - S.streakStart);
+      S.phoneOn = true;
+      S.phoneOnSince = now;
+      S.pickups += 1;
+      S.streakStart = null;
+      pushEvent('phone-on', '检测到手机 · ' + Math.round(topConf * 100) + '%');
+      if (settings.beep) beep();
+    } else if (!detected && S.phoneOn) {
+      const away = S.phoneOnSince ? now - S.phoneOnSince : 0;
+      S.phoneOn = false;
+      S.phoneOnSince = null;
+      S.streakStart = now;
+      pushEvent('phone-off', '回到专注 · 分心 ' + (away / 1000).toFixed(1) + 's');
+    }
+  }
+
+  function liveFocusMs() {
+    if (!S.running || S.paused || S.lastTickAt == null || S.phoneOn) return S.focusMs;
+    return S.focusMs + (Date.now() - S.lastTickAt);
+  }
+  function liveDistractMs() {
+    if (!S.running || S.paused || S.lastTickAt == null || !S.phoneOn) return S.distractMs;
+    return S.distractMs + (Date.now() - S.lastTickAt);
+  }
+  function liveStreakMs() {
+    if (!S.running || S.phoneOn || S.streakStart == null) return 0;
+    return Date.now() - S.streakStart;
+  }
+
+  // ---------- beep ----------
+  let audioCtx = null;
+  function beep() {
+    try {
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      o.type = 'sine'; o.frequency.value = 640;
+      g.gain.setValueAtTime(0.05, audioCtx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.22);
+      o.connect(g).connect(audioCtx.destination);
+      o.start(); o.stop(audioCtx.currentTime + 0.23);
+    } catch {}
+  }
+
+  // ---------- yolo client ----------
+  async function pingHealth() {
+    try {
+      const res = await fetch('/healthz');
+      if (!res.ok) return { ok: false };
+      return await res.json();
+    } catch { return { ok: false }; }
+  }
+
+  async function detect(dataUrl) {
+    const res = await fetch('/detect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: dataUrl, min_conf: settings.minConf, imgsz: settings.imgsz }),
+    });
+    if (!res.ok) throw new Error('detect failed (' + res.status + ')');
+    return res.json();
+  }
+
+  // ---------- camera + loops ----------
+  const video = $('video');
+  const overlay = $('overlay');
+  const captureCanvas = document.createElement('canvas');
+  let stream = null;
+  let cameraOn = false;
+  let inFlight = false;
+  let detectTimer = null, uiTimer = null, probeTimer = null;
+
+  async function startCamera() {
+    const btn = $('camBtn'), btnTxt = $('camBtnTxt'), errEl = $('camError');
+    btn.disabled = true; btnTxt.textContent = '请求权限…'; errEl.hidden = true;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false,
+      });
+      video.srcObject = stream;
+      await video.play().catch(() => {});
+      cameraOn = true;
+      $('placeholder').hidden = true;
+      $('previewBtn').hidden = false;
+      $('startBtn').disabled = false;
+      applyPreviewMode();
+      checkEngine();
+      startLoops();
+    } catch (err) {
+      errEl.textContent = (err && err.message) || '无法访问摄像头，请检查浏览器权限。';
+      errEl.hidden = false;
+    } finally {
+      btn.disabled = false; btnTxt.textContent = '开启摄像头';
+    }
+  }
+
+  function applyPreviewMode() {
+    const show = settings.showPreview;
+    video.classList.toggle('hidden', !show);
+    $('privacyPane').hidden = show || !cameraOn;
+    $('previewBtn').textContent = show ? '隐藏画面' : '显示画面';
+    $('optPreview').checked = show;
+  }
+
+  async function checkEngine() {
+    const t0 = performance.now();
+    const health = await pingHealth();
+    const dt = Math.round(performance.now() - t0);
+    const was = S.engineOnline;
+    if (health.ok) {
+      S.engineOnline = true;
+      S.latencyMs = S.latencyMs == null ? dt : S.latencyMs;
+      if (was !== true) pushEvent('engine', '引擎在线 · ' + (health.model || 'ready') + ' · ' + (health.device || '?'));
+      $('footModel').textContent = 'MODEL: ' + (health.model || '—') + ' @ ' + (health.device || '—');
+    } else {
+      S.engineOnline = false;
+      if (was !== false) pushEvent('engine', '引擎离线 · :8800 无响应');
+    }
+    renderEngine();
+  }
+
+  function startLoops() {
+    stopLoops();
+    const interval = Math.max(80, Math.round(1000 / Math.max(1, settings.fps)));
+    detectTimer = setInterval(runDetectFrame, interval);
+    uiTimer = setInterval(renderLive, 250);
+    probeTimer = setInterval(() => { if (S.engineOnline !== true) checkEngine(); }, 4000);
+  }
+
+  function stopLoops() {
+    [detectTimer, uiTimer, probeTimer].forEach((t) => t && clearInterval(t));
+    detectTimer = uiTimer = probeTimer = null;
+  }
+
+  async function runDetectFrame() {
+    if (inFlight || !cameraOn || video.readyState < 2 || S.engineOnline === false) return;
+    inFlight = true;
+    try {
+      const vw = video.videoWidth, vh = video.videoHeight;
+      if (!vw || !vh) return;
+      const targetW = Math.min(640, vw);
+      const scale = targetW / vw;
+      captureCanvas.width = targetW;
+      captureCanvas.height = Math.round(vh * scale);
+      const cctx = captureCanvas.getContext('2d');
+      cctx.drawImage(video, 0, 0, captureCanvas.width, captureCanvas.height);
+      const dataUrl = captureCanvas.toDataURL('image/jpeg', 0.7);
+
+      const result = await detect(dataUrl);
+      drawOverlay(result.boxes);
+
+      const phoneBox = result.boxes
+        .filter((b) => b.label === 'phone' || b.cls === 0)
+        .sort((a, b) => b.conf - a.conf)[0];
+      const detected = !!phoneBox;
+
+      reportDetection(detected, phoneBox ? phoneBox.conf : 0, result.inference_ms);
+
+      if (settings.pauseOnDistraction && S.running) {
+        if (detected && !S.paused) pauseSession(true);
+        else if (!detected && S.paused) resumeSession(true);
+      }
+      if (S.engineOnline !== true) { S.engineOnline = true; renderEngine(); }
+    } catch (err) {
+      S.engineOnline = false;
+      renderEngine();
+    } finally {
+      inFlight = false;
+    }
+  }
+
+  // ---------- overlay drawing ----------
+  function drawOverlay(boxes) {
+    const rect = video.getBoundingClientRect();
+    if (overlay.width !== Math.round(rect.width) || overlay.height !== Math.round(rect.height)) {
+      overlay.width = Math.max(1, Math.round(rect.width));
+      overlay.height = Math.max(1, Math.round(rect.height));
+    }
+    const ctx = overlay.getContext('2d');
+    ctx.clearRect(0, 0, overlay.width, overlay.height);
+    if (!boxes.length) return;
+
+    // video uses object-fit: cover — compute the visible crop so boxes line up
+    const vw = video.videoWidth, vh = video.videoHeight;
+    const cw = overlay.width, ch = overlay.height;
+    const videoRatio = vw / vh, canvasRatio = cw / ch;
+    let sx = 0, sy = 0, sw = 1, sh = 1;
+    if (videoRatio > canvasRatio) {
+      sw = canvasRatio / videoRatio;
+      sx = (1 - sw) / 2;
+    } else {
+      sh = videoRatio / canvasRatio;
+      sy = (1 - sh) / 2;
+    }
+
+    const previewOn = settings.showPreview;
+
+    ctx.save();
+    if (settings.mirror) { ctx.translate(cw, 0); ctx.scale(-1, 1); }
+
+    for (const box of boxes) {
+      const x = ((box.x - sx) / sw) * cw;
+      const y = ((box.y - sy) / sh) * ch;
+      const w = (box.w / sw) * cw;
+      const h = (box.h / sh) * ch;
+      const isPhone = box.label === 'phone' || box.cls === 0;
+      const color = isPhone ? 'rgba(192,57,43,0.9)' : 'rgba(85,85,85,0.7)';
+      const fill = isPhone ? 'rgba(192,57,43,0.08)' : 'rgba(85,85,85,0.05)';
+
+      ctx.fillStyle = fill;
+      ctx.fillRect(x, y, w, h);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(x, y, w, h);
+
+      ctx.save();
+      ctx.font = '600 11px "JetBrains Mono", monospace';
+      const label = (isPhone ? 'PHONE' : box.label.toUpperCase()) + ' ' + Math.round(box.conf * 100) + '%';
+      const pad = 4;
+      const tw = ctx.measureText(label).width + pad * 2;
+      let lx = x, ly = Math.max(0, y - 17);
+      if (settings.mirror) {
+        ctx.translate(cw, 0); ctx.scale(-1, 1);
+        lx = cw - x - tw;
+      }
+      ctx.fillStyle = isPhone ? 'rgba(192,57,43,0.92)' : 'rgba(85,85,85,0.85)';
+      ctx.fillRect(lx, ly, tw, 17);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillText(label, lx + pad, ly + 12);
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
+  // ---------- rendering ----------
+  function fmtDur(ms) {
+    const total = Math.max(0, Math.floor(ms / 1000));
+    if (total < 60) return total + 's';
+    const h = Math.floor(total / 3600), m = Math.floor((total % 3600) / 60);
+    if (h > 0) return h + 'h ' + String(m).padStart(2, '0') + 'm';
+    return m + 'm ' + String(total % 60).padStart(2, '0') + 's';
+  }
+  function fmtHms(ms) {
+    const total = Math.max(0, Math.floor(ms / 1000));
+    const h = Math.floor(total / 3600), m = Math.floor((total % 3600) / 60), s = total % 60;
+    const p = (n) => String(n).padStart(2, '0');
+    return h > 0 ? p(h) + ':' + p(m) + ':' + p(s) : p(m) + ':' + p(s);
+  }
+  function fmtClock(ts) {
+    const d = new Date(ts);
+    const p = (n) => String(n).padStart(2, '0');
+    return p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+  }
+
+  function renderEngine() {
+    const chip = $('engineChip');
+    chip.classList.remove('online', 'offline');
+    if (S.engineOnline === true) {
+      chip.classList.add('online');
+      $('engineLabel').textContent = '引擎在线';
+      $('engineMeta').textContent = (S.latencyMs != null ? S.latencyMs : '—') + ' ms';
+    } else if (S.engineOnline === false) {
+      chip.classList.add('offline');
+      $('engineLabel').textContent = '引擎离线';
+      $('engineMeta').textContent = ':8800';
+    } else {
+      $('engineLabel').textContent = '检测中…';
+      $('engineMeta').textContent = '— ms';
+    }
+    $('engineBanner').hidden = !(cameraOn && S.engineOnline === false);
+  }
+
+  function renderControls() {
+    $('btnRowIdle').hidden = S.running;
+    $('btnRowRun').hidden = !S.running;
+    $('pauseBtn').textContent = S.paused ? '继续' : '暂停';
+  }
+
+  function renderLive() {
+    document.body.classList.toggle('alert', S.phoneOn && S.running);
+
+    const f = liveFocusMs(), d = liveDistractMs();
+    $('statFocus').textContent = fmtDur(f);
+    $('statDistract').textContent = fmtDur(d);
+    $('statPickups').textContent = S.pickups;
+    $('statBest').textContent = fmtDur(Math.max(S.longestStreakMs, liveStreakMs()));
+    $('framesCount').textContent = S.frames;
+    $('livePct').textContent = (f + d) > 0 ? Math.round((f / (f + d)) * 100) + '%' : '—';
+    $('clock').textContent = S.startedAt && S.running ? fmtHms(Date.now() - S.startedAt) : '00:00';
+
+    const st = $('statusChip');
+    st.classList.remove('live', 'alert', 'paused');
+    if (!S.running) st.textContent = 'IDLE';
+    else if (S.phoneOn) { st.textContent = 'PHONE'; st.classList.add('alert'); }
+    else if (S.paused) { st.textContent = 'PAUSED'; st.classList.add('paused'); }
+    else { st.textContent = 'FOCUS'; st.classList.add('live'); }
+
+    if (S.engineOnline === true && S.latencyMs != null) $('engineMeta').textContent = S.latencyMs + ' ms';
+
+    renderTimeline();
+  }
+
+  function renderTimeline() {
+    const tl = $('timeline');
+    const hasSession = S.startedAt != null;
+    $('tlEmpty').hidden = hasSession;
+    $('tlCursor').hidden = !hasSession;
+    tl.querySelectorAll('.tl-seg').forEach((el) => el.remove());
+    if (!hasSession) {
+      $('tlMeta').textContent = 'no session';
+      $('axisHalf').textContent = '—'; $('axisEnd').textContent = '—';
+      return;
+    }
+    const now = Date.now();
+    const end = S.running ? now : (S.events.find((e) => e.type === 'session-end') || {}).ts || now;
+    const win = Math.max(end - S.startedAt, 60000);
+
+    const evts = [...S.events].reverse().filter((e) => e.type === 'phone-on' || e.type === 'phone-off');
+    let cursor = S.startedAt, on = false;
+    const segs = [];
+    for (const e of evts) {
+      if (e.ts > cursor) segs.push({ s: cursor, e: e.ts, on });
+      cursor = e.ts;
+      on = e.type === 'phone-on';
+    }
+    if (cursor < end) segs.push({ s: cursor, e: end, on });
+
+    for (const seg of segs) {
+      const el = document.createElement('div');
+      el.className = 'tl-seg ' + (seg.on ? 'distracted' : 'focused');
+      el.style.left = (((seg.s - S.startedAt) / win) * 100) + '%';
+      el.style.width = Math.max(((seg.e - seg.s) / win) * 100, 0.4) + '%';
+      el.title = fmtClock(seg.s) + ' – ' + fmtClock(seg.e) + ' · ' + (seg.on ? '手机' : '专注');
+      tl.appendChild(el);
+    }
+    $('tlCursor').style.left = Math.min(100, ((end - S.startedAt) / win) * 100) + '%';
+    $('tlMeta').textContent = fmtHms(end - S.startedAt) + ' · ' + S.pickups + ' 次拿起';
+    $('axisHalf').textContent = fmtHms(win / 2);
+    $('axisEnd').textContent = fmtHms(win);
+  }
+
+  function renderLog() {
+    const log = $('log');
+    log.innerHTML = '';
+    if (!S.events.length) {
+      log.innerHTML = '<li class="log-empty">等待摄像头信号…</li>';
+      return;
+    }
+    for (const e of S.events) {
+      const li = document.createElement('li');
+      li.className = e.type;
+      li.innerHTML = '<span class="t">' + fmtClock(e.ts) + '</span><span class="m"></span>';
+      li.querySelector('.m').textContent = e.message;
+      log.appendChild(li);
+    }
+  }
+
+  function renderHistory() {
+    const list = $('histList');
+    if (!history.length) {
+      list.innerHTML = '<div class="hist-empty">还没有完成过的会话。</div>';
+      $('histMeta').textContent = '';
+      return;
+    }
+    $('histMeta').textContent = history.length + ' 条';
+    list.innerHTML = '';
+    for (const h of [...history].reverse().slice(0, 6)) {
+      const pct = h.focusMs + h.distractionMs > 0 ? Math.round((h.focusMs / (h.focusMs + h.distractionMs)) * 100) : 100;
+      const d = new Date(h.startedAt);
+      const row = document.createElement('div');
+      row.className = 'hist-row';
+      row.innerHTML =
+        '<span>' + (d.getMonth() + 1) + '/' + d.getDate() + ' ' + fmtClock(h.startedAt).slice(0, 5) + '</span>' +
+        '<span>' + fmtDur(h.totalMs) + ' · ' + h.distractionCount + '次</span>' +
+        '<span class="pct ' + (pct < 50 ? 'bad' : '') + '">' + pct + '%</span>';
+      list.appendChild(row);
+    }
+  }
+
+  // ---------- wiring ----------
+  $('camBtn').addEventListener('click', startCamera);
+  $('retryBtn').addEventListener('click', checkEngine);
+  $('startBtn').addEventListener('click', startSession);
+  $('pauseBtn').addEventListener('click', () => S.paused ? resumeSession(false) : pauseSession(false));
+  $('endBtn').addEventListener('click', endSession);
+  $('previewBtn').addEventListener('click', () => {
+    settings.showPreview = !settings.showPreview;
+    saveSettings();
+    applyPreviewMode();
+  });
+
+  const optPreview = $('optPreview'), optStrict = $('optStrict'), optMirror = $('optMirror'), optBeep = $('optBeep');
+  const optFps = $('optFps'), optConf = $('optConf');
+  optPreview.checked = settings.showPreview;
+  optStrict.checked = settings.pauseOnDistraction;
+  optMirror.checked = settings.mirror;
+  optBeep.checked = settings.beep;
+  optFps.value = settings.fps;
+  optConf.value = Math.round(settings.minConf * 100);
+  $('fpsVal').textContent = settings.fps + ' fps';
+  $('confVal').textContent = Math.round(settings.minConf * 100) + '%';
+  video.classList.toggle('mirrored', settings.mirror);
+
+  optPreview.addEventListener('change', () => {
+    settings.showPreview = optPreview.checked;
+    saveSettings();
+    applyPreviewMode();
+  });
+  optStrict.addEventListener('change', () => { settings.pauseOnDistraction = optStrict.checked; saveSettings(); });
+  optMirror.addEventListener('change', () => {
+    settings.mirror = optMirror.checked;
+    video.classList.toggle('mirrored', settings.mirror);
+    saveSettings();
+  });
+  optBeep.addEventListener('change', () => { settings.beep = optBeep.checked; saveSettings(); });
+  optFps.addEventListener('input', () => {
+    settings.fps = parseInt(optFps.value, 10);
+    $('fpsVal').textContent = settings.fps + ' fps';
+    saveSettings();
+    if (cameraOn) startLoops();
+  });
+  optConf.addEventListener('input', () => {
+    settings.minConf = parseInt(optConf.value, 10) / 100;
+    $('confVal').textContent = Math.round(settings.minConf * 100) + '%';
+    saveSettings();
+  });
+
+  window.addEventListener('beforeunload', () => {
+    if (stream) stream.getTracks().forEach((t) => t.stop());
+  });
+
+  // boot
+  renderControls();
+  renderHistory();
+  renderLive();
+  applyPreviewMode();
+  checkEngine();
+})();
+</script>
+</body>
+</html>

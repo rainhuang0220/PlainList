@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>方案B: 地形图 - 拼图v2</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      font-family: 'JetBrains Mono', monospace;
+      background: #F7F7F7;
+      color: #111;
+      min-height: 100vh;
+      padding: 40px;
+    }
+    
+    .header { margin-bottom: 24px; }
+    .header h1 { font-size: 28px; font-weight: 600; margin-bottom: 6px; }
+    .header p { color: #999; font-size: 13px; }
+    
+    .container { display: flex; gap: 20px; }
+    
+    .canvas-wrapper {
+      flex: 1;
+      background: #fff;
+      border: 1px solid #e5e5e5;
+      border-radius: 14px;
+      padding: 20px;
+      box-shadow: 0 14px 34px rgba(17,17,17,.035);
+    }
+    
+    .canvas-wrapper h2 {
+      font-size: 14px;
+      margin-bottom: 12px;
+      color: #999;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+    }
+    
+    #mapCanvas {
+      width: 100%;
+      height: 420px;
+      display: block;
+      border-radius: 6px;
+      background: #888;
+    }
+    
+    .sidebar {
+      width: 280px;
+      background: #fff;
+      border: 1px solid #e5e5e5;
+      border-radius: 14px;
+      padding: 20px;
+      box-shadow: 0 14px 34px rgba(17,17,17,.035);
+    }
+    
+    .sidebar h3 {
+      font-size: 13px;
+      margin-bottom: 14px;
+      color: #999;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+    }
+    
+    .task-list { list-style: none; }
+    .task-item { padding: 10px; border-bottom: 1px solid #f0f0f0; }
+    .task-item:last-child { border-bottom: none; }
+    .task-name { font-size: 13px; font-weight: 500; }
+    .task-time { font-size: 10px; color: #999; margin-top: 2px; }
+    .task-done { opacity: 0.4; }
+    .task-done .task-name { text-decoration: line-through; }
+    
+    .legend {
+      margin-top: 20px;
+      padding-top: 14px;
+      border-top: 1px solid #f0f0f0;
+    }
+    
+    .legend h4 { font-size: 11px; color: #999; margin-bottom: 10px; }
+    
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+      font-size: 11px;
+    }
+    
+    .legend-color {
+      width: 14px;
+      height: 8px;
+      border-radius: 2px;
+    }
+    
+    .refresh-btn {
+      margin-top: 20px;
+      width: 100%;
+      padding: 10px;
+      background: #111;
+      color: #F7F7F7;
+      border: none;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    
+    .refresh-btn:hover { opacity: 0.8; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>方案B: 地形图</h1>
+    <p>任务是山峰，空闲是谷地，黑白灰光影塑造立体地形</p>
+  </div>
+  
+  <div class="container">
+    <div class="canvas-wrapper">
+      <h2>地形预览</h2>
+      <canvas id="mapCanvas"></canvas>
+    </div>
+    
+    <div class="sidebar">
+      <h3>今日任务</h3>
+      <ul class="task-list" id="taskList"></ul>
+      
+      <div class="legend">
+        <h4>地形图例</h4>
+        <div class="legend-item">
+          <div class="legend-color" style="background: linear-gradient(90deg, #2a2a2a, #4a4a4a);"></div>
+          <span>山峰（任务）</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color" style="background: linear-gradient(90deg, #7a7a7a, #9a9a9a);"></div>
+          <span>山坡</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color" style="background: linear-gradient(90deg, #aaa, #bbb);"></div>
+          <span>平原</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color" style="background: linear-gradient(90deg, #ccc, #ddd);"></div>
+          <span>谷地（空闲）</span>
+        </div>
+      </div>
+      
+      <button class="refresh-btn" onclick="regenerate()">重新生成</button>
+    </div>
+  </div>
+
+  <script>
+    const tasks = [
+      { id: 1, name: '晨间冥想', time: '07:00', duration: 30, done: true },
+      { id: 2, name: '阅读', time: '08:00', duration: 60, done: true },
+      { id: 3, name: '项目会议', time: '10:00', duration: 45, done: false },
+      { id: 4, name: '代码审查', time: '11:00', duration: 90, done: false },
+      { id: 5, name: '午餐休息', time: '12:30', duration: 60, done: true },
+      { id: 6, name: '写文档', time: '14:00', duration: 120, done: false },
+      { id: 7, name: '团队同步', time: '16:00', duration: 30, done: false },
+      { id: 8, name: '健身', time: '18:00', duration: 60, done: true },
+    ];
+
+    // 噪声函数
+    function hash(x, y, seed) {
+      let h = seed + x * 374761393 + y * 668265263;
+      h = (h ^ (h >> 13)) * 1274126177;
+      h = h ^ (h >> 16);
+      return (h & 0x7fffffff) / 0x7fffffff;
+    }
+
+    function smooth(t) { return t * t * (3 - 2 * t); }
+
+    function noise(x, y, seed) {
+      const ix = Math.floor(x), iy = Math.floor(y);
+      const fx = smooth(x - ix), fy = smooth(y - iy);
+      const a = hash(ix, iy, seed), b = hash(ix + 1, iy, seed);
+      const c = hash(ix, iy + 1, seed), d = hash(ix + 1, iy + 1, seed);
+      return a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy;
+    }
+
+    function fbm(x, y, seed, oct = 4) {
+      let v = 0, a = 1, f = 1, m = 0;
+      for (let i = 0; i < oct; i++) {
+        v += a * noise(x * f, y * f, seed + i * 50);
+        m += a; a *= 0.5; f *= 2;
+      }
+      return v / m;
+    }
+
+    let mapSeed = Math.random() * 10000;
+
+    // 计算山峰位置
+    function getPeaks(w, h) {
+      const total = tasks.reduce((s, t) => s + t.duration, 0);
+      const cx = w / 2, cy = h / 2;
+      const golden = Math.PI * (3 - Math.sqrt(5));
+      
+      return tasks.map((task, i) => {
+        // 面积与时间成正比
+        const ratio = task.duration / total;
+        const area = ratio * w * h * 0.12;
+        const r = Math.sqrt(area / Math.PI);
+        
+        // 黄金角度分布
+        const angle = i * golden + (hash(i, 0, mapSeed) - 0.5) * 0.4;
+        const dist = 20 + Math.sqrt(i / tasks.length) * Math.min(w, h) * 0.28 + (hash(i, 1, mapSeed) - 0.5) * 30;
+        
+        let x = cx + Math.cos(angle) * dist;
+        let y = cy + Math.sin(angle) * dist;
+        x = Math.max(r + 20, Math.min(w - r - 20, x));
+        y = Math.max(r + 20, Math.min(h - r - 20, y));
+        
+        // 高度与完成状态相关
+        const height = task.done ? 0.9 : 0.65;
+        
+        return { x, y, r, height, task };
+      });
+    }
+
+    // 计算高度场
+    function getHeight(x, y, peaks, seed) {
+      // 基础地形起伏
+      let h = fbm(x * 0.008, y * 0.008, seed, 3) * 0.25;
+      
+      // 叠加每个山峰
+      for (const peak of peaks) {
+        const dx = x - peak.x;
+        const dy = y - peak.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        // 山峰形状（带噪声扰动边缘）
+        const edgeNoise = fbm(x * 0.02, y * 0.02, seed + peak.task.id * 100, 2) * peak.r * 0.25;
+        const effectiveR = peak.r + edgeNoise;
+        
+        if (dist < effectiveR * 1.2) {
+          const normalized = dist / effectiveR;
+          // 高斯衰减
+          const gaussian = Math.exp(-normalized * normalized * 1.5);
+          h += gaussian * peak.height;
+        }
+      }
+      
+      return Math.min(1, h);
+    }
+
+    // 渲染地形
+    function render() {
+      const canvas = document.getElementById('mapCanvas');
+      const ctx = canvas.getContext('2d');
+      
+      const rect = canvas.getBoundingClientRect();
+      const w = Math.floor(rect.width);
+      const h = Math.floor(rect.height);
+      if (!w || !h) return;
+      
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+      ctx.scale(dpr, dpr);
+      
+      const peaks = getPeaks(w, h);
+      
+      // 渲染高度场为灰度图 + 光照
+      const scale = 2;
+      const sw = Math.ceil(w / scale);
+      const sh = Math.ceil(h / scale);
+      
+      const img = ctx.createImageData(sw, sh);
+      const d = img.data;
+      
+      // 光照方向（从左上角照射）
+      const lightX = -0.5, lightY = -0.5, lightZ = 0.7;
+      const lightLen = Math.sqrt(lightX * lightX + lightY * lightY + lightZ * lightZ);
+      const lx = lightX / lightLen, ly = lightY / lightLen, lz = lightZ / lightLen;
+      
+      for (let sy = 0; sy < sh; sy++) {
+        for (let sx = 0; sx < sw; sx++) {
+          const x = sx * scale;
+          const y = sy * scale;
+          const idx = (sy * sw + sx) * 4;
+          
+          const height = getHeight(x, y, peaks, mapSeed);
+          
+          // 计算法线（通过高度差）
+          const hL = getHeight(x - 2, y, peaks, mapSeed);
+          const hR = getHeight(x + 2, y, peaks, mapSeed);
+          const hU = getHeight(x, y - 2, peaks, mapSeed);
+          const hD = getHeight(x, y + 2, peaks, mapSeed);
+          
+          // 法线向量
+          const nx = (hL - hR) * 2;
+          const ny = (hU - hD) * 2;
+          const nz = 1;
+          const nLen = Math.sqrt(nx * nx + ny * ny + nz * nz);
+          
+          // 光照计算
+          const dot = (nx * lx + ny * ly + nz * lz) / nLen;
+          const diffuse = Math.max(0, dot);
+          const ambient = 0.3;
+          const light = ambient + diffuse * 0.7;
+          
+          // 基础灰度（高度映射）
+          const baseGray = 180 - height * 130;
+          
+          // 应用光照
+          let gray = baseGray * light;
+          
+          // 添加纹理
+          const texture = fbm(x * 0.03, y * 0.03, mapSeed + 7000, 2) * 15 - 7;
+          gray += texture;
+          
+          // 边缘增强（山脊线）
+          const slope = Math.abs(hR - hL) + Math.abs(hD - hU);
+          if (slope > 0.15 && height > 0.3) {
+            gray -= slope * 30;
+          }
+          
+          gray = Math.max(20, Math.min(220, gray));
+          
+          d[idx] = gray;
+          d[idx + 1] = gray;
+          d[idx + 2] = gray;
+          d[idx + 3] = 255;
+        }
+      }
+      
+      // 绘制
+      const tmp = document.createElement('canvas');
+      tmp.width = sw;
+      tmp.height = sh;
+      tmp.getContext('2d').putImageData(img, 0, 0);
+      
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(tmp, 0, 0, w, h);
+      
+      // 绘制文字（阴影刻字效果）
+      peaks.forEach(peak => {
+        const { x, y, r, task, height } = peak;
+        const fontSize = Math.max(10, Math.min(14, r * 0.3));
+        
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        
+        // 刻字效果 - 浅色文字 + 深色阴影
+        ctx.font = `bold ${fontSize}px "JetBrains Mono", monospace`;
+        
+        // 阴影（刻入效果）
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+        ctx.fillText(task.name, x + 1, y - 4 + 1);
+        
+        // 高光
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+        ctx.fillText(task.name, x, y - 4);
+        
+        // 时间
+        ctx.font = `${Math.max(8, Math.min(10, r * 0.2))}px "JetBrains Mono", monospace`;
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+        ctx.fillText(task.time, x, y + fontSize * 0.6);
+        
+        ctx.restore();
+      });
+    }
+
+    function renderList() {
+      document.getElementById('taskList').innerHTML = tasks.map(t => `
+        <li class="task-item ${t.done ? 'task-done' : ''}">
+          <div class="task-name">${t.name}</div>
+          <div class="task-time">${t.time} · ${t.duration}分钟</div>
+        </li>
+      `).join('');
+    }
+
+    function regenerate() {
+      mapSeed = Math.random() * 10000;
+      tasks.sort(() => Math.random() - 0.5);
+      render();
+      renderList();
+    }
+
+    function animate() {
+      render();
+      requestAnimationFrame(animate);
+    }
+
+    window.addEventListener('load', () => {
+      renderList();
+      animate();
+    });
+  </script>
+</body>
+</html>

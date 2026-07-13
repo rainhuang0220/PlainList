@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PlainList · guide</title>
+    <style>
+      *, *::before, *::after { box-sizing: border-box; }
+      :root {
+        --bg: #ffffff;
+        --ink: #111111;
+        --mut: #777777;
+        --line: #e2e2e2;
+        --rule: #111111;
+      }
+      html { -webkit-text-size-adjust: 100%; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+        font-size: 14px;
+        line-height: 1.7;
+      }
+
+      .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 12px 18px;
+        background: color-mix(in srgb, var(--bg) 88%, transparent);
+        backdrop-filter: blur(8px);
+        border-bottom: 1px solid var(--line);
+      }
+      .topbar button {
+        font-family: inherit;
+        font-size: 12px;
+        letter-spacing: 0.04em;
+        color: var(--ink);
+        background: var(--bg);
+        border: 1px solid var(--rule);
+        padding: 7px 14px;
+        cursor: pointer;
+      }
+      .topbar button:hover { background: var(--ink); color: var(--bg); }
+      .lang-group { display: inline-flex; }
+      .lang-group button { border-right-width: 0; }
+      .lang-group button:last-child { border-right-width: 1px; }
+      .lang-group button.active { background: var(--ink); color: var(--bg); }
+
+      main {
+        width: min(860px, calc(100vw - 48px));
+        margin: 0 auto;
+        padding: 44px 0 96px;
+      }
+      [hidden] { display: none !important; }
+
+      .top { border-bottom: 2px solid var(--rule); padding-bottom: 22px; }
+      .top h1 { margin: 0; font-size: 30px; letter-spacing: -0.01em; }
+      .top .lead { margin: 10px 0 0; color: var(--mut); max-width: 62ch; }
+
+      section { padding: 30px 0; border-bottom: 1px solid var(--line); }
+      section:last-of-type { border-bottom: 0; }
+      h2 { margin: 0 0 4px; font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--mut); font-weight: 600; }
+      h2 .n { color: var(--ink); margin-right: 10px; }
+      h3 { margin: 20px 0 6px; font-size: 15px; }
+      p { margin: 8px 0; max-width: 72ch; }
+      .mut { color: var(--mut); }
+
+      dl { margin: 12px 0 0; }
+      .row { display: grid; grid-template-columns: 200px 1fr; gap: 6px 20px; padding: 9px 0; border-top: 1px solid var(--line); align-items: baseline; }
+      .row dt { color: var(--ink); }
+      .row dd { margin: 0; color: var(--mut); }
+      .row dt .arg { color: var(--mut); }
+
+      ol, ul { margin: 8px 0; padding-left: 1.3em; }
+      li { margin: 3px 0; max-width: 70ch; }
+      li::marker { color: var(--mut); }
+
+      code { font-family: inherit; border: 1px solid var(--line); padding: 0 5px; border-radius: 2px; white-space: nowrap; }
+      pre { margin: 14px 0; padding: 14px 16px; border: 1px solid var(--rule); background: var(--bg); overflow-x: auto; line-height: 1.6; }
+      pre .c { color: var(--mut); }
+
+      .lanes { margin-top: 14px; border-top: 1px solid var(--line); }
+      .lane { display: grid; grid-template-columns: 130px 1fr; gap: 20px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+      .lane .name { font-weight: 700; }
+      .lane .name span { display: block; color: var(--mut); font-weight: 400; font-size: 12px; }
+      .lane p { margin: 0; }
+
+      footer { margin-top: 36px; color: var(--mut); font-size: 12px; }
+
+      @media (max-width: 640px) {
+        .row, .lane { grid-template-columns: 1fr; gap: 2px; }
+        .lane { gap: 6px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="topbar">
+      <button id="back" type="button">← <span data-back></span></button>
+      <div class="lang-group">
+        <button type="button" data-lang="zh">中文</button>
+        <button type="button" data-lang="en">EN</button>
+      </div>
+    </div>
+
+    <!-- ===================== 中文 ===================== -->
+    <main data-doc="zh">
+      <header class="top">
+        <h1>PlainList — 使用指南</h1>
+        <p class="lead">
+          一个极简到底的效率工具站，把习惯打卡、事件提醒、待办清单和轻量日历批注收进同一张朴素的页面里。
+          先把今天做完，再让复盘从真实记录里自然长出来。
+        </p>
+      </header>
+
+      <section>
+        <h2><span class="n">00</span> 终端 / the shell</h2>
+        <p>
+          PlainList 以文本终端的形式打开，提示符是 <code>pl/</code>——它本身就是 PlainList 的 shell。
+          命令可以直接输（<code>cd rain</code>），也可以带 <code>pl</code> 前缀（<code>pl cd rain</code>），二者等价。
+        </p>
+        <dl>
+          <div class="row"><dt><b>cd</b> <span class="arg">&lt;名字&gt;</span></dt><dd>登录已有账号，随后按提示输入密码。</dd></div>
+          <div class="row"><dt><b>ls</b></dt><dd>列出本实例上的全部账号。只读，不改任何数据。</dd></div>
+          <div class="row"><dt><b>new</b> <span class="arg">&lt;名字&gt;</span></dt><dd>创建账号。用户名 2–20 位（字母、数字、<code>_ . -</code>），密码至少 3 位。</dd></div>
+          <div class="row"><dt><b>pl onboard</b></dt><dd>引导式首次设置：依次填用户名、密码，然后直接进入工作台。</dd></div>
+          <div class="row"><dt><b>demo</b></dt><dd>进入预置的演示账号，先随便逛逛。</dd></div>
+          <div class="row"><dt><b>pl guide</b></dt><dd>打开本页。</dd></div>
+          <div class="row"><dt><b>pl graphic</b></dt><dd>切换到风格一致的图形化登录界面。</dd></div>
+          <div class="row"><dt><b>pl contr</b></dt><dd>查看贡献者。</dd></div>
+          <div class="row"><dt><b>clear</b></dt><dd>清空终端回滚。</dd></div>
+          <div class="row"><dt><b>/help</b></dt><dd>打印完整命令列表。</dd></div>
+        </dl>
+        <pre><span class="c"># 第一次来</span>
+pl/ pl onboard
+choose a username: rain
+set a passphrase: ***
+account created. welcome, rain.
+
+<span class="c"># 回来登录</span>
+pl/ cd rain
+passphrase for rain: ***</pre>
+      </section>
+
+      <section>
+        <h2><span class="n">01</span> 五条主线 / the five lanes</h2>
+        <p>登录后，工作台是一整页向下滚动的内容，分成五个锚点区，顶部导航可在它们之间跳转。</p>
+        <div class="lanes">
+          <div class="lane"><div class="name">Now<span>此刻 · 时钟</span></div><p>实时时钟与日期，给整页定一个节拍。</p></div>
+          <div class="lane"><div class="name">Day<span>今天 · 清单</span></div><p>核心界面。今天的习惯与任务，按时段分组，带实时完成度。</p></div>
+          <div class="lane"><div class="name">Week<span>本周 · 趋势</span></div><p>真实的 7 天 / 28 天执行趋势——哪条任务、哪个时段、哪种恢复模式在拖你后腿。</p></div>
+          <div class="lane"><div class="name">Month<span>本月 · 网格</span></div><p>所有计划在整月里的打卡网格。点格子标记某天完成；横看行就是连续性与缺口。</p></div>
+          <div class="lane"><div class="name">Year<span>全年 · 日历</span></div><p>全年完成度热力图。点某一天打开它的“日回顾”（见 §04）。</p></div>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="n">02</span> 习惯与任务</h2>
+        <p>Day 区有两类条目：</p>
+        <ul>
+          <li><b>习惯（Habit）</b>——每天重复的事。会持续累计，是连续性与趋势视图统计的对象。</li>
+          <li><b>任务（Task）</b>——今天的一次性待办。</li>
+        </ul>
+        <h3>手动添加</h3>
+        <ol>
+          <li>在 Day 区点 <code>+ 添加习惯或任务</code>。</li>
+          <li>填名称，选 <b>习惯</b> 或 <b>任务</b>，按 <code>HH:MM</code> 设时间（默认 <code>09:00</code>）。</li>
+          <li>回车或点“添加”，它会自动归入对应时段分组。</li>
+        </ol>
+        <h3>打卡</h3>
+        <p>点任意一行即可切换它“今天已完成”。完成度、侧边图表和月度条都由这一次点击驱动更新——没有单独的“完成”按钮。</p>
+        <p class="mut">提示：你给条目设的时间只决定它的分组（上午 / 下午 / 晚上），它是计划，不是闹钟。</p>
+      </section>
+
+      <section>
+        <h2><span class="n">03</span> AI 速记 —— 说人话，别填表</h2>
+        <p>
+          添加按钮旁边是 <b>AI 速记</b>。不用一条一条填表，把脑子里那一团话一口气说完，模型直接把它整理成干净、排好时间的清单。
+        </p>
+        <ol>
+          <li>打开速记框，自然地写，例如：<em>“下午三五点钟答辩，答辩前两小时洗个澡；晚上 7 点约了吃饭，回来九十点钟写作业；每天背 30 个单词。”</em></li>
+          <li>按 <code>⌘/Ctrl + Enter</code>，模型会一条龙做完：</li>
+        </ol>
+        <ul>
+          <li><b>语义分割</b>——把一长串拆成一条条可执行的事项。</li>
+          <li><b>自然语言理解</b>——区分习惯 / 任务，把元指令（“帮我安排一下”）和非今日事项丢进单独的“已丢弃”列表并说明原因。</li>
+          <li><b>时间推理</b>——把“提前两小时”“九十点钟”“三五点”换算成具体的 <code>HH:MM</code> 并排序。</li>
+          <li><b>重要性与量化</b>——答辩 / 会议 / deadline 标高优先级，维护类标普通，弹性事项标低，并给每条写一句“为什么这么排”。</li>
+          <li><b>整体研判</b>——一句今日形状的概括，外加一条调度提醒（冲突、缓冲不足、要留通勤）。</li>
+        </ul>
+        <p>
+          看一遍草稿卡片，名称 / 类型 / 时间都能就地改，不要的直接删，确认后提交——它们会沿着和手动添加完全相同的路径进入你真正的今日清单。
+          如果你说了类似“先清空今天”，它会显示一个需要你二次确认的清空步骤，确认前不会删任何东西。
+        </p>
+        <p class="mut">
+          AI 速记需要可用的在线大模型；没有所谓“本地启发式”降级——模型连不上就直接报错，不会偷偷给你一个糊弄的结果。
+        </p>
+      </section>
+
+      <section>
+        <h2><span class="n">04</span> 日回顾 —— 三种读法</h2>
+        <p>在全年日历里点任意一天，就能打开它的回顾。同一天的任务可以用三种方式来看：</p>
+        <dl>
+          <div class="row"><dt><b>任务墙</b></dt><dd>任务铺成一面卡片墙，完成的会变暗；满满一面、全部做完时，读起来就是密实、过瘾的一整块。</dd></div>
+          <div class="row"><dt><b>重力</b></dt><dd>同一批卡片变成会“掉落、堆叠”的方块——用体感去看“今天到底做了多少”。</dd></div>
+          <div class="row"><dt><b>拼图</b></dt><dd>任务拼成互相咬合的圆角拼块，完成的会嵌进去——只有全部打卡，这张拼图才完整。</dd></div>
+        </dl>
+        <p class="mut">用回顾标题栏里的标签切换读法；按 <code>x</code> 或点击空白处关闭。</p>
+      </section>
+
+      <section>
+        <h2><span class="n">05</span> 插件、主题与语言</h2>
+        <p>从工作台右上角进入：</p>
+        <dl>
+          <div class="row"><dt><b>::</b></dt><dd>打开插件商店——安装由 manifest 驱动的主题和小组件。插件只描述自己，不执行任意运行时代码。</dd></div>
+          <div class="row"><dt><b>中文 / EN</b></dt><dd>切换界面语言；除你自己的内容外都会被翻译。</dd></div>
+          <div class="row"><dt><b>lock</b></dt><dd>登出，回到 shell。</dd></div>
+        </dl>
+      </section>
+
+      <footer>PlainList —— 执行第一，复盘第二。由 rainhuang &amp; HuRong Wang 构建。</footer>
+    </main>
+
+    <!-- ===================== English ===================== -->
+    <main data-doc="en" hidden>
+      <header class="top">
+        <h1>PlainList — guide</h1>
+        <p class="lead">
+          A radically minimal tool site that folds habit tracking, event reminders, todo lists, and lightweight
+          calendar notes into one plain page. Finish today first; let the review surfaces grow out of real, recorded execution.
+        </p>
+      </header>
+
+      <section>
+        <h2><span class="n">00</span> the shell</h2>
+        <p>
+          PlainList opens as a text terminal. The prompt is <code>pl/</code>, so it already <em>is</em> the PlainList shell —
+          type commands bare (<code>cd rain</code>) or with the <code>pl</code> prefix (<code>pl cd rain</code>); both resolve the same.
+        </p>
+        <dl>
+          <div class="row"><dt><b>cd</b> <span class="arg">&lt;name&gt;</span></dt><dd>Log in to an existing account, then enter the passphrase when prompted.</dd></div>
+          <div class="row"><dt><b>ls</b></dt><dd>List every account on this instance. Read-only; changes nothing.</dd></div>
+          <div class="row"><dt><b>new</b> <span class="arg">&lt;name&gt;</span></dt><dd>Create an account. Username 2–20 chars (letters, digits, <code>_ . -</code>), passphrase 3+ chars.</dd></div>
+          <div class="row"><dt><b>pl onboard</b></dt><dd>Guided first-run setup — username, then passphrase, then straight to the dashboard.</dd></div>
+          <div class="row"><dt><b>demo</b></dt><dd>Enter the seeded demo account to look around.</dd></div>
+          <div class="row"><dt><b>pl guide</b></dt><dd>Open this page.</dd></div>
+          <div class="row"><dt><b>pl graphic</b></dt><dd>Switch to the style-matched graphical entry.</dd></div>
+          <div class="row"><dt><b>pl contr</b></dt><dd>Show contributors.</dd></div>
+          <div class="row"><dt><b>clear</b></dt><dd>Clear the terminal scrollback.</dd></div>
+          <div class="row"><dt><b>/help</b></dt><dd>Print the full command list.</dd></div>
+        </dl>
+        <pre><span class="c"># first time here</span>
+pl/ pl onboard
+choose a username: rain
+set a passphrase: ***
+account created. welcome, rain.
+
+<span class="c"># coming back</span>
+pl/ cd rain
+passphrase for rain: ***</pre>
+      </section>
+
+      <section>
+        <h2><span class="n">01</span> the five lanes</h2>
+        <p>Once inside, the dashboard is one scrolling page with five anchored lanes. The top nav jumps between them.</p>
+        <div class="lanes">
+          <div class="lane"><div class="name">Now<span>clock</span></div><p>A live clock and date — the heartbeat that frames the rest of the page.</p></div>
+          <div class="lane"><div class="name">Day<span>today’s list</span></div><p>The core surface. Habits and tasks for today, grouped by time of day, with a live completion percentage.</p></div>
+          <div class="lane"><div class="name">Week<span>trend</span></div><p>Real 7-day and 28-day trends — which task, time slot, or recovery pattern is dragging you down.</p></div>
+          <div class="lane"><div class="name">Month<span>tracker grid</span></div><p>A check-grid of every plan across the month. Tap a cell to mark a day done; scan rows for streaks and gaps.</p></div>
+          <div class="lane"><div class="name">Year<span>calendar</span></div><p>A heatmap of completion over the year. Click a day to open its Day Review (§04).</p></div>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="n">02</span> habits &amp; tasks</h2>
+        <p>Two kinds of items live on the Day lane:</p>
+        <ul>
+          <li><b>Habit</b> — something you repeat every day. It carries forward and is what the streak / trend views count.</li>
+          <li><b>Task</b> — a one-off todo for today.</li>
+        </ul>
+        <h3>Add one by hand</h3>
+        <ol>
+          <li>On the Day lane press <code>+ Add habit or task</code>.</li>
+          <li>Type a name, choose <b>Habit</b> or <b>Task</b>, and set a time as <code>HH:MM</code> (defaults to <code>09:00</code>).</li>
+          <li>Press <kbd>Enter</kbd> or <code>Add</code>. It slots into the right time group automatically.</li>
+        </ol>
+        <h3>Check things off</h3>
+        <p>Click any row to toggle it done for today. The percentage, side chart, and month strip all update from that single check — there is no separate "complete" button.</p>
+        <p class="mut">Tip: an item’s time only controls its grouping (Morning / Afternoon / Evening). It’s a plan, not an alarm.</p>
+      </section>
+
+      <section>
+        <h2><span class="n">03</span> AI 速记 — talk, don’t fill forms</h2>
+        <p>Next to the add button is <b>AI 速记</b>. Say everything on your mind in one messy paragraph and the model turns it into a clean, scheduled list.</p>
+        <ol>
+          <li>Open the dock and write naturally, e.g. <em>“defense at 3-5pm, shower two hours before; dinner with a friend at 7, homework around 9-10; review 30 words daily.”</em></li>
+          <li>Press <kbd>⌘/Ctrl + Enter</kbd>. End-to-end, the model does:</li>
+        </ol>
+        <ul>
+          <li><b>Segmentation</b> — splits the run-on into discrete, doable items.</li>
+          <li><b>Understanding</b> — classifies habit vs. task; drops meta-talk and non-today items into a separate <em>discarded</em> list with reasons.</li>
+          <li><b>Time reasoning</b> — resolves “two hours before”, “around 9-10”, “3-5pm” into concrete <code>HH:MM</code> and orders them.</li>
+          <li><b>Importance &amp; quantification</b> — marks defenses / meetings / deadlines high, maintenance normal, flexible low, with a one-line <em>why</em> for each.</li>
+          <li><b>Brief</b> — a summary of the day’s shape plus one scheduling caveat (conflicts, missing buffer, commute).</li>
+        </ul>
+        <p>Review the draft cards, edit name / type / time inline, drop what you don’t want, then commit — they enter your real Day list through the same path as a manual add. If you said “clear today first”, a guarded clear step appears that you must confirm before anything is deleted.</p>
+        <p class="mut">AI 速记 needs a configured online model. There is no offline “heuristic” mode — if the model can’t be reached you get a plain error, not a silent, degraded guess.</p>
+      </section>
+
+      <section>
+        <h2><span class="n">04</span> day review — three readings</h2>
+        <p>Click any day in the Year calendar to open its review. The same day’s tasks can be read three ways:</p>
+        <dl>
+          <div class="row"><dt><b>Wall</b></dt><dd>Tasks as a wall of cards; done items darken. A full, finished day reads as a dense, satisfying block.</dd></div>
+          <div class="row"><dt><b>Gravity</b></dt><dd>The same cards become blocks that drop and stack — a tactile sense of how much got done.</dd></div>
+          <div class="row"><dt><b>Puzzle</b></dt><dd>Tasks tile into rounded, interlocking jigsaw pieces; the picture is whole only when everything is checked.</dd></div>
+        </dl>
+        <p class="mut">Switch readings with the tabs in the review header; <code>x</code> or click-outside closes it.</p>
+      </section>
+
+      <section>
+        <h2><span class="n">05</span> plugins, themes &amp; language</h2>
+        <p>From the top-right of the dashboard:</p>
+        <dl>
+          <div class="row"><dt><b>::</b></dt><dd>Open the plugin store — install manifest-driven themes and widgets. Plugins describe themselves; they don’t run arbitrary code.</dd></div>
+          <div class="row"><dt><b>中文 / EN</b></dt><dd>Toggle the interface language. Everything except your own content is translated.</dd></div>
+          <div class="row"><dt><b>lock</b></dt><dd>Sign out and return to the shell.</dd></div>
+        </dl>
+      </section>
+
+      <footer>PlainList — execution first, review second. Built by rainhuang &amp; HuRong Wang.</footer>
+    </main>
+
+    <script>
+      (function () {
+        var BACK = { zh: '返回', en: 'back' };
+        var docs = document.querySelectorAll('[data-doc]');
+        var langButtons = document.querySelectorAll('[data-lang]');
+        var backLabel = document.querySelector('[data-back]');
+
+        function apply(lang) {
+          if (lang !== 'en' && lang !== 'zh') lang = 'zh';
+          document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
+          docs.forEach(function (el) { el.hidden = el.getAttribute('data-doc') !== lang; });
+          langButtons.forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-lang') === lang); });
+          if (backLabel) backLabel.textContent = BACK[lang];
+          try { localStorage.setItem('pl_guide_lang', lang); } catch (e) {}
+        }
+
+        var saved;
+        try { saved = localStorage.getItem('pl_guide_lang'); } catch (e) {}
+        var initial = saved || (navigator.language && navigator.language.toLowerCase().indexOf('zh') === 0 ? 'zh' : 'en');
+        apply(initial);
+
+        langButtons.forEach(function (b) {
+          b.addEventListener('click', function () { apply(b.getAttribute('data-lang')); });
+        });
+
+        document.getElementById('back').addEventListener('click', function () {
+          // opened via window.open(): close the tab; otherwise fall back to history
+          window.close();
+          setTimeout(function () {
+            if (!window.closed) {
+              if (history.length > 1) history.back();
+              else window.location.href = '/';
+            }
+          }, 120);
+        });
+      })();
+    </script>
+  </body>
+</html>

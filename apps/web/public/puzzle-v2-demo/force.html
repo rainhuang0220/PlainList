@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>方案C: 力导向图 - 拼图v2</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    :root {
+      --dark: #111;
+      --bg: #F7F7F7;
+      --muted: #999;
+      --surface: #fff;
+      --faint: #e5e5e5;
+    }
+    
+    body {
+      font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+      background: var(--bg);
+      color: var(--dark);
+      min-height: 100vh;
+      padding: 40px;
+    }
+    
+    .header {
+      margin-bottom: 32px;
+    }
+    
+    .header h1 {
+      font-size: 32px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    
+    .header p {
+      color: var(--muted);
+      font-size: 14px;
+    }
+    
+    .container {
+      display: flex;
+      gap: 24px;
+    }
+    
+    .canvas-wrapper {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--faint);
+      border-radius: 14px;
+      padding: 24px;
+      box-shadow: 0 14px 34px rgba(17,17,17,.035);
+    }
+    
+    .canvas-wrapper h2 {
+      font-size: 16px;
+      margin-bottom: 16px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .1em;
+    }
+    
+    canvas {
+      width: 100%;
+      height: 500px;
+      display: block;
+    }
+    
+    .sidebar {
+      width: 300px;
+      background: var(--surface);
+      border: 1px solid var(--faint);
+      border-radius: 14px;
+      padding: 24px;
+      box-shadow: 0 14px 34px rgba(17,17,17,.035);
+    }
+    
+    .sidebar h3 {
+      font-size: 14px;
+      margin-bottom: 16px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .1em;
+    }
+    
+    .task-list {
+      list-style: none;
+    }
+    
+    .task-item {
+      padding: 12px;
+      border-bottom: 1px solid var(--faint);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .task-item:last-child {
+      border-bottom: none;
+    }
+    
+    .task-color {
+      width: 16px;
+      height: 16px;
+      border-radius: 4px;
+    }
+    
+    .task-info {
+      flex: 1;
+    }
+    
+    .task-name {
+      font-size: 14px;
+      font-weight: 500;
+    }
+    
+    .task-time {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    
+    .task-done {
+      opacity: 0.5;
+    }
+    
+    .task-done .task-name {
+      text-decoration: line-through;
+    }
+    
+    .checkmark {
+      width: 18px;
+      height: 18px;
+      border: 2px solid var(--dark);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .checkmark.done {
+      background: var(--dark);
+    }
+    
+    .checkmark.done::after {
+      content: '✓';
+      color: var(--bg);
+      font-size: 12px;
+    }
+    
+    .legend {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--faint);
+    }
+    
+    .legend h4 {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+    
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+      font-size: 12px;
+    }
+    
+    .legend-color {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+    }
+    
+    .refresh-btn {
+      margin-top: 24px;
+      width: 100%;
+      padding: 12px;
+      background: var(--dark);
+      color: var(--bg);
+      border: none;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 13px;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    
+    .refresh-btn:hover {
+      opacity: 0.8;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>方案C: 力导向图</h1>
+    <p>使用力导向布局算法，任务块像岛屿漂浮在水面上，河流在岛屿之间流动</p>
+  </div>
+  
+  <div class="container">
+    <div class="canvas-wrapper">
+      <h2>预览效果</h2>
+      <canvas id="forceCanvas"></canvas>
+    </div>
+    
+    <div class="sidebar">
+      <h3>今日任务</h3>
+      <ul class="task-list" id="taskList"></ul>
+      
+      <div class="legend">
+        <h4>图例说明</h4>
+        <div class="legend-item">
+          <div class="legend-color" style="background: #111;"></div>
+          <span>大岛（已完成任务）</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color" style="background: #999;"></div>
+          <span>小岛（未完成任务）</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color" style="background: linear-gradient(90deg, #b0c4de, #87ceeb);"></div>
+          <span>河流（岛屿间连接）</span>
+        </div>
+      </div>
+      
+      <button class="refresh-btn" onclick="regenerate()">重新生成</button>
+    </div>
+  </div>
+
+  <script>
+    // 模拟任务数据
+    const tasks = [
+      { id: 1, name: '晨间冥想', time: '07:00', duration: 30, done: true },
+      { id: 2, name: '阅读《深度工作》', time: '08:00', duration: 60, done: true },
+      { id: 3, name: '项目会议', time: '10:00', duration: 45, done: false },
+      { id: 4, name: '代码审查', time: '11:00', duration: 90, done: false },
+      { id: 5, name: '午餐休息', time: '12:30', duration: 60, done: true },
+      { id: 6, name: '写技术文档', time: '14:00', duration: 120, done: false },
+      { id: 7, name: '团队同步', time: '16:00', duration: 30, done: false },
+      { id: 8, name: '健身', time: '18:00', duration: 60, done: true },
+    ];
+
+    // 力导向图节点
+    class Node {
+      constructor(task, x, y, radius) {
+        this.task = task;
+        this.x = x;
+        this.y = y;
+        this.vx = 0;
+        this.vy = 0;
+        this.radius = radius;
+        this.targetX = x;
+        this.targetY = y;
+      }
+    }
+
+    // 力导向图模拟器
+    class ForceGraph {
+      constructor(width, height, nodes) {
+        this.width = width;
+        this.height = height;
+        this.nodes = nodes;
+        this.edges = [];
+        this.repulsion = 5000;
+        this.attraction = 0.01;
+        this.damping = 0.9;
+        this.centerForce = 0.01;
+      }
+
+      // 添加边（任务之间的连接）
+      addEdge(source, target, strength = 1) {
+        this.edges.push({ source, target, strength });
+      }
+
+      // 模拟一步
+      simulate() {
+        // 重置力
+        this.nodes.forEach(node => {
+          node.vx = 0;
+          node.vy = 0;
+        });
+
+        // 斥力（所有节点之间）
+        for (let i = 0; i < this.nodes.length; i++) {
+          for (let j = i + 1; j < this.nodes.length; j++) {
+            const nodeA = this.nodes[i];
+            const nodeB = this.nodes[j];
+            
+            const dx = nodeB.x - nodeA.x;
+            const dy = nodeB.y - nodeA.y;
+            const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+            const minDist = nodeA.radius + nodeB.radius + 20;
+            
+            if (dist < minDist * 3) {
+              const force = this.repulsion / (dist * dist);
+              const fx = (dx / dist) * force;
+              const fy = (dy / dist) * force;
+              
+              nodeA.vx -= fx;
+              nodeA.vy -= fy;
+              nodeB.vx += fx;
+              nodeB.vy += fy;
+            }
+          }
+        }
+
+        // 引力（边连接的节点）
+        this.edges.forEach(edge => {
+          const source = this.nodes[edge.source];
+          const target = this.nodes[edge.target];
+          
+          const dx = target.x - source.x;
+          const dy = target.y - source.y;
+          const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+          
+          const force = dist * this.attraction * edge.strength;
+          const fx = (dx / dist) * force;
+          const fy = (dy / dist) * force;
+          
+          source.vx += fx;
+          source.vy += fy;
+          target.vx -= fx;
+          target.vy -= fy;
+        });
+
+        // 中心引力
+        this.nodes.forEach(node => {
+          const dx = this.width / 2 - node.x;
+          const dy = this.height / 2 - node.y;
+          
+          node.vx += dx * this.centerForce;
+          node.vy += dy * this.centerForce;
+        });
+
+        // 更新位置
+        this.nodes.forEach(node => {
+          node.vx *= this.damping;
+          node.vy *= this.damping;
+          
+          node.x += node.vx;
+          node.y += node.vy;
+          
+          // 边界约束
+          const padding = node.radius + 10;
+          node.x = Math.max(padding, Math.min(this.width - padding, node.x));
+          node.y = Math.max(padding, Math.min(this.height - padding, node.y));
+        });
+      }
+    }
+
+    // 创建节点
+    function createNodes(width, height) {
+      const totalDuration = tasks.reduce((sum, t) => sum + t.duration, 0);
+      
+      return tasks.map((task, i) => {
+        const area = (task.duration / totalDuration) * width * height * 0.3;
+        const radius = Math.max(30, Math.min(80, Math.sqrt(area / Math.PI)));
+        
+        // 初始位置（随机分布）
+        const angle = (i / tasks.length) * Math.PI * 2;
+        const distance = Math.min(width, height) * 0.3;
+        const x = width / 2 + Math.cos(angle) * distance + (Math.random() - 0.5) * 50;
+        const y = height / 2 + Math.sin(angle) * distance + (Math.random() - 0.5) * 50;
+        
+        return new Node(task, x, y, radius);
+      });
+    }
+
+    // 创建边（基于任务时间顺序）
+    function createEdges(nodes) {
+      const edges = [];
+      
+      // 按时间排序的任务索引
+      const timeOrder = [...nodes]
+        .sort((a, b) => a.task.time.localeCompare(b.task.time))
+        .map(n => nodes.indexOf(n));
+      
+      // 连接相邻时间的任务
+      for (let i = 0; i < timeOrder.length - 1; i++) {
+        edges.push({
+          source: timeOrder[i],
+          target: timeOrder[i + 1],
+          strength: 0.5
+        });
+      }
+      
+      // 连接相同类型的任务
+      nodes.forEach((nodeA, i) => {
+        nodes.forEach((nodeB, j) => {
+          if (i < j && nodeA.task.done === nodeB.task.done) {
+            edges.push({
+              source: i,
+              target: j,
+              strength: 0.2
+            });
+          }
+        });
+      });
+      
+      return edges;
+    }
+
+    let graph = null;
+    let nodes = [];
+    let edges = [];
+
+    // 初始化图
+    function initGraph(width, height) {
+      nodes = createNodes(width, height);
+      graph = new ForceGraph(width, height, nodes);
+      edges = createEdges(nodes);
+      edges.forEach(edge => graph.addEdge(edge.source, edge.target, edge.strength));
+    }
+
+    // 主渲染函数
+    function render() {
+      const canvas = document.getElementById('forceCanvas');
+      const ctx = canvas.getContext('2d');
+      
+      // 设置canvas尺寸
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width * 2;
+      canvas.height = rect.height * 2;
+      ctx.scale(2, 2);
+      
+      const width = rect.width;
+      const height = rect.height;
+      
+      // 初始化图（如果还没有）
+      if (!graph || graph.width !== width || graph.height !== height) {
+        initGraph(width, height);
+      }
+      
+      // 模拟物理
+      graph.simulate();
+      
+      // 绘制背景（水面）
+      drawWater(ctx, width, height);
+      
+      // 绘制河流（边）
+      drawRivers(ctx, nodes, edges);
+      
+      // 绘制岛屿（节点）
+      drawIslands(ctx, nodes);
+    }
+
+    // 绘制水面
+    function drawWater(ctx, width, height) {
+      const time = Date.now() * 0.001;
+      
+      // 创建水面渐变
+      const gradient = ctx.createLinearGradient(0, 0, width, height);
+      gradient.addColorStop(0, '#e8e8e8');
+      gradient.addColorStop(0.5, '#f0f0f0');
+      gradient.addColorStop(1, '#e8e8e8');
+      
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, width, height);
+      
+      // 添加水面波纹
+      ctx.strokeStyle = 'rgba(200, 200, 200, 0.3)';
+      ctx.lineWidth = 0.5;
+      
+      for (let y = 0; y < height; y += 20) {
+        ctx.beginPath();
+        for (let x = 0; x < width; x += 5) {
+          const offset = Math.sin(x * 0.02 + time + y * 0.01) * 3;
+          if (x === 0) {
+            ctx.moveTo(x, y + offset);
+          } else {
+            ctx.lineTo(x, y + offset);
+          }
+        }
+        ctx.stroke();
+      }
+    }
+
+    // 绘制河流（边）
+    function drawRivers(ctx, nodes, edges) {
+      const time = Date.now() * 0.001;
+      
+      edges.forEach((edge, i) => {
+        const source = nodes[edge.source];
+        const target = nodes[edge.target];
+        
+        const dx = target.x - source.x;
+        const dy = target.y - source.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        // 只绘制距离合适的边
+        if (dist > Math.min(graph.width, graph.height) * 0.6) return;
+        
+        // 计算控制点（使河流弯曲）
+        const midX = (source.x + target.x) / 2;
+        const midY = (source.y + target.y) / 2;
+        
+        // 垂直偏移
+        const perpX = -dy / dist;
+        const perpY = dx / dist;
+        const offset = Math.sin(time + i) * 20;
+        
+        const controlX = midX + perpX * offset;
+        const controlY = midY + perpY * offset;
+        
+        // 绘制河流
+        ctx.beginPath();
+        ctx.moveTo(source.x, source.y);
+        ctx.quadraticCurveTo(controlX, controlY, target.x, target.y);
+        
+        // 创建渐变
+        const gradient = ctx.createLinearGradient(source.x, source.y, target.x, target.y);
+        gradient.addColorStop(0, 'rgba(176, 196, 222, 0.4)');
+        gradient.addColorStop(0.5, 'rgba(135, 206, 235, 0.6)');
+        gradient.addColorStop(1, 'rgba(176, 196, 222, 0.4)');
+        
+        ctx.strokeStyle = gradient;
+        ctx.lineWidth = 4 + edge.strength * 4;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+        
+        // 添加高光
+        ctx.beginPath();
+        ctx.moveTo(source.x, source.y - 1);
+        ctx.quadraticCurveTo(controlX, controlY - 1, target.x, target.y - 1);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      });
+    }
+
+    // 绘制岛屿（节点）
+    function drawIslands(ctx, nodes) {
+      const time = Date.now() * 0.001;
+      
+      nodes.forEach((node, i) => {
+        const { x, y, radius, task } = node;
+        
+        // 绘制岛屿阴影
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(x + 3, y + 3, radius, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+        ctx.fill();
+        ctx.restore();
+        
+        // 绘制岛屿主体
+        ctx.save();
+        ctx.beginPath();
+        
+        // 使用噪声使岛屿边缘不规则
+        const points = 32;
+        for (let j = 0; j <= points; j++) {
+          const angle = (j / points) * Math.PI * 2;
+          const noise = Math.sin(angle * 3 + time + i) * 0.1 + 
+                       Math.sin(angle * 5 + time * 2 + i) * 0.05;
+          const r = radius * (1 + noise);
+          const px = x + Math.cos(angle) * r;
+          const py = y + Math.sin(angle) * r;
+          
+          if (j === 0) {
+            ctx.moveTo(px, py);
+          } else {
+            ctx.lineTo(px, py);
+          }
+        }
+        ctx.closePath();
+        
+        // 创建渐变
+        const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
+        
+        if (task.done) {
+          gradient.addColorStop(0, '#222');
+          gradient.addColorStop(0.7, '#111');
+          gradient.addColorStop(1, '#000');
+        } else {
+          gradient.addColorStop(0, '#aaa');
+          gradient.addColorStop(0.7, '#888');
+          gradient.addColorStop(1, '#666');
+        }
+        
+        ctx.fillStyle = gradient;
+        ctx.fill();
+        
+        // 绘制边缘高光
+        ctx.strokeStyle = task.done ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.4)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        
+        ctx.restore();
+        
+        // 绘制勾号（如果完成）
+        if (task.done) {
+          ctx.save();
+          ctx.translate(x, y);
+          
+          // 绘制圆形背景
+          ctx.beginPath();
+          ctx.arc(0, 0, 14, 0, Math.PI * 2);
+          ctx.fillStyle = '#fff';
+          ctx.fill();
+          
+          // 绘制勾号
+          ctx.beginPath();
+          ctx.moveTo(-6, 0);
+          ctx.lineTo(-2, 5);
+          ctx.lineTo(7, -5);
+          ctx.strokeStyle = '#111';
+          ctx.lineWidth = 3;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.stroke();
+          
+          ctx.restore();
+        }
+        
+        // 绘制任务名称
+        ctx.save();
+        ctx.font = 'bold 12px "JetBrains Mono", monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        ctx.fillStyle = '#111';
+        ctx.shadowColor = 'rgba(255, 255, 255, 0.8)';
+        ctx.shadowBlur = 3;
+        ctx.fillText(task.name, x, y + radius + 8);
+        ctx.restore();
+      });
+    }
+
+    // 渲染任务列表
+    function renderTaskList() {
+      const list = document.getElementById('taskList');
+      list.innerHTML = tasks.map(task => `
+        <li class="task-item ${task.done ? 'task-done' : ''}">
+          <div class="checkmark ${task.done ? 'done' : ''}"></div>
+          <div class="task-info">
+            <div class="task-name">${task.name}</div>
+            <div class="task-time">${task.time} · ${task.duration}分钟</div>
+          </div>
+        </li>
+      `).join('');
+    }
+
+    // 重新生成
+    function regenerate() {
+      tasks.sort(() => Math.random() - 0.5);
+      graph = null;
+      render();
+      renderTaskList();
+    }
+
+    // 动画循环
+    let animationFrame;
+    function animate() {
+      render();
+      animationFrame = requestAnimationFrame(animate);
+    }
+
+    // 初始化
+    window.addEventListener('load', () => {
+      renderTaskList();
+      animate();
+    });
+
+    window.addEventListener('resize', () => {
+      cancelAnimationFrame(animationFrame);
+      graph = null;
+      animate();
+    });
+  </script>
+</body>
+</html>

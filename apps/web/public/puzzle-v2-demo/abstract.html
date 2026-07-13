@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>方案 A · 抽象艺术等高线群岛</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --ink: #141414;
+    --paper: #ffffff;
+    --canvas-bg: #ffffff;
+    --muted: #9a9a96;
+    --faint: #ececec;
+    --line: #e6e6e3;
+  }
+
+  body {
+    font-family: -apple-system, 'PingFang SC', 'SF Pro Text', 'Helvetica Neue', sans-serif;
+    background: #f3f2ef;
+    color: var(--ink);
+    min-height: 100vh;
+    padding: 28px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .shell {
+    max-width: 1180px;
+    margin: 0 auto;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    box-shadow: 0 30px 80px rgba(20,20,20,.07);
+    overflow: hidden;
+  }
+
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--faint);
+    font-size: 13px;
+  }
+  .crumb { color: var(--muted); display: flex; align-items: center; gap: 8px; }
+  .crumb b { color: var(--ink); font-weight: 600; }
+  .crumb .sep { opacity: .5; }
+  .datepick { display: flex; align-items: center; gap: 10px; color: var(--ink); }
+  .datepick .nav { width: 26px; height: 26px; border: 1px solid var(--line); border-radius: 7px;
+    display: grid; place-items: center; color: var(--muted); cursor: pointer; font-size: 12px; }
+  .datepick .nav:hover { background: #f6f5f2; }
+
+  .body { display: flex; }
+
+  /* sidebar */
+  .side {
+    width: 240px; flex: none;
+    padding: 26px 24px;
+    border-right: 1px solid var(--faint);
+  }
+  .bigdate { display: flex; align-items: baseline; gap: 8px; margin-bottom: 26px; }
+  .bigdate .m { font-size: 40px; font-weight: 300; letter-spacing: -.02em; }
+  .bigdate .s { font-size: 40px; font-weight: 300; color: var(--muted); }
+  .bigdate .w { font-size: 13px; color: var(--muted); margin-left: 4px; }
+
+  .block { margin-bottom: 26px; }
+  .block h4 { font-size: 11px; letter-spacing: .12em; color: var(--muted);
+    text-transform: uppercase; margin-bottom: 14px; }
+  .stat { display: flex; align-items: center; gap: 10px; font-size: 13px; margin-bottom: 11px; }
+  .stat .dot { width: 11px; height: 11px; border-radius: 50%; flex: none; }
+  .stat .dot.done { background: var(--ink); }
+  .stat .dot.todo { border: 1.5px solid #bdbdba; }
+  .stat .lbl { flex: 1; color: #565654; }
+  .stat .val { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .stat .wave { width: 18px; height: 11px; flex: none; }
+
+  .kv { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 10px; }
+  .kv .k { color: #565654; }
+  .kv .v { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  .legend .li { display: flex; align-items: center; gap: 11px; font-size: 12px; margin-bottom: 12px; color: #565654; }
+  .legend .sw { width: 30px; height: 20px; border-radius: 4px; flex: none; border: 1px solid var(--line); overflow: hidden; }
+
+  .btn {
+    margin-top: 6px; width: 100%; padding: 10px;
+    background: var(--ink); color: #fff; border: 0; border-radius: 9px;
+    font-family: inherit; font-size: 12px; letter-spacing: .04em; cursor: pointer;
+    transition: opacity .15s;
+  }
+  .btn:hover { opacity: .85; }
+
+  /* stage */
+  .stage { flex: 1; position: relative; }
+  .map-frame { position: relative; width: 100%; aspect-ratio: 4 / 3; background: var(--canvas-bg); }
+  #map { width: 100%; height: 100%; display: block; }
+
+  .labels { position: absolute; inset: 0; pointer-events: none; }
+  .label {
+    position: absolute; transform: translate(-50%, -50%);
+    text-align: center; white-space: nowrap; max-width: 34%;
+  }
+  .label .lname { display: block; font-size: 14px; font-weight: 600; letter-spacing: .01em; }
+  .label .ltime { display: block; font-size: 10.5px; letter-spacing: .06em; margin-top: 3px; font-variant-numeric: tabular-nums; }
+  .label .lmark { display: inline-flex; align-items: center; justify-content: center;
+    width: 16px; height: 16px; border-radius: 50%; margin-top: 7px; font-size: 9px; }
+
+  .label.on-dark .lname { color: #fafafa; }
+  .label.on-dark .ltime { color: #c9c9c6; }
+  .label.on-dark .lmark { background: #fafafa; color: #141414; }
+
+  .label.on-light .lname { color: #1c1c1c; }
+  .label.on-light .ltime { color: #8d8d8a; }
+  .label.on-light .lmark { border: 1.4px solid #b6b6b3; color: transparent; }
+
+  .footnote { padding: 12px 24px; border-top: 1px solid var(--faint);
+    font-size: 11px; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+</style>
+</head>
+<body>
+  <div class="shell">
+    <div class="topbar">
+      <div class="crumb"><b>年度复盘</b><span class="sep">›</span><span>日详情</span></div>
+      <div class="datepick">
+        <span class="nav" onclick="shiftDay(-1)">‹</span>
+        <span id="dateText">2024年5月20日 周一</span>
+        <span class="nav" onclick="shiftDay(1)">›</span>
+      </div>
+    </div>
+
+    <div class="body">
+      <div class="side">
+        <div class="bigdate">
+          <span class="m" id="dM">5</span><span class="s">/</span><span class="s" id="dD">20</span>
+          <span class="w" id="dW">周一</span>
+        </div>
+
+        <div class="block">
+          <h4>日程概览</h4>
+          <div class="stat"><span class="dot done"></span><span class="lbl">已完成</span><span class="val" id="stDone">6</span></div>
+          <div class="stat"><span class="dot todo"></span><span class="lbl">未完成</span><span class="val" id="stTodo">2</span></div>
+          <div class="stat"><svg class="wave" viewBox="0 0 18 11"><path d="M0 6 Q4.5 1 9 6 T18 6" fill="none" stroke="#bdbdba" stroke-width="1.3"/></svg><span class="lbl">自由时间</span><span class="val" id="stFree">35%</span></div>
+        </div>
+
+        <div class="block">
+          <h4>时间统计</h4>
+          <div class="kv"><span class="k">专注时间</span><span class="v" id="stFocus">7h 25m</span></div>
+          <div class="kv"><span class="k">总时长</span><span class="v" id="stTotal">11h 30m</span></div>
+        </div>
+
+        <div class="block legend">
+          <h4>图例 Legend</h4>
+          <div class="li"><span class="sw" id="swDone"></span><span>已完成</span></div>
+          <div class="li"><span class="sw" id="swTodo"></span><span>未完成</span></div>
+          <div class="li"><span class="sw" id="swRiver"></span><span>自由时间（河流）</span></div>
+        </div>
+
+        <button class="btn" onclick="regenerate()">重新生成 Regenerate</button>
+      </div>
+
+      <div class="stage">
+        <div class="map-frame">
+          <canvas id="map"></canvas>
+          <div class="labels" id="labels"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footnote"><span>✦</span><span>提示：每座岛屿是一项任务，岛与岛之间的留白是自由时间。已完成 = 隆起的黑色山峰，未完成 = 浅色洼地。</span></div>
+  </div>
+
+<script>
+/* =============================================================================
+   方案 A — 抽象艺术等高线群岛
+   复用「高度场 + power diagram + marching squares」引擎（同 relief.html），
+   但渲染方式改为「实心填色 + 内部刻线」的平面艺术：
+     · 已完成任务 → 实心黑色岛屿，内部用白色等高线一圈圈刻出隆起
+     · 未完成任务 → 浅色（纸白）岛屿，内部用灰色等高线
+     · 岛与岛之间 → 纸白「河流 / 自由时间」
+   ========================================================================== */
+
+let tasks = [
+  { id: 1, name: '晨间计划', time: '07:00 – 08:00', duration: 60,  done: false },
+  { id: 2, name: '深度工作', time: '09:00 – 11:30', duration: 150, done: true  },
+  { id: 3, name: '会议',     time: '13:30 – 15:00', duration: 90,  done: false },
+  { id: 4, name: '编码',     time: '15:30 – 18:30', duration: 180, done: true  },
+  { id: 5, name: '运动',     time: '08:00 – 09:00', duration: 60,  done: true  },
+  { id: 6, name: '阅读',     time: '19:30 – 20:30', duration: 60,  done: true  },
+  { id: 7, name: '学习新知', time: '11:30 – 12:30', duration: 60,  done: false },
+  { id: 8, name: '复盘',     time: '21:00 – 21:45', duration: 45,  done: true  },
+];
+
+let mapSeed = 8423;
+const WARP = 34;       // 域扭曲：海岸线/河岸的蜿蜒程度（越大越圆润有机）
+const WATER_W = 12;    // 河流（自由时间）半宽
+
+/* ---------- value noise / fBm ---------- */
+function hash(x, y, s) {
+  let h = s + x * 374761393 + y * 668265263;
+  h = (h ^ (h >> 13)) * 1274126177;
+  h = h ^ (h >> 16);
+  return (h & 0x7fffffff) / 0x7fffffff;
+}
+const sm = t => t * t * (3 - 2 * t);
+function noise(x, y, s) {
+  const ix = Math.floor(x), iy = Math.floor(y);
+  const fx = sm(x - ix), fy = sm(y - iy);
+  const a = hash(ix, iy, s),     b = hash(ix + 1, iy, s);
+  const c = hash(ix, iy + 1, s), d = hash(ix + 1, iy + 1, s);
+  return a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy;
+}
+function fbm(x, y, s, oct = 4) {
+  let v = 0, amp = 1, f = 1, m = 0;
+  for (let i = 0; i < oct; i++) { v += amp * noise(x * f, y * f, s + i * 57); m += amp; amp *= 0.5; f *= 2; }
+  return v / m;
+}
+function rand(s) { return hash(s & 65535, (s >> 16) & 65535, mapSeed); }
+
+/* ---------- 任务 → 种子（power diagram，面积≈时长） ---------- */
+function buildSeeds(W, H) {
+  const total = tasks.reduce((a, t) => a + t.duration, 0);
+  const cx = W / 2, cy = H / 2;
+  const golden = Math.PI * (3 - Math.sqrt(5));
+  const n = tasks.length;
+
+  let seeds = tasks.map((task, i) => {
+    const ratio = task.duration / total;
+    const ang = i * golden + (rand(i * 13 + 1) - 0.5) * 0.6;
+    const rad = Math.sqrt((i + 0.5) / n) * Math.min(W, H) * 0.46;
+    return {
+      task,
+      x: cx + Math.cos(ang) * rad * (W / Math.min(W, H)),
+      y: cy + Math.sin(ang) * rad,
+      // 面积∝时长，但收一点幂次，避免短任务变成碎屑、长任务吞并全图
+      weight: (0.5 + ratio) * W * H * 0.12,
+      peak: task.done ? 1.0 : 0.42,
+    };
+  });
+
+  // 多走几步 Lloyd 松弛 → 省份更均衡、更圆润、铺满整幅
+  for (let pass = 0; pass < 6; pass++) {
+    const ax = new Array(n).fill(0), ay = new Array(n).fill(0), cnt = new Array(n).fill(0);
+    const step = 6;
+    for (let y = 0; y < H; y += step) {
+      for (let x = 0; x < W; x += step) {
+        let best = 0, bd = Infinity;
+        for (let i = 0; i < n; i++) {
+          const dx = x - seeds[i].x, dy = y - seeds[i].y;
+          const d = dx * dx + dy * dy - seeds[i].weight;
+          if (d < bd) { bd = d; best = i; }
+        }
+        ax[best] += x; ay[best] += y; cnt[best]++;
+      }
+    }
+    for (let i = 0; i < n; i++) if (cnt[i]) {
+      seeds[i].x = seeds[i].x * 0.35 + (ax[i] / cnt[i]) * 0.65;
+      seeds[i].y = seeds[i].y * 0.35 + (ay[i] / cnt[i]) * 0.65;
+    }
+  }
+  return seeds;
+}
+
+let SEEDS = [];
+
+/* ---------- 高度场（同 relief 引擎）+ 顺带返回所属种子 ---------- */
+function warpAt(x, y) {
+  return {
+    wx: x + (fbm(x * 0.016, y * 0.016, mapSeed + 11, 3) - 0.5) * WARP,
+    wy: y + (fbm(x * 0.016, y * 0.016, mapSeed + 71, 3) - 0.5) * WARP,
+  };
+}
+function nearestSeed(wx, wy) {
+  let b0 = 0, d0 = Infinity;
+  for (let i = 0; i < SEEDS.length; i++) {
+    const dx = wx - SEEDS[i].x, dy = wy - SEEDS[i].y;
+    const d = dx * dx + dy * dy - SEEDS[i].weight;
+    if (d < d0) { d0 = d; b0 = i; }
+  }
+  return b0;
+}
+
+/* 高度场：没有外圈海洋——整幅画面都是陆地，岛屿铺满，
+   岛与岛之间只有省界处的河流（自由时间）。这样才能贴近参考图1的"铺满"观感。 */
+function heightAt(x, y, W, H) {
+  const { wx, wy } = warpAt(x, y);
+
+  let b0 = 0, b1 = 0, d0 = Infinity, d1 = Infinity;
+  for (let i = 0; i < SEEDS.length; i++) {
+    const dx = wx - SEEDS[i].x, dy = wy - SEEDS[i].y;
+    const d = dx * dx + dy * dy - SEEDS[i].weight;
+    if (d < d0) { d1 = d0; b1 = b0; d0 = d; b0 = i; }
+    else if (d < d1) { d1 = d; b1 = i; }
+  }
+  const sd = SEEDS[b0], s1 = SEEDS[b1];
+  const dist0 = Math.hypot(wx - sd.x, wy - sd.y);
+  const dist1 = Math.hypot(wx - s1.x, wy - s1.y);
+  const edgeDist = (dist1 - dist0) * 0.5;
+
+  if (edgeDist < WATER_W) return Math.max(-0.12, (edgeDist - WATER_W) * 0.012);
+  const edge = sm(Math.min(1, (edgeDist - WATER_W) / 28));
+
+  const reach = Math.sqrt(sd.weight) * 0.72 + 26;
+  const t = Math.min(1, dist0 / reach);
+  let prof;
+  if (sd.task.done) prof = 0.50 + (1 - t) * (1 - t) * 0.50;
+  else              prof = 0.42 - Math.exp(-t * t * 3.0) * 0.56;
+
+  let h = prof * edge;
+  h += (fbm(x * 0.024, y * 0.024, mapSeed + 200, 3) - 0.5) * 0.03 * edge;
+  return h;
+}
+
+/* 仅返回所属任务 + 是否河流（用于实心填色，全分辨率扫描时调用） */
+function sampleProvince(x, y) {
+  const { wx, wy } = warpAt(x, y);
+  let b0 = 0, b1 = 0, d0 = Infinity, d1 = Infinity;
+  for (let i = 0; i < SEEDS.length; i++) {
+    const dx = wx - SEEDS[i].x, dy = wy - SEEDS[i].y;
+    const d = dx * dx + dy * dy - SEEDS[i].weight;
+    if (d < d0) { d1 = d0; b1 = b0; d0 = d; b0 = i; }
+    else if (d < d1) { d1 = d; b1 = i; }
+  }
+  const dist0 = Math.hypot(wx - SEEDS[b0].x, wy - SEEDS[b0].y);
+  const dist1 = Math.hypot(wx - SEEDS[b1].x, wy - SEEDS[b1].y);
+  const water = (dist1 - dist0) * 0.5 < WATER_W;
+  return { seed: SEEDS[b0], water };
+}
+
+/* ---------- 渲染状态 ---------- */
+let R = { ctx: null, W: 0, H: 0, cssScale: 1 };
+let GEOM = null;
+
+const clamp01 = v => Math.max(0, Math.min(1, v));
+
+function setupCanvas() {
+  const canvas = document.getElementById('map');
+  const rect = canvas.getBoundingClientRect();
+  const W = Math.max(1, Math.floor(rect.width));
+  const H = Math.max(1, Math.floor(rect.height));
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  R = { ctx, W, H, cssScale: rect.width / W };
+  SEEDS = buildSeeds(W, H);
+}
+
+/* ---------- 几何 ---------- */
+const LEVEL_COUNT = 14;
+
+function centroidOf(pts) { let x = 0, y = 0; for (const p of pts) { x += p.x; y += p.y; } return { x: x / pts.length, y: y / pts.length }; }
+function lengthOf(pts) { let L = 0; for (let i = 1; i < pts.length; i++) L += Math.hypot(pts[i].x - pts[i-1].x, pts[i].y - pts[i-1].y); return L; }
+function areaOf(pts) { let a = 0; for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) a += (pts[j].x + pts[i].x) * (pts[j].y - pts[i].y); return Math.abs(a / 2); }
+function isClosed(pts) { return Math.hypot(pts[0].x - pts[pts.length-1].x, pts[0].y - pts[pts.length-1].y) < 8; }
+
+function buildGeom(W, H) {
+  // 海岸线 = 河岸轮廓（贴着河流的那条线）。允许开放折线（岛屿被画框裁切时）。
+  const coast = contourPaths(W, H, [0.02]).filter(pts => pts.length > 6 && lengthOf(pts) > 30);
+
+  const levels = [];
+  for (let i = 1; i <= LEVEL_COUNT; i++) {
+    const lv = i / (LEVEL_COUNT + 1);
+    const paths = contourPaths(W, H, [lv]).map(pts => {
+      const c = centroidOf(pts);
+      const len = lengthOf(pts);
+      const closed = isClosed(pts);
+      const area = closed ? areaOf(pts) : Infinity;
+      const compact = closed ? (len * len / area) : Infinity;
+      const mid = pts[Math.floor(pts.length / 2)];
+      const { wx, wy } = warpAt(mid.x, mid.y);
+      return { pts, len, lv, closed, area, compact, seed: SEEDS[nearestSeed(wx, wy)] };
+    }).filter(p => {
+      if (p.len < 26) return false;
+      if (p.area === Infinity) return p.len > 40;
+      if (p.area < 300) return false;
+      return p.compact < 50;
+    });
+    levels.push({ lv, paths });
+  }
+  return { coast, levels };
+}
+
+/* ---------- 主绘制 ---------- */
+function render() {
+  setupCanvas();
+  buildHeightGrid(R.W, R.H);
+  GEOM = buildGeom(R.W, R.H);
+  draw();
+  placeLabels(R.W, R.H, R.cssScale);
+}
+
+function tracePath(pts) {
+  const ctx = R.ctx;
+  ctx.beginPath();
+  pts.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y));
+}
+
+/* 实心填色：逐像素判定所属任务 / 是否河流。
+   已完成=黑，未完成=纸白，河流（自由时间）=纸白。岛屿因此铺满整幅。 */
+function fillProvinces() {
+  const { ctx, W, H } = R;
+  const scale = 2;
+  const sw = Math.ceil(W / scale), sh = Math.ceil(H / scale);
+  const img = ctx.createImageData(sw, sh);
+  const d = img.data;
+  for (let sy = 0; sy < sh; sy++) {
+    for (let sx = 0; sx < sw; sx++) {
+      const { seed, water } = sampleProvince(sx * scale, sy * scale);
+      const black = !water && seed.task.done;
+      const v = black ? 20 : 255;
+      const idx = (sy * sw + sx) * 4;
+      d[idx] = v; d[idx + 1] = v; d[idx + 2] = v; d[idx + 3] = 255;
+    }
+  }
+  const tmp = document.createElement('canvas');
+  tmp.width = sw; tmp.height = sh;
+  tmp.getContext('2d').putImageData(img, 0, 0);
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(tmp, 0, 0, W, H);
+}
+
+function draw() {
+  const { ctx, W, H } = R;
+  ctx.clearRect(0, 0, W, H);
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+
+  // 1) 实心铺底（黑岛 / 白岛 / 白河）
+  fillProvinces();
+
+  // 2) 河流（自由时间）极淡水波纹理
+  drawWaterTexture();
+
+  // 3) 海岸线：每座岛屿的黑色轮廓（白岛靠它与河流区分）
+  ctx.strokeStyle = '#141414'; ctx.lineWidth = 1.6;
+  for (const pts of GEOM.coast) { tracePath(pts); ctx.stroke(); }
+
+  // 4) 内部等高线：黑岛上描白线，白岛上描灰线
+  for (const L of GEOM.levels) {
+    for (const p of L.paths) {
+      if (p.pts.length < 2) continue;
+      const done = p.seed && p.seed.task.done;
+      if (done) {
+        // 白色刻线，越往高处越亮越密的视觉由层级自然形成
+        ctx.strokeStyle = `rgba(255,255,255,${0.18 + p.lv * 0.42})`;
+        ctx.lineWidth = 0.8;
+      } else {
+        const g = Math.round(150 - p.lv * 70);
+        ctx.strokeStyle = `rgba(${g},${g},${g},0.85)`;
+        ctx.lineWidth = 0.75;
+      }
+      tracePath(p.pts);
+      ctx.stroke();
+    }
+  }
+}
+
+function drawWaterTexture() {
+  const { ctx, W, H } = R;
+  ctx.save();
+  ctx.strokeStyle = 'rgba(20,20,20,0.05)';
+  ctx.lineWidth = 0.7;
+  for (const pts of contourPaths(W, H, [-0.04])) {
+    if (pts.length < 6) continue;
+    tracePath(pts); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/* ---------- marching squares（高度场只算一次，多条等高线复用） ---------- */
+let HGRID = null;
+function buildHeightGrid(W, H) {
+  const step = 4;
+  const cols = Math.floor(W / step), rows = Math.floor(H / step);
+  const grid = new Float32Array((cols + 1) * (rows + 1));
+  for (let j = 0; j <= rows; j++)
+    for (let i = 0; i <= cols; i++)
+      grid[j * (cols + 1) + i] = heightAt(i * step, j * step, W, H);
+  HGRID = { step, cols, rows, grid };
+}
+
+function contourPaths(W, H, levels) {
+  const { step, cols, rows, grid } = HGRID;
+  const segs = [];
+  const get = (i, j) => grid[j * (cols + 1) + i];
+  const interp = (a, b, t) => a + (b - a) * t;
+
+  for (const lv of levels) {
+    for (let j = 0; j < rows; j++) {
+      for (let i = 0; i < cols; i++) {
+        const x0 = i * step, y0 = j * step, x1 = x0 + step, y1 = y0 + step;
+        const tl = get(i, j), tr = get(i + 1, j), br = get(i + 1, j + 1), bl = get(i, j + 1);
+        let c = 0;
+        if (tl > lv) c |= 8; if (tr > lv) c |= 4; if (br > lv) c |= 2; if (bl > lv) c |= 1;
+        if (c === 0 || c === 15) continue;
+        const T = { x: interp(x0, x1, (lv - tl) / (tr - tl)), y: y0 };
+        const B = { x: interp(x0, x1, (lv - bl) / (br - bl)), y: y1 };
+        const Lp = { x: x0, y: interp(y0, y1, (lv - tl) / (bl - tl)) };
+        const Rp = { x: x1, y: interp(y0, y1, (lv - tr) / (br - tr)) };
+        const push = (a, b) => segs.push([a, b]);
+        switch (c) {
+          case 1: case 14: push(Lp, B); break;
+          case 2: case 13: push(B, Rp); break;
+          case 3: case 12: push(Lp, Rp); break;
+          case 4: case 11: push(T, Rp); break;
+          case 6: case 9:  push(T, B); break;
+          case 7: case 8:  push(Lp, T); break;
+          case 5: push(Lp, T); push(B, Rp); break;
+          case 10: push(T, Rp); push(Lp, B); break;
+        }
+      }
+    }
+  }
+  return stitch(segs);
+}
+
+function stitch(segs) {
+  const paths = [];
+  const used = new Array(segs.length).fill(false);
+  const key = p => `${Math.round(p.x)},${Math.round(p.y)}`;
+  const startMap = new Map();
+  segs.forEach((s, i) => {
+    (startMap.get(key(s[0])) || startMap.set(key(s[0]), []).get(key(s[0]))).push(i);
+    (startMap.get(key(s[1])) || startMap.set(key(s[1]), []).get(key(s[1]))).push(i);
+  });
+  for (let i = 0; i < segs.length; i++) {
+    if (used[i]) continue;
+    used[i] = true;
+    const path = [segs[i][0], segs[i][1]];
+    let grow = true;
+    while (grow) {
+      grow = false;
+      const tail = path[path.length - 1];
+      const cand = startMap.get(key(tail)) || [];
+      for (const ci of cand) {
+        if (used[ci]) continue;
+        const [a, b] = segs[ci];
+        if (key(a) === key(tail)) { path.push(b); used[ci] = true; grow = true; break; }
+        if (key(b) === key(tail)) { path.push(a); used[ci] = true; grow = true; break; }
+      }
+    }
+    if (path.length >= 2) paths.push(path);
+  }
+  return paths;
+}
+
+/* ---------- 刻字（按岛屿质心，且落在陆地上） ---------- */
+function placeLabels(W, H, cssScale) {
+  const box = document.getElementById('labels');
+  box.innerHTML = '';
+  const counts = new Array(SEEDS.length).fill(0);
+  const sxs = new Array(SEEDS.length).fill(0), sys = new Array(SEEDS.length).fill(0);
+  const step = 8;
+  for (let y = 0; y < H; y += step) {
+    for (let x = 0; x < W; x += step) {
+      if (heightAt(x, y, W, H) < 0.04) continue;
+      const { wx, wy } = warpAt(x, y);
+      const best = nearestSeed(wx, wy);
+      sxs[best] += x; sys[best] += y; counts[best]++;
+    }
+  }
+  SEEDS.forEach((sd, i) => {
+    if (!counts[i]) return;
+    const cx = sxs[i] / counts[i], cy = sys[i] / counts[i];
+    const el = document.createElement('div');
+    el.className = 'label ' + (sd.task.done ? 'on-dark' : 'on-light');
+    el.style.left = (cx * cssScale) + 'px';
+    el.style.top = (cy * cssScale) + 'px';
+    const mark = sd.task.done ? '✓' : '';
+    el.innerHTML = `<span class="lname">${sd.task.name}</span><span class="ltime">${sd.task.time}</span><span class="lmark">${mark}</span>`;
+    box.appendChild(el);
+  });
+}
+
+/* ---------- 侧栏统计 ---------- */
+function fmtDur(mins) {
+  const h = Math.floor(mins / 60), m = mins % 60;
+  return (h ? h + 'h ' : '') + (m ? m + 'm' : (h ? '' : '0m'));
+}
+function parseSpan(t) {
+  const m = t.time.match(/(\d{1,2}):(\d{2})/g) || [];
+  const toMin = s => { const [h, mm] = s.split(':').map(Number); return h * 60 + mm; };
+  if (m.length < 2) return { start: 0, end: t.duration };
+  return { start: toMin(m[0]), end: toMin(m[1]) };
+}
+function renderStats() {
+  const done = tasks.filter(t => t.done);
+  const total = tasks.reduce((a, t) => a + t.duration, 0);
+  const focus = done.reduce((a, t) => a + t.duration, 0);
+  const spans = tasks.map(parseSpan);
+  const dayStart = Math.min(...spans.map(s => s.start));
+  const dayEnd = Math.max(...spans.map(s => s.end));
+  const window = Math.max(1, dayEnd - dayStart);   // 当日活动窗口
+  const free = Math.max(0, window - total);        // 未排程 = 自由时间
+  document.getElementById('stDone').textContent = done.length;
+  document.getElementById('stTodo').textContent = tasks.length - done.length;
+  document.getElementById('stFree').textContent = Math.round(free / window * 100) + '%';
+  document.getElementById('stFocus').textContent = fmtDur(focus);
+  document.getElementById('stTotal').textContent = fmtDur(total);
+
+  // legend swatches
+  document.getElementById('swDone').style.background = '#141414';
+  document.getElementById('swTodo').innerHTML = '<svg width="30" height="20"><path d="M2 14 Q8 8 14 13 T28 11" fill="none" stroke="#bdbdba" stroke-width="1"/><path d="M2 8 Q8 3 14 7 T28 6" fill="none" stroke="#d4d4d2" stroke-width="1"/></svg>';
+  document.getElementById('swRiver').innerHTML = '<svg width="30" height="20"><path d="M0 10 Q7 5 15 10 T30 10" fill="none" stroke="#c8c8c5" stroke-width="1.4"/></svg>';
+}
+
+function regenerate() {
+  mapSeed = Math.floor(Math.random() * 65536);
+  tasks = tasks.slice().sort(() => Math.random() - 0.5);
+  render(); renderStats();
+}
+
+let baseDate = new Date(2024, 4, 20);
+const WK = ['周日','周一','周二','周三','周四','周五','周六'];
+function refreshDate() {
+  const m = baseDate.getMonth() + 1, d = baseDate.getDate(), w = WK[baseDate.getDay()];
+  document.getElementById('dateText').textContent = `${baseDate.getFullYear()}年${m}月${d}日 ${w}`;
+  document.getElementById('dM').textContent = m;
+  document.getElementById('dD').textContent = d;
+  document.getElementById('dW').textContent = w;
+}
+function shiftDay(n) { baseDate.setDate(baseDate.getDate() + n); refreshDate(); regenerate(); }
+
+const params = new URLSearchParams(location.search);
+if (params.get('seed')) mapSeed = +params.get('seed');
+window.addEventListener('load', () => { refreshDate(); renderStats(); render(); });
+let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(render, 140); });
+</script>
+</body>
+</html>

@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>方案A: Voronoi地形图 - 拼图v2</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    :root {
+      --dark: #111;
+      --bg: #F7F7F7;
+      --muted: #999;
+      --surface: #fff;
+      --faint: #e5e5e5;
+    }
+    
+    body {
+      font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+      background: var(--bg);
+      color: var(--dark);
+      min-height: 100vh;
+      padding: 40px;
+    }
+    
+    .header {
+      margin-bottom: 32px;
+    }
+    
+    .header h1 {
+      font-size: 32px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    
+    .header p {
+      color: var(--muted);
+      font-size: 14px;
+    }
+    
+    .container {
+      display: flex;
+      gap: 24px;
+    }
+    
+    .canvas-wrapper {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--faint);
+      border-radius: 14px;
+      padding: 24px;
+      box-shadow: 0 14px 34px rgba(17,17,17,.035);
+    }
+    
+    .canvas-wrapper h2 {
+      font-size: 16px;
+      margin-bottom: 16px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .1em;
+    }
+    
+    canvas {
+      width: 100%;
+      height: 500px;
+      display: block;
+    }
+    
+    .sidebar {
+      width: 300px;
+      background: var(--surface);
+      border: 1px solid var(--faint);
+      border-radius: 14px;
+      padding: 24px;
+      box-shadow: 0 14px 34px rgba(17,17,17,.035);
+    }
+    
+    .sidebar h3 {
+      font-size: 14px;
+      margin-bottom: 16px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .1em;
+    }
+    
+    .task-list {
+      list-style: none;
+    }
+    
+    .task-item {
+      padding: 12px;
+      border-bottom: 1px solid var(--faint);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .task-item:last-child {
+      border-bottom: none;
+    }
+    
+    .task-color {
+      width: 16px;
+      height: 16px;
+      border-radius: 4px;
+    }
+    
+    .task-info {
+      flex: 1;
+    }
+    
+    .task-name {
+      font-size: 14px;
+      font-weight: 500;
+    }
+    
+    .task-time {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    
+    .task-done {
+      opacity: 0.5;
+    }
+    
+    .task-done .task-name {
+      text-decoration: line-through;
+    }
+    
+    .checkmark {
+      width: 18px;
+      height: 18px;
+      border: 2px solid var(--dark);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .checkmark.done {
+      background: var(--dark);
+    }
+    
+    .checkmark.done::after {
+      content: '✓';
+      color: var(--bg);
+      font-size: 12px;
+    }
+    
+    .legend {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--faint);
+    }
+    
+    .legend h4 {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+    
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+      font-size: 12px;
+    }
+    
+    .legend-color {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+    }
+    
+    .refresh-btn {
+      margin-top: 24px;
+      width: 100%;
+      padding: 12px;
+      background: var(--dark);
+      color: var(--bg);
+      border: none;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 13px;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    
+    .refresh-btn:hover {
+      opacity: 0.8;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>方案A: Voronoi地形图</h1>
+    <p>使用Voronoi图算法生成不规则多边形地块，任务块像地图上的区域，河流在缝隙间流淌</p>
+  </div>
+  
+  <div class="container">
+    <div class="canvas-wrapper">
+      <h2>预览效果</h2>
+      <canvas id="voronoiCanvas"></canvas>
+    </div>
+    
+    <div class="sidebar">
+      <h3>今日任务</h3>
+      <ul class="task-list" id="taskList"></ul>
+      
+      <div class="legend">
+        <h4>图例说明</h4>
+        <div class="legend-item">
+          <div class="legend-color" style="background: #111;"></div>
+          <span>已完成任务</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color" style="background: #999;"></div>
+          <span>未完成任务</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color" style="background: linear-gradient(90deg, #e0e0e0, #f5f5f5);"></div>
+          <span>河流（空闲时间）</span>
+        </div>
+      </div>
+      
+      <button class="refresh-btn" onclick="regenerate()">重新生成</button>
+    </div>
+  </div>
+
+  <script>
+    // 模拟任务数据
+    const tasks = [
+      { id: 1, name: '晨间冥想', time: '07:00', duration: 30, done: true },
+      { id: 2, name: '阅读《深度工作》', time: '08:00', duration: 60, done: true },
+      { id: 3, name: '项目会议', time: '10:00', duration: 45, done: false },
+      { id: 4, name: '代码审查', time: '11:00', duration: 90, done: false },
+      { id: 5, name: '午餐休息', time: '12:30', duration: 60, done: true },
+      { id: 6, name: '写技术文档', time: '14:00', duration: 120, done: false },
+      { id: 7, name: '团队同步', time: '16:00', duration: 30, done: false },
+      { id: 8, name: '健身', time: '18:00', duration: 60, done: true },
+    ];
+
+    // 颜色方案（单色系）
+    const colors = {
+      done: '#111',
+      undone: '#999',
+      river: '#e8e8e8',
+      riverHighlight: '#f5f5f5',
+      stroke: '#d0d0d0'
+    };
+
+    // Voronoi图生成器
+    class VoronoiGenerator {
+      constructor(width, height, points) {
+        this.width = width;
+        this.height = height;
+        this.points = points;
+        this.cells = [];
+      }
+
+      // 使用Fortune算法简化版生成Voronoi图
+      generate() {
+        // 为每个任务生成随机种子点
+        const seedPoints = this.points.map((point, i) => ({
+          x: point.x,
+          y: point.y,
+          taskIndex: i
+        }));
+
+        // 使用简单的最近点方法生成Voronoi区域
+        const imageData = new ImageData(this.width, this.height);
+        const data = imageData.data;
+
+        for (let y = 0; y < this.height; y++) {
+          for (let x = 0; x < this.width; x++) {
+            let minDist = Infinity;
+            let closestIndex = 0;
+
+            // 找到最近的种子点
+            for (let i = 0; i < seedPoints.length; i++) {
+              const dx = x - seedPoints[i].x;
+              const dy = y - seedPoints[i].y;
+              const dist = dx * dx + dy * dy;
+              if (dist < minDist) {
+                minDist = dist;
+                closestIndex = i;
+              }
+            }
+
+            const idx = (y * this.width + x) * 4;
+            const task = this.points[closestIndex];
+            
+            // 计算到边界的距离（用于边缘效果）
+            const edgeDist = Math.sqrt(minDist);
+            const edgeThreshold = 8;
+            
+            if (edgeDist < edgeThreshold) {
+              // 边缘区域 - 河流效果
+              const gradient = edgeDist / edgeThreshold;
+              const riverColor = this.interpolateColor(colors.river, colors.riverHighlight, gradient);
+              const rgb = this.hexToRgb(riverColor);
+              data[idx] = rgb.r;
+              data[idx + 1] = rgb.g;
+              data[idx + 2] = rgb.b;
+              data[idx + 3] = 255;
+            } else {
+              // 任务区域
+              const baseColor = task.done ? colors.done : colors.undone;
+              const rgb = this.hexToRgb(baseColor);
+              
+              // 添加一些深度变化
+              const depthVariation = Math.sin(x * 0.05 + y * 0.03) * 10;
+              data[idx] = Math.max(0, Math.min(255, rgb.r + depthVariation));
+              data[idx + 1] = Math.max(0, Math.min(255, rgb.g + depthVariation));
+              data[idx + 2] = Math.max(0, Math.min(255, rgb.b + depthVariation));
+              data[idx + 3] = 255;
+            }
+          }
+        }
+
+        return imageData;
+      }
+
+      hexToRgb(hex) {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? {
+          r: parseInt(result[1], 16),
+          g: parseInt(result[2], 16),
+          b: parseInt(result[3], 16)
+        } : { r: 0, g: 0, b: 0 };
+      }
+
+      interpolateColor(color1, color2, factor) {
+        const rgb1 = this.hexToRgb(color1);
+        const rgb2 = this.hexToRgb(color2);
+        const r = Math.round(rgb1.r + (rgb2.r - rgb1.r) * factor);
+        const g = Math.round(rgb1.g + (rgb2.g - rgb1.g) * factor);
+        const b = Math.round(rgb1.b + (rgb2.b - rgb1.b) * factor);
+        return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+      }
+    }
+
+    // 主渲染函数
+    function render() {
+      const canvas = document.getElementById('voronoiCanvas');
+      const ctx = canvas.getContext('2d');
+      
+      // 设置canvas尺寸
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width * 2;
+      canvas.height = rect.height * 2;
+      ctx.scale(2, 2);
+      
+      const width = rect.width;
+      const height = rect.height;
+      
+      // 生成种子点（基于任务时长计算区域大小）
+      const totalDuration = tasks.reduce((sum, t) => sum + t.duration, 0);
+      const points = tasks.map((task, i) => {
+        const area = (task.duration / totalDuration) * width * height;
+        const radius = Math.sqrt(area / Math.PI);
+        
+        // 使用黄金角度分布，确保均匀分布
+        const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+        const angle = i * goldenAngle;
+        const distance = Math.sqrt(i / tasks.length) * Math.min(width, height) * 0.4;
+        
+        return {
+          x: width / 2 + Math.cos(angle) * distance,
+          y: height / 2 + Math.sin(angle) * distance,
+          radius: radius,
+          done: task.done
+        };
+      });
+      
+      // 生成Voronoi图
+      const voronoi = new VoronoiGenerator(canvas.width, canvas.height, points);
+      const imageData = voronoi.generate();
+      
+      // 绘制到canvas
+      ctx.putImageData(imageData, 0, 0);
+      
+      // 绘制河流动画效果
+      drawRiverAnimation(ctx, width, height, points);
+      
+      // 绘制任务标记
+      drawTaskMarkers(ctx, points, tasks);
+    }
+
+    // 绘制河流动画
+    function drawRiverAnimation(ctx, width, height, points) {
+      const time = Date.now() * 0.001;
+      
+      // 在Voronoi边缘绘制流动的河流
+      for (let i = 0; i < points.length; i++) {
+        for (let j = i + 1; j < points.length; j++) {
+          const p1 = points[i];
+          const p2 = points[j];
+          
+          // 计算两点之间的距离
+          const dx = p2.x - p1.x;
+          const dy = p2.y - p1.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          
+          // 只绘制相邻的河流
+          if (dist < Math.min(width, height) * 0.6) {
+            drawRiver(ctx, p1, p2, time);
+          }
+        }
+      }
+    }
+
+    // 绘制单条河流
+    function drawRiver(ctx, p1, p2, time) {
+      const midX = (p1.x + p2.x) / 2;
+      const midY = (p1.y + p2.y) / 2;
+      
+      // 添加一些随机偏移，使河流更自然
+      const offset1 = Math.sin(time + p1.x * 0.01) * 15;
+      const offset2 = Math.cos(time + p2.y * 0.01) * 15;
+      
+      ctx.beginPath();
+      ctx.moveTo(p1.x, p1.y);
+      ctx.quadraticCurveTo(
+        midX + offset1,
+        midY + offset2,
+        p2.x,
+        p2.y
+      );
+      
+      // 创建渐变
+      const gradient = ctx.createLinearGradient(p1.x, p1.y, p2.x, p2.y);
+      gradient.addColorStop(0, 'rgba(224, 224, 224, 0.6)');
+      gradient.addColorStop(0.5, 'rgba(245, 245, 245, 0.8)');
+      gradient.addColorStop(1, 'rgba(224, 224, 224, 0.6)');
+      
+      ctx.strokeStyle = gradient;
+      ctx.lineWidth = 4 + Math.sin(time * 2) * 2;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+      
+      // 添加高光
+      ctx.beginPath();
+      ctx.moveTo(p1.x, p1.y);
+      ctx.quadraticCurveTo(
+        midX + offset1 * 0.5,
+        midY + offset2 * 0.5 - 2,
+        p2.x,
+        p2.y
+      );
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+
+    // 绘制任务标记
+    function drawTaskMarkers(ctx, points, tasks) {
+      points.forEach((point, i) => {
+        const task = tasks[i];
+        
+        // 绘制勾号（如果完成）
+        if (task.done) {
+          ctx.save();
+          ctx.translate(point.x, point.y);
+          
+          // 绘制圆形背景
+          ctx.beginPath();
+          ctx.arc(0, 0, 12, 0, Math.PI * 2);
+          ctx.fillStyle = '#111';
+          ctx.fill();
+          
+          // 绘制勾号
+          ctx.beginPath();
+          ctx.moveTo(-5, 0);
+          ctx.lineTo(-1, 4);
+          ctx.lineTo(6, -4);
+          ctx.strokeStyle = '#fff';
+          ctx.lineWidth = 2.5;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.stroke();
+          
+          ctx.restore();
+        }
+        
+        // 绘制任务名称
+        ctx.save();
+        ctx.font = '11px "JetBrains Mono", monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        ctx.fillStyle = task.done ? '#fff' : '#111';
+        ctx.shadowColor = task.done ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.8)';
+        ctx.shadowBlur = 3;
+        ctx.fillText(task.name, point.x, point.y + 18);
+        ctx.restore();
+      });
+    }
+
+    // 渲染任务列表
+    function renderTaskList() {
+      const list = document.getElementById('taskList');
+      list.innerHTML = tasks.map(task => `
+        <li class="task-item ${task.done ? 'task-done' : ''}">
+          <div class="checkmark ${task.done ? 'done' : ''}"></div>
+          <div class="task-info">
+            <div class="task-name">${task.name}</div>
+            <div class="task-time">${task.time} · ${task.duration}分钟</div>
+          </div>
+        </li>
+      `).join('');
+    }
+
+    // 重新生成
+    function regenerate() {
+      // 随机打乱任务顺序
+      tasks.sort(() => Math.random() - 0.5);
+      render();
+      renderTaskList();
+    }
+
+    // 动画循环
+    let animationFrame;
+    function animate() {
+      render();
+      animationFrame = requestAnimationFrame(animate);
+    }
+
+    // 初始化
+    window.addEventListener('load', () => {
+      renderTaskList();
+      animate();
+    });
+
+    window.addEventListener('resize', () => {
+      cancelAnimationFrame(animationFrame);
+      animate();
+    });
+  </script>
+</body>
+</html>

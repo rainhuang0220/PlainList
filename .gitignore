@@ -1,0 +1,28 @@
+node_modules/
+apps/*/node_modules/
+apps/*/dist/
+packages/*/node_modules/
+packages/*/dist/
+
+# Capacitor native projects (regenerated via `npx cap add`)
+apps/web/android/
+apps/web/ios/
+coverage/
+*.tsbuildinfo
+.DS_Store
+apps/api/.env
+# 个人方法论/经验档案，含服务器密码与敏感信息
+exp.md
+apps/Untitled
+data/widgets/
+apps/api/data/
+plugins/*/.venv/
+plugins/*/__pycache__/
+backup-*.zip
+backup-*/
+.codex-logs/
+.codex-mysql/
+.runtime/
+.runtime-logs/
+logs/
+.superpowers/
