@@ -1,61 +1,57 @@
 <template>
-  <div class="user-settings-overlay" @click.self="emit('close')">
-    <div class="user-settings-shell">
-      <aside class="user-settings-sidebar">
-        <div class="user-settings-sidebar-head">
-          <div class="user-settings-kicker">{{ t('settings.kicker', 'Settings') }}</div>
-          <div class="user-settings-username">{{ username }}</div>
+  <div class="us-overlay" @click.self="emit('close')">
+    <div class="us-modal" role="dialog" aria-label="用户设置">
+      <!-- 左侧导航栏：永远在左侧，不再受任何响应式断点影响 -->
+      <aside class="us-side">
+        <div class="us-side-head">
+          <div class="us-kicker">设置</div>
+          <div class="us-username">{{ username }}</div>
         </div>
-
-        <nav class="user-settings-nav">
+        <div class="us-side-body">
           <button
             v-for="item in navItems"
             :key="item.id"
             type="button"
-            :class="['user-settings-nav-item', { active: activeSection === item.id }]"
-            @click="activeSection = item.id"
+            class="us-nav-item"
+            :class="{ 'us-nav-active': activeSection === item.id }"
+            @click="switchSection(item.id)"
           >
             {{ item.label }}
           </button>
-        </nav>
-
-        <button type="button" class="user-settings-close-side" @click="emit('close')">
-          {{ t('settings.close', '关闭') }}
-        </button>
+        </div>
+        <div class="us-side-foot">
+          <button type="button" class="us-close-btn" @click="emit('close')">关闭</button>
+        </div>
       </aside>
 
-      <main class="user-settings-main">
-        <header class="user-settings-main-head">
-          <h2 class="user-settings-title">{{ activeTitle }}</h2>
-          <button type="button" class="user-settings-close" aria-label="close" @click="emit('close')">×</button>
+      <!-- 右侧主区域 -->
+      <section class="us-main">
+        <header class="us-main-head">
+          <h2 class="us-main-title">{{ activeTitle }}</h2>
+          <button type="button" class="us-main-x" aria-label="close" @click="emit('close')">×</button>
         </header>
-
-        <section v-if="activeSection === 'account'" class="user-settings-content">
-          <div class="settings-account-card">
-            <div class="settings-account-row">
-              <span class="settings-account-label">{{ t('settings.account_name', '用户名') }}</span>
-              <span class="settings-account-value">{{ username }}</span>
+        <div class="us-main-body">
+          <AiSettingsForm v-if="activeSection === 'ai'" :key="formKey" />
+          <UserProfileSettings v-else-if="activeSection === 'profile'" :key="formKey" />
+          <div v-else class="us-account">
+            <div class="us-account-card">
+              <div class="us-account-row">
+                <span class="us-account-label">{{ t('settings.account_name', '用户名') }}</span>
+                <span class="us-account-value">{{ username }}</span>
+              </div>
+              <div class="us-account-row">
+                <span class="us-account-label">{{ t('settings.account_role', '角色') }}</span>
+                <span class="us-account-value">
+                  {{ isAdmin ? t('settings.role_admin', '管理员') : t('settings.role_user', '普通用户') }}
+                </span>
+              </div>
             </div>
-            <div class="settings-account-row">
-              <span class="settings-account-label">{{ t('settings.account_role', '角色') }}</span>
-              <span class="settings-account-value">
-                {{ isAdmin ? t('settings.role_admin', '管理员') : t('settings.role_user', '普通用户') }}
-              </span>
-            </div>
+            <p class="us-account-hint">
+              {{ t('settings.account_hint', '更多账户选项（密码修改、语言偏好等）待后续版本。') }}
+            </p>
           </div>
-          <p class="settings-account-hint">
-            {{ t('settings.account_hint', '更多账户选项（密码修改、语言偏好等）待后续版本。') }}
-          </p>
-        </section>
-
-        <section v-else-if="activeSection === 'ai'" class="user-settings-content">
-          <AiSettingsForm />
-        </section>
-
-        <section v-else class="user-settings-content">
-          <UserProfileSettings />
-        </section>
-      </main>
+        </div>
+      </section>
     </div>
   </div>
 </template>
@@ -76,6 +72,8 @@ const emit = defineEmits<{ close: [] }>();
 
 const i18n = useI18nStore();
 const activeSection = ref<'account' | 'ai' | 'profile'>(props.initialSection ?? 'ai');
+// 切换 tab 时强制重置子组件，避免不同 tab 状态污染
+const formKey = ref(0);
 
 function t(key: string, fallback: string) {
   return i18n.t(key, fallback);
@@ -97,6 +95,12 @@ const activeTitle = computed(() => {
   return t('intake.settings_title', '大模型设置');
 });
 
+// 切 tab 时子组件重新挂载，避免表单 / 画像状态残留
+function switchSection(id: 'account' | 'ai' | 'profile') {
+  activeSection.value = id;
+  formKey.value += 1;
+}
+
 onMounted(() => {
   document.body.style.overflow = 'hidden';
 });
@@ -107,72 +111,79 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.user-settings-overlay {
+/* 命名空间全部加 us- 前缀，避免和别的组件冲突 */
+
+/* 遮罩层 */
+.us-overlay {
   position: fixed;
   inset: 0;
   z-index: 1200;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
-  padding: max(52px, 8vh) 24px 24px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
+  padding: 24px;
   background: rgba(0, 0, 0, 0.42);
   backdrop-filter: blur(6px);
+  overflow: auto;
 }
 
-.user-settings-shell {
-  display: grid;
-  grid-template-columns: 220px 1fr;
-  grid-template-rows: minmax(0, 1fr);
-  width: min(860px, 100%);
-  height: min(640px, calc(100vh - max(52px, 8vh) - 24px));
-  max-height: min(640px, calc(100vh - max(52px, 8vh) - 24px));
+/* 模态框本体：固定 flex 两列 */
+.us-modal {
+  display: flex;
+  flex-direction: row;
+  width: 860px;
+  max-width: 100%;
+  height: 640px;
+  max-height: calc(100vh - 48px);
   background: var(--surface);
   border: 1px solid var(--faint);
   box-shadow: 0 28px 80px rgba(0, 0, 0, 0.16);
   overflow: hidden;
 }
 
-.user-settings-sidebar {
+/* 左侧导航：固定 220px，永远在左 */
+.us-side {
+  flex: 0 0 220px;
   display: flex;
   flex-direction: column;
-  min-height: 0;
-  padding: 20px 0;
   background: var(--faint2);
   border-right: 1px solid var(--faint);
-  overflow-y: auto;
+  min-height: 0;
 }
 
-.user-settings-sidebar-head {
-  padding: 0 18px 16px;
+.us-side-head {
+  padding: 20px 18px 16px;
   border-bottom: 1px solid var(--faint);
 }
 
-.user-settings-kicker {
+.us-kicker {
   font-size: 10px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--muted);
 }
 
-.user-settings-username {
+.us-username {
   margin-top: 6px;
   font-family: var(--mono);
   font-size: 14px;
   font-weight: 600;
   color: var(--dark);
+  word-break: break-all;
 }
 
-.user-settings-nav {
+/* 中段：导航列表，纵向排列 */
+.us-side-body {
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   gap: 2px;
   padding: 12px 10px;
-  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
 }
 
-.user-settings-nav-item {
+.us-nav-item {
   text-align: left;
   padding: 10px 12px;
   border: none;
@@ -181,23 +192,27 @@ onUnmounted(() => {
   color: var(--mid);
   cursor: pointer;
   border-radius: var(--r);
-  transition: background 0.15s, color 0.15s;
+  font-family: inherit;
 }
 
-.user-settings-nav-item:hover {
+.us-nav-item:hover {
   background: color-mix(in srgb, var(--surface) 70%, transparent);
   color: var(--dark);
 }
 
-.user-settings-nav-item.active {
+.us-nav-active {
   background: var(--surface);
   color: var(--dark);
   font-weight: 600;
-  box-shadow: 0 1px 0 var(--faint);
 }
 
-.user-settings-close-side {
-  margin: 0 14px;
+.us-side-foot {
+  padding: 12px 14px 16px;
+  border-top: 1px solid var(--faint);
+}
+
+.us-close-btn {
+  width: 100%;
   padding: 8px 10px;
   border: 1px solid var(--faint);
   background: transparent;
@@ -207,57 +222,71 @@ onUnmounted(() => {
   color: var(--muted);
   cursor: pointer;
   border-radius: var(--r);
+  font-family: inherit;
 }
 
-.user-settings-main {
+.us-close-btn:hover {
+  color: var(--dark);
+  border-color: var(--mid);
+}
+
+/* 右侧主区域：flex column，body 内部滚动 */
+.us-main {
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  overflow: hidden;
 }
 
-.user-settings-main-head {
+.us-main-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  flex-shrink: 0;
+  flex: 0 0 auto;
   padding: 18px 24px 14px;
   border-bottom: 1px solid var(--faint2);
 }
 
-.user-settings-title {
+.us-main-title {
   margin: 0;
   font-size: 20px;
   font-weight: 600;
+  color: var(--dark);
 }
 
-.user-settings-close {
+.us-main-x {
   border: none;
   background: transparent;
   font-size: 26px;
   line-height: 1;
   color: var(--muted);
   cursor: pointer;
+  padding: 4px 8px;
 }
 
-.user-settings-content {
-  flex: 1;
+.us-main-x:hover {
+  color: var(--dark);
+}
+
+.us-main-body {
+  flex: 1 1 auto;
   min-height: 0;
-  padding: 18px 24px 24px;
-  overflow-x: hidden;
   overflow-y: auto;
-  overscroll-behavior: contain;
+  overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
+  padding: 18px 24px 24px;
 }
 
-.settings-account-card {
+/* 账户面板 */
+.us-account-card {
   border: 1px solid var(--faint);
   border-radius: var(--r);
   overflow: hidden;
+  background: var(--surface);
 }
 
-.settings-account-row {
+.us-account-row {
   display: flex;
   justify-content: space-between;
   gap: 16px;
@@ -265,58 +294,26 @@ onUnmounted(() => {
   font-size: 14px;
 }
 
-.settings-account-row + .settings-account-row {
+.us-account-row + .us-account-row {
   border-top: 1px solid var(--faint2);
 }
 
-.settings-account-label {
+.us-account-label {
   color: var(--muted);
   font-size: 12px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
-.settings-account-value {
+.us-account-value {
   color: var(--dark);
   font-family: var(--mono);
 }
 
-.settings-account-hint {
+.us-account-hint {
   margin-top: 14px;
   font-size: 13px;
   line-height: 1.5;
   color: var(--muted);
-}
-
-@media (max-width: 720px) {
-  .user-settings-overlay {
-    padding: 56px 12px 12px;
-  }
-
-  .user-settings-shell {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto minmax(0, 1fr);
-    height: min(640px, calc(100vh - 68px));
-    max-height: min(640px, calc(100vh - 68px));
-  }
-
-  .user-settings-sidebar {
-    flex-shrink: 0;
-    max-height: none;
-    overflow: visible;
-    border-right: none;
-    border-bottom: 1px solid var(--faint);
-    padding-bottom: 10px;
-  }
-
-  .user-settings-nav {
-    flex-direction: row;
-    flex-wrap: wrap;
-    padding: 8px 12px;
-  }
-
-  .user-settings-close-side {
-    display: none;
-  }
 }
 </style>

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { ZodError } from 'zod';
 import { authMiddleware, type AuthRequest } from '../../middleware/auth';
 import {
+  applyDefaultAiSettings,
   clearUserAiSettings,
   getAiSettingsView,
   saveAiSettings,
@@ -83,6 +84,21 @@ aiIntakeRouter.put('/settings', async (req, res) => {
 aiIntakeRouter.delete('/settings', async (req, res) => {
   try {
     res.json(await clearUserAiSettings((req as AuthRequest).user.id));
+  } catch (error) {
+    respondError(error, res);
+  }
+});
+
+aiIntakeRouter.post('/settings/apply-default', async (req, res) => {
+  try {
+    const result = await applyDefaultAiSettings((req as AuthRequest).user.id);
+    if (!result) {
+      res.status(503).json({
+        error: '服务端未配置 AI_USER_DEFAULT_API_KEY，请联系管理员在 apps/api/.env 中配置。',
+      });
+      return;
+    }
+    res.json(result);
   } catch (error) {
     respondError(error, res);
   }

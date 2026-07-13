@@ -13,14 +13,8 @@
 
       <div class="settings-presets">
         <span class="settings-presets-label">{{ t('intake.settings_presets', '快速填充') }}</span>
-        <button type="button" class="settings-preset-btn" @click="applySpeedPreset">
-          {{ t('intake.settings_presets_speed', '速记加速') }}
-        </button>
-        <button type="button" class="settings-preset-btn" @click="applyMinimaxOpenAi">
-          MiniMax-M3（OpenAI）
-        </button>
-        <button type="button" class="settings-preset-btn" @click="applyMinimaxAnthropic">
-          MiniMax-M3（Anthropic）
+        <button type="button" class="settings-preset-btn" @click="applyQwenPreset" :disabled="applyingPreset">
+          {{ t('intake.settings_presets_qwen', '通义千问 qwen3.7-plus') }}
         </button>
       </div>
 
@@ -33,19 +27,19 @@
       <label class="settings-field">
         <span>{{ t('intake.settings_provider', '协议') }}</span>
         <select v-model="form.provider">
-          <option value="openai">OpenAI 兼容（SiliconFlow / DeepSeek / OpenRouter …）</option>
-          <option value="anthropic">Anthropic 兼容（MiniMax / Claude …）</option>
+          <option value="openai">OpenAI 兼容（DashScope / SiliconFlow / DeepSeek / OpenRouter …）</option>
+          <option value="anthropic">Anthropic 兼容（Claude …）</option>
         </select>
       </label>
 
       <label class="settings-field">
         <span>{{ t('intake.settings_base_url', '接口地址') }}</span>
-        <input v-model="form.baseUrl" type="url" required placeholder="https://api.siliconflow.cn/v1" />
+        <input v-model="form.baseUrl" type="url" required placeholder="https://dashscope.aliyuncs.com/compatible-mode/v1" />
       </label>
 
       <label class="settings-field">
         <span>{{ t('intake.settings_model', '深度模型') }}</span>
-        <input v-model="form.model" type="text" required placeholder="MiniMax-M3 / deepseek-ai/DeepSeek-V3.1-Terminus" />
+        <input v-model="form.model" type="text" required placeholder="qwen3.7-plus" />
         <small class="settings-hint">复盘、深度推理等场景；速记可单独指定更快模型。</small>
       </label>
 
@@ -57,7 +51,7 @@
           :placeholder="form.model"
         />
         <small class="settings-hint">
-          {{ t('intake.settings_intake_model_hint', '留空则与深度模型相同。速记建议填更快模型（如 DeepSeek-V3）。') }}
+          {{ t('intake.settings_intake_model_hint', '留空则与深度模型相同。速记建议填更快模型（如 qwen3.7-plus）。') }}
         </small>
       </label>
 
@@ -107,7 +101,7 @@
 </template>
 
 <script setup lang="ts">
-import type { AiConnectionTestResult, AiProvider, AiUserSettingsView } from '@plainlist/shared';
+import type { AiConnectionTestResult, AiProvider, AiUserSettingsView, AiUserSettingsViewWithKey } from '@plainlist/shared';
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue';
 import { useApi } from '@/shared/api/useApi';
 import { useI18nStore } from '@/shared/i18n/useI18nStore';
@@ -118,6 +112,8 @@ const { del, get, post, put } = useApi();
 const loading = ref(true);
 const saving = ref(false);
 const testing = ref(false);
+const applyingPreset = ref(false);
+const showApiKey = ref(true);
 const saved = ref(false);
 const error = ref('');
 const testMessage = ref('');
@@ -128,8 +124,8 @@ let mounted = true;
 
 const form = reactive({
   provider: 'openai' as AiProvider,
-  baseUrl: 'https://api.siliconflow.cn/v1',
-  model: 'deepseek-ai/DeepSeek-V3.1-Terminus',
+  baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+  model: 'qwen3.7-plus',
   intakeModel: '',
   apiKey: '',
   timeoutMs: 30000,
@@ -156,35 +152,36 @@ const apiKeyPlaceholder = computed(() => {
 
 const providerHint = computed(() => {
   if (form.provider === 'anthropic') {
-    return 'MiniMax Anthropic 兼容：Base URL 填 https://api.minimax.chat/anthropic，模型 MiniMax-M3。详见 platform.minimaxi.com 文档。';
+    return 'Anthropic 兼容：Base URL 填官方/兼容网关地址，模型按网关支持的 Claude 系列填写。';
   }
-  return 'MiniMax OpenAI 兼容：Base URL 填 https://api.minimaxi.com/v1，模型 MiniMax-M3。M3 较慢，建议超时 ≥ 180000ms（3 分钟）。';
+  return '通义千问 qwen3.7-plus（推荐）：Base URL 填 https://dashscope.aliyuncs.com/compatible-mode/v1 ，模型 qwen3.7-plus。DashScope 兼容 OpenAI 协议，可直接使用 OpenAI SDK。';
 });
 
-function applySpeedPreset() {
+function applyQwenPreset() {
   form.provider = 'openai';
-  form.baseUrl = 'https://api.siliconflow.cn/v1';
-  form.intakeModel = 'deepseek-ai/DeepSeek-V3.1-Terminus';
-  if (!form.model || form.model === form.intakeModel) {
-    form.model = 'MiniMax-M3';
+  form.baseUrl = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
+  form.model = 'qwen3.7-plus';
+  form.intakeModel = 'qwen3.7-plus';
+  form.timeoutMs = 60000;
+  void applyServerDefault();
+}
+
+async function applyServerDefault() {
+  applyingPreset.value = true;
+  saved.value = false;
+  error.value = '';
+  testMessage.value = '';
+  try {
+    const next = await post<AiUserSettingsViewWithKey>('/ai-intake/settings/apply-default', {});
+    applyView(next);
+    // apply-default 接口一次性返回真实 Key，演示时直接显示在输入框里
+    form.apiKey = next.apiKey ?? '';
+    saved.value = true;
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'apply default failed';
+  } finally {
+    applyingPreset.value = false;
   }
-  form.timeoutMs = 90000;
-}
-
-function applyMinimaxOpenAi() {
-  form.provider = 'openai';
-  form.baseUrl = 'https://api.minimaxi.com/v1';
-  form.model = 'MiniMax-M3';
-  form.intakeModel = '';
-  form.timeoutMs = 180000;
-}
-
-function applyMinimaxAnthropic() {
-  form.provider = 'anthropic';
-  form.baseUrl = 'https://api.minimax.chat/anthropic';
-  form.model = 'MiniMax-M3';
-  form.timeoutMs = 180000;
-  form.anthropicVersion = '2023-06-01';
 }
 
 function applyView(next: AiUserSettingsView) {
@@ -393,6 +390,37 @@ onUnmounted(() => {
   letter-spacing: normal;
   text-transform: none;
   color: var(--muted);
+}
+
+.settings-key-row {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.settings-key-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+.settings-key-toggle {
+  flex: 0 0 auto;
+  padding: 0 10px;
+  border: 1px solid var(--faint);
+  background: var(--faint2);
+  color: var(--mid);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  border-radius: var(--r);
+}
+
+.settings-key-toggle:hover {
+  color: var(--dark);
+  border-color: var(--mid);
 }
 
 .settings-error {

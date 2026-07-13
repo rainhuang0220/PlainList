@@ -69,11 +69,11 @@ async function seedDemoAiSettings(pool: Pool, userId: number): Promise<void> {
   const baseUrl =
     (process.env.AI_USER_DEFAULT_BASE_URL ?? '').trim()
     || (process.env.AI_REVIEW_BASE_URL ?? '').trim()
-    || 'https://api.siliconflow.cn/v1';
+    || 'https://dashscope.aliyuncs.com/compatible-mode/v1';
   const model =
     (process.env.AI_USER_DEFAULT_MODEL ?? '').trim()
     || (process.env.AI_REVIEW_MODEL ?? '').trim()
-    || 'deepseek-ai/DeepSeek-V3.1-Terminus';
+    || 'qwen3.7-plus';
   const intakeModel = (process.env.AI_USER_DEFAULT_INTAKE_MODEL ?? '').trim();
   const timeoutMs = Number(process.env.AI_REVIEW_TIMEOUT_MS) || 30000;
 

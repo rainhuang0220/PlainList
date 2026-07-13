@@ -265,6 +265,16 @@ export interface AiUserSettingsView {
   effectiveSource: 'user' | 'server' | 'none';
 }
 
+/**
+ * Same as AiUserSettingsView, but ALSO returns the full apiKey.
+ * Only used by `POST /ai-intake/settings/apply-default` so the demo form
+ * can be pre-filled with the server-side default key. Never exposed by
+ * GET endpoints (which always use AiUserSettingsView).
+ */
+export interface AiUserSettingsViewWithKey extends AiUserSettingsView {
+  apiKey: string;
+}
+
 export interface AiConnectionTestResult {
   ok: true;
   provider: AiProvider;

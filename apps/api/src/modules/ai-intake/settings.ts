@@ -62,6 +62,24 @@ export async function seedDefaultAiSettings(userId: number): Promise<boolean> {
   return true;
 }
 
+/**
+ * 把服务端 `AI_USER_DEFAULT_*` 套到当前用户，覆盖用户原有 ai_settings。
+ * 返回 null 表示服务端未配置默认（接口返回 503）。
+ * 返回的 view **额外带明文 apiKey**（仅这一次返回），便于前端演示时把表单填好。
+ */
+export async function applyDefaultAiSettings(
+  userId: number,
+): Promise<(AiUserSettingsView & { apiKey: string }) | null> {
+  const defaults = getDefaultAiSettings();
+  if (!defaults) {
+    return null;
+  }
+
+  await setUserSetting(userId, USER_SETTING_KEYS.aiSettings, JSON.stringify(defaults));
+  const view = await getAiSettingsView(userId);
+  return { ...view, apiKey: defaults.apiKey };
+}
+
 function isPlaceholderKey(key: string): boolean {
   const trimmed = key.trim();
   return !trimmed || trimmed === 'your-api-key';
