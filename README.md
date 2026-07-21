@@ -50,7 +50,7 @@ plainlist/
 - 本机 MySQL（账号、密码、端口准备好）
 ### 第一次启动
 ```bash
-cd trae-plainlist
+cd plainlist
 npm install
 cp apps/api/.env.example apps/api/.env
 # 编辑 DB_* 与可选的 AI_* 默认配置
