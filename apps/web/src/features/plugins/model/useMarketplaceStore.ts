@@ -27,6 +27,8 @@ export const useMarketplaceStore = defineStore('marketplace', () => {
 
   // --- Theme state (migrated from old usePluginsStore) ---
   const themeVars = reactive<ThemeVars>({ ...DEFAULT_THEME_VARS });
+  const activeThemeId = ref<string>('default');
+  const previewingThemeId = ref<string | null>(null);
   const previewing = ref(false);
   let savedVars: ThemeVars | null = null;
 
@@ -51,6 +53,27 @@ export const useMarketplaceStore = defineStore('marketplace', () => {
     return enabledIds.value.has(pluginId);
   }
 
+  // Resolve a widget's iframe URL.
+  // - Absolute URLs (http://, https://) and root-relative paths starting with
+  //   `/` are used as-is.
+  // - The special prefix `/widget/` is preserved so multi-host deployments
+  //   that proxy `/widget/<id>/` to the sidecar port keep working.
+  // - Any other relative value is treated as relative to the manifest's
+  //   origin (e.g. for Vite-served static widgets under
+  //   `apps/web/public/widgets/<id>/`).
+  function resolveWidgetUrl(pluginId: string, manifestUrl: string): string {
+    if (/^https?:\/\//i.test(manifestUrl)) {
+      return manifestUrl;
+    }
+    if (manifestUrl.startsWith('/')) {
+      return manifestUrl.startsWith('/widget/') || manifestUrl.startsWith('/widgets/')
+        ? `${window.location.origin}${manifestUrl}`
+        : `${window.location.origin}${manifestUrl.replace(/^\/+/, '/')}`;
+    }
+    // Bare relative path (e.g. "widgets/focus-bay/") — treat as origin-rooted.
+    return `${window.location.origin}/${manifestUrl.replace(/^\/+/, '')}`;
+  }
+
   // --- Theme methods ---
   function emitThemeChanged() {
     requestAnimationFrame(() => {
@@ -67,11 +90,12 @@ export const useMarketplaceStore = defineStore('marketplace', () => {
     emitThemeChanged();
   }
 
-  function previewTheme(vars: ThemeVars) {
+  function previewTheme(themeId: string, vars: ThemeVars) {
     if (!previewing.value) {
       savedVars = { ...themeVars };
     }
     previewing.value = true;
+    previewingThemeId.value = themeId;
     applyVars(vars);
   }
 
@@ -81,15 +105,18 @@ export const useMarketplaceStore = defineStore('marketplace', () => {
     }
     savedVars = null;
     previewing.value = false;
+    previewingThemeId.value = null;
   }
 
   async function loadActiveTheme() {
     try {
       const { themeId } = await get<{ themeId: string }>('/marketplace/active-theme');
+      activeThemeId.value = themeId;
       const manifest = await get<PluginVersionManifest>('/marketplace/detail/theme-pack/manifest').catch(() => null);
       const theme = manifest?.themes?.find((t: ThemeDefinition) => t.id === themeId);
       applyVars(theme?.vars ?? DEFAULT_THEME_VARS);
     } catch {
+      activeThemeId.value = 'default';
       applyVars(DEFAULT_THEME_VARS);
     }
   }
@@ -99,8 +126,10 @@ export const useMarketplaceStore = defineStore('marketplace', () => {
     const manifest = await get<PluginVersionManifest>('/marketplace/detail/theme-pack/manifest').catch(() => null);
     const theme = manifest?.themes?.find((t: ThemeDefinition) => t.id === themeId);
     applyVars(theme?.vars ?? DEFAULT_THEME_VARS);
+    activeThemeId.value = themeId;
     savedVars = null;
     previewing.value = false;
+    previewingThemeId.value = null;
   }
 
   // --- Marketplace search/browse ---
@@ -164,16 +193,27 @@ export const useMarketplaceStore = defineStore('marketplace', () => {
         category: p.category,
       }));
 
-      // Load widget URLs for widget plugins. The backend manifest stores the
-      // widget's *local* listen URL (e.g. http://127.0.0.1:5174). In production
-      // we run the widget behind a reverse proxy at /widget/<id>/, so we
-      // rewrite the URL to the proxy path the current page is served from.
+      // Resolve the iframe URL for each widget plugin.
+      //
+      // Preferred: the manifest's own `widgetUrl` (e.g. http://127.0.0.1:8800).
+      // Widgets are started as sidecar processes by the API and listen on a
+      // local port. The web frontend lives on the same machine, so the iframe
+      // can hit the local port directly. This works in both dev (Vite) and
+      // production (Nginx-served) as long as the API and widget are on the
+      // same host.
+      //
+      // Fallback: rewrite to the reverse-proxied public path
+      // `/widget/<id>/`. We only do this if the manifest's `widgetUrl`
+      // explicitly asks for a proxied path (e.g. it starts with `/widget/`)
+      // — that lets multi-host deployments opt in without breaking the
+      // default same-host case.
       for (const p of result.plugins.filter((pl) => pl.category === 'widget')) {
         try {
           const m = await get<PluginVersionManifest>(`/marketplace/detail/${p.id}/manifest`);
           const entry = availableManifests.value.find((e) => e.id === p.id);
-          if (entry && m.widgetUrl) {
-            entry.widgetUrl = `${window.location.origin}/widget/${p.id}/`;
+          if (!entry) continue;
+          if (m.widgetUrl) {
+            entry.widgetUrl = resolveWidgetUrl(p.id, m.widgetUrl);
           }
         } catch {
           // skip
@@ -241,6 +281,8 @@ export const useMarketplaceStore = defineStore('marketplace', () => {
     clear,
     // Theme
     themeVars,
+    activeThemeId,
+    previewingThemeId,
     previewing,
     applyVars,
     previewTheme,

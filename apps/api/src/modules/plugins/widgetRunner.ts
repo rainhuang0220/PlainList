@@ -141,6 +141,13 @@ export async function installWidget(
 export async function startWidget(pluginId: string): Promise<void> {
   if (running.has(pluginId)) return;
 
+  // Stop any stale child process from a previous API restart (tsx watch).
+  // The `running` Map is per-process — a restart creates a new process that
+  // loses the old Map, but the old detached children are still alive and
+  // holding ports. The start.sh scripts also self-clean, but this is a
+  // belt-and-suspenders measure.
+  stopWidget(pluginId);
+
   const info = await getWidgetInfo(pluginId);
   if (info?.widgetUrl) {
     try {

@@ -165,11 +165,20 @@
 
           <div v-if="marketplace.currentManifest?.themes" class="mp-section">
             <div class="mp-section-label">{{ t('marketplace.themes', 'Themes') }}</div>
+            <p v-if="!themePackInstalled" class="mp-theme-hint">
+              {{ t('marketplace.theme_install_hint', 'Install Theme Pack first to preview and apply themes.') }}
+            </p>
             <div class="mp-theme-grid">
               <div
                 v-for="theme in marketplace.currentManifest.themes"
                 :key="theme.id"
-                class="mp-swatch"
+                :class="[
+                  'mp-swatch',
+                  marketplace.activeThemeId === theme.id ? 'is-active' : '',
+                  marketplace.previewingThemeId === theme.id ? 'is-previewing' : '',
+                ]"
+                :title="theme.name"
+                @click="onPreviewTheme(theme)"
               >
                 <div class="mp-swatch-colors">
                   <span
@@ -178,8 +187,29 @@
                     :style="{ background: theme.vars[key] }"
                   />
                 </div>
-                <div class="mp-swatch-name">{{ theme.name }}</div>
+                <div class="mp-swatch-name">
+                  <span>{{ theme.name }}</span>
+                  <span v-if="marketplace.activeThemeId === theme.id" class="mp-swatch-tag">
+                    {{ t('marketplace.theme_active', 'Active') }}
+                  </span>
+                </div>
               </div>
+            </div>
+            <div v-if="marketplace.previewing" class="mp-theme-actions">
+              <button
+                class="mp-btn primary"
+                :disabled="busy || !themePackInstalled"
+                @click="onApplyTheme"
+              >
+                {{ t('marketplace.theme_apply', 'Apply Theme') }}
+              </button>
+              <button
+                class="mp-btn"
+                :disabled="busy"
+                @click="marketplace.revertTheme()"
+              >
+                {{ t('marketplace.theme_revert', 'Revert') }}
+              </button>
             </div>
           </div>
 
@@ -229,7 +259,7 @@
 </template>
 
 <script setup lang="ts">
-import type { PluginCategory } from '@plainlist/shared';
+import type { PluginCategory, ThemeDefinition } from '@plainlist/shared';
 import { computed, onMounted, ref } from 'vue';
 import { useMarketplaceStore } from '@/features/plugins/model/useMarketplaceStore';
 import { useI18nStore } from '@/shared/i18n/useI18nStore';
@@ -244,6 +274,8 @@ const activeCategory = ref<PluginCategory | 'all'>('all');
 const activeSort = ref<'downloads' | 'newest' | 'updated'>('downloads');
 const selectedId = ref<string | null>(null);
 const busy = ref(false);
+
+const themePackInstalled = computed(() => marketplace.isInstalled('theme-pack'));
 
 let searchTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -337,6 +369,23 @@ async function onDisable() {
   busy.value = true;
   try {
     await marketplace.toggle(marketplace.currentDetail.id, false);
+  } finally {
+    busy.value = false;
+  }
+}
+
+function onPreviewTheme(theme: ThemeDefinition) {
+  if (!themePackInstalled.value) return;
+  marketplace.previewTheme(theme.id, theme.vars);
+}
+
+async function onApplyTheme() {
+  if (!themePackInstalled.value) return;
+  const themeId = marketplace.previewingThemeId;
+  if (!themeId) return;
+  busy.value = true;
+  try {
+    await marketplace.saveTheme(themeId);
   } finally {
     busy.value = false;
   }
@@ -774,6 +823,25 @@ onMounted(async () => {
   border: 2px solid var(--faint);
   border-radius: 6px;
   overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.12s, border-color 0.12s, box-shadow 0.12s;
+  position: relative;
+}
+
+.mp-swatch:hover {
+  transform: translateY(-1px);
+  border-color: var(--mid);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+}
+
+.mp-swatch.is-active {
+  border-color: var(--dark);
+  box-shadow: 0 0 0 1px var(--dark) inset;
+}
+
+.mp-swatch.is-previewing {
+  border-color: var(--mid);
+  box-shadow: 0 0 0 1px var(--mid) inset;
 }
 
 .mp-swatch-colors {
@@ -786,11 +854,38 @@ onMounted(async () => {
 }
 
 .mp-swatch-name {
-  padding: 5px 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 5px 8px;
   font-size: 10px;
   color: var(--mid);
   background: var(--surface);
-  text-align: center;
+}
+
+.mp-swatch-tag {
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 0.04em;
+  padding: 1px 4px;
+  border-radius: 2px;
+  background: var(--dark);
+  color: var(--surface);
+  text-transform: uppercase;
+}
+
+.mp-theme-hint {
+  margin: 0 0 10px;
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.mp-theme-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
 }
 
 .mp-versions {

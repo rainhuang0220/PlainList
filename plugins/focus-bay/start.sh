@@ -7,6 +7,12 @@ cd "$(dirname "$0")"
 
 PORT="${PL_YOLO_PORT:-8800}"
 
+# Kill any stale process from a previous run that still holds our port.
+# This happens when the parent API restarts (tsx watch) — the old detached
+# child survives and keeps :8800 occupied.
+echo "[focus-bay] Cleaning up stale processes on port $PORT..."
+lsof -ti:"$PORT" 2>/dev/null | xargs kill -9 2>/dev/null || true
+
 PYTHON_BIN="${PL_PYTHON:-python3}"
 VENV_DIR=".venv"
 

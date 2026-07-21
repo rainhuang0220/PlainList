@@ -52,7 +52,12 @@ const pluginSeeds: PluginSeed[] = [
     version: '1.0.0',
     manifest: {
       runtime: 'iframe',
-      widgetUrl: 'http://localhost:5174',
+      // fishtime is a Vite project built with `base: '/widget/fishtime/'`.
+      // The iframe must be served from the main app's origin at this path,
+      // then proxied (dev: vite.config / prod: nginx) to fishtime's own
+      // sidecar (default :5174). Hard-coding localhost would 404 on
+      // /widget/fishtime/assets/* in the browser.
+      widgetUrl: '/widget/fishtime/',
     },
   },
   {
