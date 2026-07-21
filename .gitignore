@@ -26,3 +26,7 @@ backup-*/
 .runtime-logs/
 logs/
 .superpowers/
+
+# Competition documents (kept locally, not versioned)
+/*.docx
+/*.pdf
