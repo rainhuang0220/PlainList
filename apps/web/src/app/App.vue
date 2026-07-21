@@ -101,17 +101,17 @@ import { useUserProfileStore } from '@/features/user-profile/model/useUserProfil
 import { useMarketplaceStore } from '@/features/plugins/model/useMarketplaceStore';
 import { useApi } from '@/shared/api/useApi';
 import { useI18nStore } from '@/shared/i18n/useI18nStore';
-import UserMenu from '@/widgets/settings/UserMenu.vue';
-import UserSettingsPanel from '@/widgets/settings/UserSettingsPanel.vue';
-import AuthTerminal from '@/widgets/auth/AuthTerminal.vue';
-import AuthGraphic from '@/widgets/auth/AuthGraphic.vue';
-import Marketplace from '@/widgets/plugins/Marketplace.vue';
-import WidgetPanel from '@/widgets/plugins/WidgetPanel.vue';
-import CalendarSection from '@/widgets/sections/CalendarSection.vue';
-import ClockSection from '@/widgets/sections/ClockSection.vue';
-import PlansSection from '@/widgets/sections/PlansSection.vue';
-import TrackerSection from '@/widgets/sections/TrackerSection.vue';
-import WeekSection from '@/widgets/sections/WeekSection.vue';
+import UserMenu from '@/components/settings/UserMenu.vue';
+import UserSettingsPanel from '@/components/settings/UserSettingsPanel.vue';
+import AuthTerminal from '@/components/auth/AuthTerminal.vue';
+import AuthGraphic from '@/components/auth/AuthGraphic.vue';
+import Marketplace from '@/components/plugins/Marketplace.vue';
+import WidgetPanel from '@/components/plugins/WidgetPanel.vue';
+import CalendarSection from '@/views/sections/CalendarSection.vue';
+import ClockSection from '@/views/sections/ClockSection.vue';
+import PlansSection from '@/views/sections/PlansSection.vue';
+import TrackerSection from '@/views/sections/TrackerSection.vue';
+import WeekSection from '@/views/sections/WeekSection.vue';
 
 const auth = useAuthStore();
 const plans = usePlansStore();

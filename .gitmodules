@@ -1,0 +1,3 @@
+[submodule "data/widgets/fishtime"]
+	path = data/widgets/fishtime
+	url = https://github.com/nanlingyin/fishtime.git

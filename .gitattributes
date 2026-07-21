@@ -1,0 +1,2 @@
+plugins/focus-bay/weights/*.pt filter=lfs diff=lfs merge=lfs -text
+data/widgets/**/weights/*.pt filter=lfs diff=lfs merge=lfs -text

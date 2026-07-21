@@ -14,7 +14,22 @@ apps/api/.env
 # 个人方法论/经验档案，含服务器密码与敏感信息
 exp.md
 apps/Untitled
-data/widgets/
+
+# Widget runtime copies installed by the API (source lives in plugins/)
+data/widgets/focus-bay/
+
+# Widget runtime artifacts (sources in data/widgets/fishtime are tracked)
+data/widgets/**/.venv/
+data/widgets/**/node_modules/
+data/widgets/**/dist/
+data/widgets/**/*.db
+data/widgets/**/*.db-journal
+data/widgets/**/__pycache__/
+data/widgets/**/weights/*.pt
+data/widgets/**/.env
+data/widgets/**/.env.*.local
+data/widgets/**/*.log
+
 apps/api/data/
 plugins/*/.venv/
 plugins/*/__pycache__/
