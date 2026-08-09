@@ -3,6 +3,9 @@ import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 
 export default defineConfig({
+  // Use relative asset paths so the bundle works under file:// (Electron),
+  // not just dev-server absolute paths.
+  base: './',
   plugins: [vue()],
   resolve: {
     alias: {
