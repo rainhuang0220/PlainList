@@ -1,0 +1,36 @@
+appId: com.plainlist.app
+productName: PlainList
+copyright: Copyright © 2026 rainhuang
+electronVersion: 33.4.11
+directories:
+  output: release
+  buildResources: build
+files:
+  - dist/**/*
+  - electron/**/*
+  - package.json
+asar: true
+asarUnpack:
+  - dist/assets/**
+mac:
+  category: public.app-category.productivity
+  target:
+    - target: zip
+      arch:
+        - arm64
+        - x64
+  artifactName: ${productName}-${version}-${arch}.${ext}
+  hardenedRuntime: false
+  gatekeeperAssess: false
+  darkModeSupport: true
+  extendInfo:
+    NSHumanReadableCopyright: Copyright © 2026 rainhuang
+    CFBundleDocumentTypes: []
+  # Strip unused Chromium locales — saves ~40MB.
+  # PlainList's UI is in zh-CN (bundled in dist/), Electron's chrome
+  # only needs en-US for native dialogs / menus.
+  electronLanguages:
+    - en-US
+    - zh-CN
+extraMetadata:
+  main: electron/main.cjs
