@@ -13,6 +13,9 @@ import { defineStore } from 'pinia';
 import { computed, reactive, ref } from 'vue';
 import { useApi } from '@/shared/api/useApi';
 
+// vite define 注入（与 src/shared/api/useApi.ts 一致）
+declare const __API_BASE_URL__: string;
+
 export const useMarketplaceStore = defineStore('marketplace', () => {
   const { get, post, del } = useApi();
 
@@ -54,24 +57,30 @@ export const useMarketplaceStore = defineStore('marketplace', () => {
   }
 
   // Resolve a widget's iframe URL.
-  // - Absolute URLs (http://, https://) and root-relative paths starting with
-  //   `/` are used as-is.
-  // - The special prefix `/widget/` is preserved so multi-host deployments
-  //   that proxy `/widget/<id>/` to the sidecar port keep working.
+  // - Absolute URLs (http://, https://) are used as-is.
+  // - `/widget/` paths are the reverse-proxied public routes (nginx → sidecar)
+  //   and must be rooted at the API origin. Using __API_BASE_URL__ (instead
+  //   of window.location.origin) keeps them working under Electron's file://,
+  //   where the origin would otherwise resolve to "file://".
   // - Any other relative value is treated as relative to the manifest's
   //   origin (e.g. for Vite-served static widgets under
   //   `apps/web/public/widgets/<id>/`).
   function resolveWidgetUrl(pluginId: string, manifestUrl: string): string {
+    const apiBase =
+      typeof __API_BASE_URL__ === 'string' && __API_BASE_URL__
+        ? __API_BASE_URL__
+        : window.location.origin;
     if (/^https?:\/\//i.test(manifestUrl)) {
       return manifestUrl;
     }
+    if (manifestUrl.startsWith('/widget/') || manifestUrl.startsWith('/widgets/')) {
+      return `${apiBase}${manifestUrl}`;
+    }
     if (manifestUrl.startsWith('/')) {
-      return manifestUrl.startsWith('/widget/') || manifestUrl.startsWith('/widgets/')
-        ? `${window.location.origin}${manifestUrl}`
-        : `${window.location.origin}${manifestUrl.replace(/^\/+/, '/')}`;
+      return `${window.location.origin}${manifestUrl.replace(/^\/+/, '/')}`;
     }
     // Bare relative path (e.g. "widgets/focus-bay/") — treat as origin-rooted.
-    return `${window.location.origin}/${manifestUrl.replace(/^\/+/, '')}`;
+    return `${apiBase}/${manifestUrl.replace(/^\/+/, '')}`;
   }
 
   // --- Theme methods ---

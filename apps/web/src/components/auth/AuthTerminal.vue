@@ -334,7 +334,7 @@ async function executeCommand(rawValue: string) {
 
   if (value === 'guide' || value === '/guide') {
     print('  opening visual guide...', 'out');
-    window.open('/guide.html', '_blank');
+    window.open('./guide.html', '_blank');
     return;
   }
 

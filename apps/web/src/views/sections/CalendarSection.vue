@@ -183,7 +183,7 @@ import { usePlansStore } from '@/features/plans/model/usePlansStore'
 import { useChecksStore } from '@/features/checks/model/useChecksStore'
 import { useReviewsStore } from '@/features/reviews/model/useReviewsStore'
 import { useI18nStore } from '@/shared/i18n/useI18nStore'
-import DayReviewOverlay from '@/widgets/sections/DayReviewOverlay.vue'
+import DayReviewOverlay from '@/views/sections/DayReviewOverlay.vue'
 
 const plansStore = usePlansStore()
 const checksStore = useChecksStore()

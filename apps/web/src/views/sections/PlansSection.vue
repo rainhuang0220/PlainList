@@ -197,7 +197,7 @@ import { useChecksStore } from '@/features/checks/model/useChecksStore'
 import { useAuthStore } from '@/features/auth/model/useAuthStore'
 import { useReviewsStore } from '@/features/reviews/model/useReviewsStore'
 import { useI18nStore } from '@/shared/i18n/useI18nStore'
-import AiIntakeDock from '@/widgets/sections/AiIntakeDock.vue'
+import AiIntakeDock from '@/views/sections/AiIntakeDock.vue'
 
 const plans = usePlansStore()
 const checks = useChecksStore()

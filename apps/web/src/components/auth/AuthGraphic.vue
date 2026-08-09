@@ -226,7 +226,7 @@ async function loginDemo() {
 }
 
 function openGuide() {
-  window.open('/guide.html', '_blank');
+  window.open('./guide.html', '_blank');
 }
 
 onMounted(() => {

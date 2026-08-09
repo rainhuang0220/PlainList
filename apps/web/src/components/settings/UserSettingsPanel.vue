@@ -59,8 +59,8 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useI18nStore } from '@/shared/i18n/useI18nStore';
-import AiSettingsForm from '@/widgets/settings/AiSettingsForm.vue';
-import UserProfileSettings from '@/widgets/settings/UserProfileSettings.vue';
+import AiSettingsForm from '@/components/settings/AiSettingsForm.vue';
+import UserProfileSettings from '@/components/settings/UserProfileSettings.vue';
 
 const props = defineProps<{
   username: string;
