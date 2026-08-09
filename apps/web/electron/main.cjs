@@ -81,6 +81,23 @@ function createMainWindow() {
     return;
   }
 
+  // 显式处理媒体权限：允许摄像头/麦克风（focus-bay 等 widget 需要）。
+  // 不设置 handler 时 Electron 的默认行为可能受 iframe/OOPIF 影响，
+  // 显式放行 media 权限确保 getUserMedia 不会静默挂起。
+  const { session } = require('electron');
+  const ses = mainWindow.webContents.session;
+  ses.setPermissionRequestHandler((_wc, permission, callback, details) => {
+    const ok =
+      permission === 'media' ||
+      permission === 'camera' ||
+      permission === 'microphone' ||
+      permission === 'display-capture' ||
+      permission === 'fullscreen' ||
+      permission === 'clipboard-sanitized-write';
+    callback(ok);
+  });
+  ses.setDevicePermissionHandler((_details) => true);
+
   mainWindow.loadFile(indexHtml);
 
   // 应用内页面（file://，如 guide.html）用新窗口打开；外部链接用系统浏览器
