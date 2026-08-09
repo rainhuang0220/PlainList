@@ -45,3 +45,8 @@ logs/
 # Competition documents (kept locally, not versioned)
 /*.docx
 /*.pdf
+
+# Electron 打包构建产物（手动流程产物，不入库）
+apps/web/.electron-stage/
+apps/web/release/
+release/
