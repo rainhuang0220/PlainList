@@ -21,6 +21,8 @@ export function createApp() {
       /^https?:\/\/localhost(:\d+)?$/,
       /^capacitor:\/\/localhost$/,
       /^https?:\/\/localhost$/,
+      // Electron 壳用 file:// 加载打包页面，跨域请求的 Origin 序列化为 "null"
+      'null',
       ...(env.CORS_ORIGINS ? env.CORS_ORIGINS.split(',').map((o: string) => o.trim()) : []),
     ],
     credentials: true,

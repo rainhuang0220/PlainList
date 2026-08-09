@@ -26,6 +26,40 @@ const WIDGETS_DIR = path.join(APP_ROOT, 'data', 'widgets');
 const COPY_SKIP = new Set(['.git', '.venv', 'node_modules', '__pycache__']);
 
 const running = new Map<string, ChildProcess>();
+const stopping = new Set<string>();
+const restartAttempts = new Map<string, number>();
+const MAX_RESTART_ATTEMPTS = 5;
+const RESTART_DELAYS_MS = [1000, 2000, 5000, 10000, 30000];
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function parseWidgetPort(widgetUrl?: string): number | null {
+  if (!widgetUrl) return null;
+  try {
+    const url = new URL(widgetUrl);
+    const port = parseInt(url.port, 10);
+    return Number.isNaN(port) ? null : port;
+  } catch {
+    return null;
+  }
+}
+
+async function waitForWidgetPort(port: number, timeoutMs = 120000): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  let lastLog = 0;
+  while (Date.now() < deadline) {
+    if (await isPortInUse(port)) return true;
+    const now = Date.now();
+    if (now - lastLog > 5000) {
+      console.log(`[widget:health] waiting for port ${port}...`);
+      lastLog = now;
+    }
+    await sleep(500);
+  }
+  return false;
+}
 
 interface WidgetInfo {
   id: string;
@@ -141,6 +175,19 @@ export async function installWidget(
 export async function startWidget(pluginId: string): Promise<void> {
   if (running.has(pluginId)) return;
 
+  // We may be re-entering here after an unexpected exit or a failed health
+  // check. Clear the "stopping" flag so the new spawn is not treated as a
+  // deliberate shutdown.
+  stopping.delete(pluginId);
+
+  const attempts = restartAttempts.get(pluginId) || 0;
+  if (attempts >= MAX_RESTART_ATTEMPTS) {
+    console.error(
+      `[widget:${pluginId}] reached max restart attempts (${MAX_RESTART_ATTEMPTS}), giving up`,
+    );
+    return;
+  }
+
   // Stop any stale child process from a previous API restart (tsx watch).
   // The `running` Map is per-process — a restart creates a new process that
   // loses the old Map, but the old detached children are still alive and
@@ -149,20 +196,7 @@ export async function startWidget(pluginId: string): Promise<void> {
   stopWidget(pluginId);
 
   const info = await getWidgetInfo(pluginId);
-  if (info?.widgetUrl) {
-    try {
-      const url = new URL(info.widgetUrl);
-      const port = parseInt(url.port, 10);
-      // Note: widgetUrl may point to a reverse-proxied public URL (e.g. Nginx
-      // on :8086), not the widget's actual listen port. Checking the URL port
-      // here would cause us to falsely skip starting a widget that points to
-      // a port already taken by the proxy. Trust the manifest's runtime port
-      // (set below) instead, and always attempt to start.
-      void port;
-    } catch {
-      // URL parse failed, continue with normal start
-    }
-  }
+  const widgetPort = parseWidgetPort(info?.widgetUrl);
 
   const dir = widgetDir(pluginId);
   const script = path.join(dir, 'start.sh');
@@ -189,16 +223,65 @@ export async function startWidget(pluginId: string): Promise<void> {
 
   proc.stdout?.on('data', (d: Buffer) => process.stdout.write(`[widget:${pluginId}] ${d}`));
   proc.stderr?.on('data', (d: Buffer) => process.stderr.write(`[widget:${pluginId}] ${d}`));
-  proc.on('exit', (code) => {
-    console.log(`[widget:${pluginId}] exited with code ${code}`);
+  proc.on('exit', (code, signal) => {
+    console.log(`[widget:${pluginId}] exited with code ${code}, signal ${signal}`);
     running.delete(pluginId);
+
+    // If this was a deliberate stop we do not auto-restart.
+    if (stopping.has(pluginId)) {
+      stopping.delete(pluginId);
+      restartAttempts.delete(pluginId);
+      return;
+    }
+
+    // Unexpected exit: schedule a restart with exponential backoff.
+    const nextAttempt = (restartAttempts.get(pluginId) || 0) + 1;
+    if (nextAttempt <= MAX_RESTART_ATTEMPTS) {
+      const delay = RESTART_DELAYS_MS[Math.min(nextAttempt - 1, RESTART_DELAYS_MS.length - 1)];
+      restartAttempts.set(pluginId, nextAttempt);
+      console.log(
+        `[widget:${pluginId}] unexpected exit, restarting in ${delay}ms (attempt ${nextAttempt}/${MAX_RESTART_ATTEMPTS})`,
+      );
+      setTimeout(() => startWidget(pluginId), delay);
+    } else {
+      console.error(`[widget:${pluginId}] exceeded max restart attempts, giving up`);
+    }
   });
 
   running.set(pluginId, proc);
   console.log(`[widget:${pluginId}] process started (pid ${proc.pid})`);
+
+  // Health check: wait for the widget's advertised port to become reachable.
+  // This catches startup failures (missing deps, port conflicts, crashes during
+  // model load) immediately instead of leaving a dead widget registered.
+  if (widgetPort && proc.pid) {
+    const healthy = await waitForWidgetPort(widgetPort);
+    if (!healthy) {
+      console.error(
+        `[widget:${pluginId}] health check failed on port ${widgetPort}, killing and retrying`,
+      );
+      try {
+        process.kill(-proc.pid, 'SIGTERM');
+      } catch {
+        // process may have already exited
+      }
+      // The exit handler will see stopping=false and schedule a restart,
+      // but we also mark stopping here so it does not race with a double
+      // restart. Our own re-entry below will clear the flag.
+      stopping.add(pluginId);
+      restartAttempts.set(pluginId, attempts + 1);
+      const delay = RESTART_DELAYS_MS[Math.min(attempts, RESTART_DELAYS_MS.length - 1)];
+      setTimeout(() => startWidget(pluginId), delay);
+      return;
+    }
+    console.log(`[widget:${pluginId}] health check passed on port ${widgetPort}`);
+    restartAttempts.delete(pluginId);
+  }
 }
 
 export function stopWidget(pluginId: string): void {
+  stopping.add(pluginId);
+
   const proc = running.get(pluginId);
   if (proc?.pid) {
     try {
