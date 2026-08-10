@@ -165,7 +165,16 @@ function t(key: string, fallback: string) {
 
 
 function scrollTo(id: string) {
-  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+  const element = document.getElementById(id);
+  if (!element) {
+    activeSection.value = id;
+    return;
+  }
+  // Sections already reserve top padding for the fixed nav.
+  // Align the section edge to the viewport top (nav overlays that padding).
+  // Do NOT subtract nav height — that leaves a strip of the previous section visible.
+  const top = window.scrollY + element.getBoundingClientRect().top;
+  window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
   activeSection.value = id;
 }
 

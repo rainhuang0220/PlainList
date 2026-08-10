@@ -250,7 +250,13 @@
                 {{ t('intake.model_label', '模型') }} · {{ intake.lastResponse.model }}
               </span>
             </div>
-            <button class="ai-intake-commit" :class="{ destructive: footClearActive }" :disabled="committing" @click="commitAll">
+            <button
+              class="ai-intake-commit"
+              :class="{ destructive: footClearActive }"
+              :disabled="committing"
+              type="button"
+              @click.stop="commitAll"
+            >
               <span class="ai-intake-commit-icon" aria-hidden="true"></span>
               {{ commitButtonLabel }}
             </button>
@@ -340,18 +346,36 @@ const PANEL_MARGIN = 16;
 const PANEL_GAP = 10;
 const panelTop = ref(0);
 const panelLeft = ref(0);
+const isNarrowPanel = ref(false);
 
-const panelStyle = computed(() => ({
-  top: `${panelTop.value}px`,
-  left: `${panelLeft.value}px`,
-  width: `${Math.min(PANEL_WIDTH, window.innerWidth - PANEL_MARGIN * 2)}px`,
-}));
+const panelStyle = computed(() => {
+  if (isNarrowPanel.value) {
+    return {
+      top: 'auto',
+      left: '0',
+      right: '0',
+      bottom: '0',
+      width: '100%',
+      maxHeight: 'min(88dvh, 720px)',
+      borderRadius: '16px 16px 0 0',
+      paddingBottom: 'calc(12px + env(safe-area-inset-bottom, 0px))',
+    };
+  }
+  return {
+    top: `${panelTop.value}px`,
+    left: `${panelLeft.value}px`,
+    width: `${Math.min(PANEL_WIDTH, window.innerWidth - PANEL_MARGIN * 2)}px`,
+  };
+});
 
 function updatePanelPosition() {
+  const vw = window.innerWidth;
+  isNarrowPanel.value = vw <= 768;
+  if (isNarrowPanel.value) return;
+
   const trigger = triggerEl.value;
   if (!trigger) return;
   const rect = trigger.getBoundingClientRect();
-  const vw = window.innerWidth;
   const width = Math.min(PANEL_WIDTH, vw - PANEL_MARGIN * 2);
 
   let left = rect.right - width;
@@ -463,8 +487,19 @@ function setType(draftId: string, type: PlanType) {
   intake.updateDraft(draftId, { type });
 }
 
+function normalizeTime(value: string) {
+  const raw = String(value || '').trim();
+  const match = raw.match(/^(\d{1,2}):(\d{1,2})$/);
+  if (!match) return '';
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return '';
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return '';
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
+
 function isValidTime(value: string) {
-  return /^\d{2}:\d{2}$/.test(value);
+  return Boolean(normalizeTime(value));
 }
 
 const statusCopy = computed(() => {
@@ -477,9 +512,17 @@ async function commitAll() {
   if (committing.value) return;
   syncSessionDate();
   const today = todayKey();
-  const valid = intake.drafts.filter((draft) => draft.name.trim() && isValidTime(draft.time));
+  const normalized = intake.drafts.map((draft) => ({
+    ...draft,
+    name: draft.name.trim(),
+    time: normalizeTime(draft.time),
+  }));
+  const valid = normalized.filter((draft) => draft.name && draft.time);
   const willClear = intake.clearTodos && currentTodoCount.value > 0;
-  if (!valid.length && !willClear) return;
+  if (!valid.length && !willClear) {
+    window.alert(t('intake.commit_invalid', '没有可加入的条目，请检查名称和时间格式（如 09:00）。'));
+    return;
+  }
 
   if (willClear) {
     const promptCopy = t(
@@ -504,17 +547,36 @@ async function commitAll() {
     const ordered = [...valid].sort((left, right) => {
       const byTime = left.time.localeCompare(right.time);
       if (byTime !== 0) return byTime;
-      return left.name.trim().localeCompare(right.name.trim());
+      return left.name.localeCompare(right.name);
     });
 
     let addedCount = 0;
+    let skippedHabitCount = 0;
+    const failedNames: string[] = [];
     for (const draft of ordered) {
-      const name = draft.name.trim();
-      if (draft.type === 'habit' && findHabitByName(plans.plans, name)) {
+      if (draft.type === 'habit' && findHabitByName(plans.plans, draft.name)) {
+        skippedHabitCount += 1;
         continue;
       }
-      await plans.add(name, draft.type, draft.time, draft.type === 'todo' ? today : undefined);
-      addedCount += 1;
+      try {
+        await plans.add(draft.name, draft.type, draft.time, draft.type === 'todo' ? today : undefined);
+        addedCount += 1;
+      } catch (error) {
+        console.error('[ai-intake] commit failed', draft.name, error);
+        const reason = error instanceof Error ? error.message : 'unknown';
+        failedNames.push(`${draft.name}（${reason}）`);
+      }
+    }
+
+    if (failedNames.length) {
+      window.alert(
+        t(
+          'intake.commit_partial_fail',
+          '已加入 {added} 条；失败 {failed} 条：\n{names}',
+          { added: addedCount, failed: failedNames.length, names: failedNames.slice(0, 3).join('\n') },
+        ),
+      );
+      return;
     }
 
     if (removeFailedCount > 0) {
@@ -525,6 +587,8 @@ async function commitAll() {
           { added: addedCount, failed: removeFailedCount },
         ),
       );
+    } else if (addedCount === 0 && skippedHabitCount > 0) {
+      window.alert(t('intake.commit_all_skipped', '这些习惯已存在，没有新条目可加入。'));
     }
 
     text.value = '';
@@ -532,6 +596,9 @@ async function commitAll() {
     discardedOpen.value = false;
     clearDetailOpen.value = false;
     open.value = false;
+  } catch (error) {
+    console.error('[ai-intake] commitAll failed', error);
+    window.alert(t('intake.commit_error', '加入失败，请稍后重试。'));
   } finally {
     committing.value = false;
   }
@@ -1082,6 +1149,12 @@ onUnmounted(() => {
   padding-top: 10px;
   border-top: 1px solid var(--faint, #e4e4e4);
   flex-wrap: wrap;
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  margin-top: auto;
+  background: var(--surface, #fff);
+  padding-bottom: 2px;
 }
 .ai-intake-foot-meta {
   display: flex; flex-direction: column; gap: 2px;
@@ -1097,13 +1170,14 @@ onUnmounted(() => {
 .ai-intake-commit {
   font-family: inherit;
   font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
-  padding: 10px 16px; border-radius: 8px;
+  padding: 12px 16px; border-radius: 8px;
   cursor: pointer;
   background: var(--dark, #111);
   color: var(--surface, #fff);
   border: 1px solid var(--dark, #111);
   display: inline-flex; align-items: center; gap: 8px;
   transition: transform .15s, background .15s, border-color .15s;
+  min-height: 44px;
 }
 .ai-intake-commit:hover:not(:disabled) { transform: translateY(-1px); }
 .ai-intake-commit:disabled { opacity: .5; cursor: not-allowed; }

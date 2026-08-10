@@ -12,26 +12,35 @@ PlainList 是一个前后端分离的单仓库 TypeScript 项目。围绕「时�
 | Untitled | 🔨幻想中 (0%) | 网盘 |
 | docxEditor(TBD) | 🔨进行中 (25%) | 文档编辑器 |
 
-## 下载 macOS 客户端
+## 下载客户端
 
-官网下载页（含一键安装指令）：**[http://175.24.134.228/](http://175.24.134.228/)**
+官网下载页：**[http://175.24.134.228/](http://175.24.134.228/)** · GitHub Release：**[Releases](https://github.com/rainhuang0220/PlainList/releases)**
 
-GitHub Release（DMG 附件）：**[Releases](https://github.com/rainhuang0220/PlainList/releases)**
+### 推荐：Android（语音 + AI 速记）
+
+移动端是当前更推荐的日常入口：手机更常随身，系统语音输入可以把口语直接丢给 **AI 速记**，自动结构化并排布今日任务；后续的 **AI 画像** 优化也建立在这条链路上。
+
+| 平台 | 下载 |
+|------|------|
+| **Android APK（推荐）** | [PlainList-2.0.11.apk](http://175.24.134.228/downloads/PlainList-2.0.11.apk) · [GitHub Release](https://github.com/rainhuang0220/PlainList/releases/tag/v2.0.11) |
+
+Android 为侧载 APK：下载后需在系统设置中允许「未知来源」或「安装未知应用」，再打开安装包。Release 签名 keystore 须离线备份，详见 [apps/web/android-signing/README.md](apps/web/android-signing/README.md)。
+
+演示账号：`rainhuang` / `rainhuang`。
+
+### macOS 桌面端
 
 ```bash
-# 推荐：终端一键安装（Apple Silicon / Intel 自动识别）
+# 终端一键安装（Apple Silicon / Intel 自动识别）
 curl -fsSL http://175.24.134.228/downloads/install.sh | bash
 ```
 
-| 架构 / 平台 | 下载 |
+| 架构 | 下载 |
 |------|------|
 | Apple Silicon (arm64) | [PlainList-2.0.0-arm64.dmg](http://175.24.134.228/downloads/PlainList-2.0.0-arm64.dmg) · [GitHub](https://github.com/rainhuang0220/PlainList/releases) |
 | Intel (x64) | [PlainList-2.0.0-x64.dmg](http://175.24.134.228/downloads/PlainList-2.0.0-x64.dmg) · [GitHub](https://github.com/rainhuang0220/PlainList/releases) |
-| Android APK | [PlainList-2.0.0.apk](http://175.24.134.228/downloads/PlainList-2.0.0.apk) |
 
-演示账号：`rainhuang` / `rainhuang`。macOS 当前为 ad-hoc 签名，首次打开若提示「无法验证」，在「隐私与安全性」点一次「仍要打开」即可。
-
-Android 为侧载 APK：下载后需在系统设置中允许「未知来源」或「安装未知应用」，再打开安装包。Release 签名 keystore 须离线备份，详见 [apps/web/android-signing/README.md](apps/web/android-signing/README.md)。
+macOS 当前为 ad-hoc 签名，首次打开若提示「无法验证」，在「隐私与安全性」点一次「仍要打开」即可。
 
 桌面端 FishTime 为本机前台应用监测（Chrome / 微信等会实时累计）；Focus Bay 需摄像头权限。
 
@@ -44,7 +53,7 @@ Android 为侧载 APK：下载后需在系统设置中允许「未知来源」�
 - **插件市场**：manifest 驱动，不执行任意远程 JS；支持 theme / widget / language 三类
   - 内置 `theme-pack`（8 套主题：Default / Dark / Warm / Cool / High Contrast / Solarized / Nord / Rose）
   - widget 插件：`fishtime`（应用使用时长追踪）、`focus-bay`（YOLO26 手机监测）
-- **移动端**：基于 Capacitor 打包 Android / iOS，复用同一套 Web 代码
+- **移动端（推荐日常入口）**：Capacitor Android APK；适合语音输入 → AI 速记结构化今日清单；后续画像优化也基于此链路
 - **安全**：JWT + bcrypt 密码加密；登录失败写入 fail2ban 兼容审计日志；CORS 白名单
 ## 技术栈
 | 层 | 技术 |

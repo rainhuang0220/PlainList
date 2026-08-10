@@ -223,6 +223,8 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  min-width: 0;
+  width: 100%;
 }
 
 .profile-hero {
@@ -479,6 +481,16 @@ onMounted(async () => {
 
   .profile-analyze {
     align-self: stretch;
+    min-height: 44px;
+  }
+
+  .profile-hero,
+  .profile-card {
+    padding: 14px;
+  }
+
+  .profile-run {
+    flex-wrap: wrap;
   }
 }
 </style>

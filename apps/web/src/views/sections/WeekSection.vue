@@ -523,7 +523,13 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.section { padding: 2rem 1.5rem; }
+.section {
+  /* Keep global top padding so sticky nav does not cover the title */
+  padding-left: calc(20px + var(--safe-left, 0px));
+  padding-right: calc(20px + var(--safe-right, 0px));
+  padding-bottom: 2rem;
+  justify-content: flex-start;
+}
 
 .week-header { display: flex; align-items: baseline; gap: 1rem; margin-bottom: 1.5rem; }
 .week-title  { font-size: 1.4rem; font-weight: 700; }

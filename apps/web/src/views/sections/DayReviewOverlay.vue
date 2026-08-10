@@ -4,7 +4,7 @@
       <div class="day-review-overlay" @click.self="emit('close')">
         <section class="day-review">
           <header class="day-review-head">
-            <div>
+            <div class="day-review-copy">
               <div class="day-review-kicker">{{ t('calendar.review.kicker', 'Day review') }}</div>
               <h3 class="day-review-title">{{ review.title }}</h3>
               <div class="day-review-meta">
@@ -24,7 +24,12 @@
                   {{ option.label }}
                 </button>
               </div>
-              <button class="day-review-close" type="button" @click="emit('close')">x</button>
+              <button
+                class="day-review-close"
+                type="button"
+                :aria-label="t('calendar.review.close', '关闭')"
+                @click.stop="emit('close')"
+              >×</button>
             </div>
           </header>
 
@@ -128,6 +133,10 @@
           <div v-else class="day-review-empty">
             {{ t('calendar.review.empty', 'No tasks were recorded on this day.') }}
           </div>
+
+          <button class="day-review-dismiss" type="button" @click.stop="emit('close')">
+            {{ t('calendar.review.close', '关闭') }}
+          </button>
         </section>
       </div>
     </Transition>
@@ -306,7 +315,7 @@ const gravityItems = computed(() => {
     return tasks.map((task) => ({ task, style: { opacity: '0' } as Record<string, string> }));
   }
 
-  const cols = clamp(Math.round(w / 190), 2, 6);
+  const cols = clamp(Math.round(w / 160), 1, 4);
   const gap = 12;
   const colW = (w - gap * (cols + 1)) / cols;
   const baseH = clamp(colW * 0.46, 52, 88);
@@ -433,9 +442,9 @@ const puzzleBoard = computed(() => {
   if (!w || !h || !count) return null;
 
   const { cols, rows } = puzzleGrid(count);
-  const margin = 24;
-  const safeW = Math.max(320, w - margin * 2);
-  const safeH = Math.max(240, h - margin * 2);
+  const margin = Math.min(24, Math.max(8, Math.round(Math.min(w, h) * 0.04)));
+  const safeW = Math.max(1, w - margin * 2);
+  const safeH = Math.max(1, h - margin * 2);
   const cellW = safeW / (cols + PUZZLE_KNOB * 2);
   const cellH = Math.min(safeH / (rows + PUZZLE_KNOB * 2), cellW * 0.78);
   const boardW = cellW * cols;
@@ -526,6 +535,11 @@ function triggerGravity() {
 
 async function enterFreeMode() {
   await nextTick();
+  await new Promise<void>((resolve) => {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => resolve());
+    });
+  });
   measureStage();
   if (resizeObserver) resizeObserver.disconnect();
   if (stageEl.value) {
@@ -563,27 +577,45 @@ onBeforeUnmount(() => {
 .day-review-overlay {
   position: fixed;
   inset: 0;
-  z-index: 10000;
+  z-index: 12000;
   display: flex;
-  background: color-mix(in srgb, var(--bg) 88%, rgba(0,0,0,.08));
+  align-items: stretch;
+  justify-content: stretch;
+  background: color-mix(in srgb, var(--bg) 92%, rgba(0,0,0,.06));
   backdrop-filter: blur(16px);
+  pointer-events: auto;
 }
 
 .day-review {
-  display: grid;
-  grid-template-rows: auto 1fr;
+  display: flex;
+  flex-direction: column;
   width: 100%;
-  height: 100vh;
+  height: 100%;
+  max-height: 100dvh;
+  max-height: 100svh;
   overflow: hidden;
   color: var(--dark);
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  box-sizing: border-box;
+  background: var(--bg);
 }
 
 .day-review-head {
+  position: relative;
+  z-index: 5;
+  flex: 0 0 auto;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 24px;
-  padding: 30px 34px 16px;
+  gap: 16px;
+  padding: 22px 24px 12px;
+  background: color-mix(in srgb, var(--bg) 94%, transparent);
+}
+
+.day-review-copy {
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .day-review-kicker {
@@ -596,9 +628,10 @@ onBeforeUnmount(() => {
 
 .day-review-title {
   margin: 4px 0 4px;
-  font-size: clamp(25px, 4vw, 48px);
-  line-height: 1;
+  font-size: clamp(22px, 4vw, 42px);
+  line-height: 1.1;
   letter-spacing: 0;
+  overflow-wrap: anywhere;
 }
 
 .day-review-meta {
@@ -609,13 +642,23 @@ onBeforeUnmount(() => {
 .day-review-actions {
   display: inline-flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  flex: 0 0 auto;
+  max-width: min(100%, 560px);
 }
 
 .day-review-tabs {
   display: inline-flex;
+  max-width: min(62vw, 420px);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   border: 1px solid var(--faint);
   background: color-mix(in srgb, var(--surface) 80%, transparent);
+  scrollbar-width: none;
+}
+
+.day-review-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .day-review-tab,
@@ -628,11 +671,13 @@ onBeforeUnmount(() => {
 }
 
 .day-review-tab {
+  flex: 0 0 auto;
   min-height: 38px;
   padding: 0 13px;
   font-size: 11px;
   letter-spacing: .08em;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .day-review-tab + .day-review-tab {
@@ -649,28 +694,40 @@ onBeforeUnmount(() => {
   height: 42px;
   border: 1px solid var(--faint);
   border-radius: 50%;
-  font-size: 18px;
+  font-size: 22px;
+  line-height: 1;
+  flex: 0 0 auto;
+  background: var(--surface);
 }
 
 .day-review-stage {
   position: relative;
+  z-index: 1;
+  flex: 1 1 auto;
   min-height: 0;
+  width: 100%;
   display: flex;
   flex-direction: column;
-  padding: 12px 24px 24px;
+  padding: 8px 20px 12px;
+  overflow: hidden;
+}
+
+.day-review-stage > * {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
 }
 
 /* WALL — clean responsive grid (no overlap; scrolls if it overflows) */
 .task-wall {
-  flex: 1;
-  min-height: 0;
   display: grid;
   grid-template-columns: repeat(var(--wall-cols), minmax(0, 1fr));
   gap: 12px;
-  width: 100%;
   align-content: start;
-  padding-top: 16px;
+  padding-top: 12px;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   border-top: 1px solid color-mix(in srgb, var(--faint) 82%, transparent);
 }
 
@@ -717,10 +774,10 @@ onBeforeUnmount(() => {
 /* FREE STAGE (gravity + puzzle) */
 .free-stage {
   position: relative;
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 0;
   width: 100%;
-  margin-top: 16px;
+  height: 100%;
   overflow: hidden;
   border-top: 1px solid color-mix(in srgb, var(--faint) 82%, transparent);
 }
@@ -844,9 +901,27 @@ onBeforeUnmount(() => {
 .day-review-empty {
   display: grid;
   place-items: center;
-  min-height: calc(100vh - 120px);
+  flex: 1 1 auto;
+  min-height: 0;
   color: var(--muted);
   font-family: var(--mono);
+}
+
+.day-review-dismiss {
+  flex: 0 0 auto;
+  position: relative;
+  z-index: 6;
+  margin: 0 16px calc(10px + env(safe-area-inset-bottom, 0px));
+  min-height: 46px;
+  border: 1px solid var(--faint);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--dark);
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  cursor: pointer;
 }
 
 .review-shell-enter-active,
@@ -862,16 +937,47 @@ onBeforeUnmount(() => {
 @media (max-width: 760px) {
   .day-review-head {
     flex-direction: column;
-    padding: 22px 18px 12px;
-  }
-
-  .day-review-stage {
-    padding: 0 12px 12px;
+    gap: 10px;
+    padding: 14px 14px 10px;
   }
 
   .day-review-actions {
     width: 100%;
+    max-width: none;
     justify-content: space-between;
+    gap: 8px;
+  }
+
+  .day-review-tabs {
+    flex: 1 1 auto;
+    max-width: none;
+  }
+
+  .day-review-title {
+    font-size: clamp(20px, 6.5vw, 28px);
+  }
+
+  .day-review-stage {
+    padding: 0 12px 8px;
+  }
+
+  .day-review-close {
+    width: 40px;
+    height: 40px;
+  }
+
+  .task-wall {
+    gap: 8px;
+    padding-top: 10px;
+  }
+
+  .task-art-card {
+    min-height: 84px;
+  }
+
+  .day-review-dismiss {
+    margin-left: 12px;
+    margin-right: 12px;
   }
 }
 </style>

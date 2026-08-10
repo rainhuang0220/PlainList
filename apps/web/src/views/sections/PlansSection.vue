@@ -13,6 +13,11 @@
         </div>
       </div>
 
+      <div class="day-ai-block">
+        <div class="day-ai-block-label">{{ t('intake.trigger_open', 'AI 速记') }}</div>
+        <AiIntakeDock class="day-ai-dock" />
+      </div>
+
       <div class="day-primary-status">
         <span class="day-primary-status-chip strong">{{ t('stat.done', 'done') }} {{ doneCount }}</span>
         <span class="day-primary-status-chip">{{ t('stat.remaining', 'remaining') }} {{ remainCount }}</span>
@@ -22,7 +27,7 @@
       <div class="plan-list">
         <div v-if="!todayPlans.length" class="empty-state">
           <div class="empty-state-icon">○</div>
-          <div class="empty-state-text">{{ t('plan.empty', 'No plans yet - add your first habit or task below') }}</div>
+          <div class="empty-state-text">{{ t('plan.empty', 'No plans yet - add your first habit or task') }}</div>
         </div>
         <template v-else>
           <template v-for="(group, index) in groupedPlans" :key="index">
@@ -73,13 +78,11 @@
                 <span class="plan-tag" :class="plan.type">{{ planTypeTag(plan.type) }}</span>
                 <span class="plan-time">{{ plan.time }}</span>
                 <button
-                  v-if="!auth.isAdmin"
                   class="plan-edit-btn"
                   :title="t('plan.edit', 'edit')"
                   @click.stop="startEdit(plan)"
                 >✎</button>
                 <button
-                  v-if="!auth.isAdmin"
                   class="plan-del"
                   :title="t('plan.remove', 'remove')"
                   @click.stop="plans.remove(plan.id)"
@@ -90,12 +93,11 @@
         </template>
       </div>
 
-      <div v-if="!auth.isAdmin" class="plan-controls">
+      <div class="plan-controls">
         <div class="add-plan-bar">
           <button class="add-plan-btn" @click="openForm">
             <span class="apb-icon">+</span> {{ t('plan.add_btn', 'Add habit or task') }}
           </button>
-          <AiIntakeDock class="add-plan-intake" />
         </div>
         <div class="add-plan-form" :class="{ open: formOpen }">
           <div class="apf-row">

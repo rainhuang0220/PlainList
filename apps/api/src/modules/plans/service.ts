@@ -137,10 +137,6 @@ export async function listPlans(user: AuthenticatedUser): Promise<PlanRecord[]> 
 }
 
 export async function createPlan(user: AuthenticatedUser, payload: unknown): Promise<PlanRecord> {
-  if (user.isAdmin) {
-    throw serviceError(403, 'admin account is read-only');
-  }
-
   const input = createPlanSchema.parse(payload);
   const scheduledDate = input.type === 'todo'
     ? (input.scheduledDate ?? toDateKey(new Date()))
@@ -181,10 +177,6 @@ export async function createPlan(user: AuthenticatedUser, payload: unknown): Pro
 }
 
 export async function updatePlan(user: AuthenticatedUser, planIdInput: unknown, payload: unknown): Promise<PlanRecord> {
-  if (user.isAdmin) {
-    throw serviceError(403, 'admin account is read-only');
-  }
-
   const { id } = planIdParamSchema.parse(planIdInput);
   const input = updatePlanSchema.parse(payload);
 
@@ -237,10 +229,6 @@ export async function updatePlan(user: AuthenticatedUser, planIdInput: unknown, 
 }
 
 export async function deletePlan(user: AuthenticatedUser, planIdInput: unknown): Promise<void> {
-  if (user.isAdmin) {
-    throw serviceError(403, 'admin account is read-only');
-  }
-
   const { id } = planIdParamSchema.parse(planIdInput);
   const [result] = await pool.query('DELETE FROM plans WHERE id = ? AND user_id = ?', [id, user.id]);
 

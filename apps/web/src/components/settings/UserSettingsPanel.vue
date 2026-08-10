@@ -324,4 +324,116 @@ onUnmounted(() => {
   line-height: 1.5;
   color: var(--muted);
 }
+
+@media (max-width: 768px) {
+  .us-overlay {
+    align-items: stretch;
+    justify-content: stretch;
+    padding: 0;
+  }
+
+  .us-modal {
+    flex-direction: column;
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    max-height: 100dvh;
+    max-height: 100svh;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .us-side {
+    flex: 0 0 auto;
+    border-right: none;
+    border-bottom: 1px solid var(--faint);
+    padding-top: env(safe-area-inset-top, 0px);
+    background: var(--surface);
+  }
+
+  .us-side-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px 10px;
+    border-bottom: none;
+  }
+
+  .us-username {
+    margin-top: 0;
+    font-size: 13px;
+  }
+
+  .us-side-body {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0;
+    padding: 0;
+    overflow: hidden;
+    border-top: 1px solid var(--faint);
+  }
+
+  .us-nav-item {
+    flex: none;
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+    padding: 12px 4px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    text-align: center;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .us-nav-item + .us-nav-item {
+    border-left: 1px solid var(--faint);
+  }
+
+  .us-nav-item:hover {
+    background: transparent;
+    color: var(--dark);
+  }
+
+  .us-nav-active {
+    background: var(--dark);
+    color: var(--bg);
+    font-weight: 600;
+    border-radius: 0;
+  }
+
+  .us-side-foot {
+    display: none;
+  }
+
+  .us-main {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .us-main-head {
+    padding: 12px 14px;
+  }
+
+  .us-main-title {
+    font-size: 16px;
+  }
+
+  .us-main-body {
+    padding: 12px 14px calc(18px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .us-account-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+}
 </style>

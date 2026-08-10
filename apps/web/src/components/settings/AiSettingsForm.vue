@@ -303,6 +303,8 @@ onUnmounted(() => {
 <style scoped>
 .ai-settings-form {
   max-width: 520px;
+  width: 100%;
+  min-width: 0;
 }
 
 .settings-note {
@@ -467,5 +469,30 @@ onUnmounted(() => {
 .settings-btn-secondary {
   background: transparent;
   color: var(--mid);
+}
+
+@media (max-width: 768px) {
+  .ai-settings-form {
+    max-width: none;
+  }
+
+  .settings-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .settings-actions .settings-btn-secondary:first-child {
+    margin-right: 0;
+  }
+
+  .settings-btn-primary,
+  .settings-btn-secondary {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  .settings-preset-btn {
+    width: 100%;
+  }
 }
 </style>

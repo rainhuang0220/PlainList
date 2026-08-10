@@ -2,7 +2,18 @@
   <div class="auth-graphic">
     <div class="ag-shell">
       <header class="ag-head">
-        <div class="ag-brand">PlainList</div>
+        <div class="ag-head-row">
+          <div class="ag-brand">PlainList</div>
+          <button
+            type="button"
+            class="ag-locale"
+            :title="t('nav.language', 'Language')"
+            :aria-label="t('nav.language', 'Language')"
+            @click="toggleLocale"
+          >
+            {{ localeButtonLabel }}
+          </button>
+        </div>
         <p class="ag-tagline">
           {{ t('graphic.tagline', 'Habits, reminders, todos and calendar notes — one plain page. Finish today first.') }}
         </p>
@@ -95,6 +106,7 @@ import type { AuthAccount, AuthSuccessResponse } from '@plainlist/shared';
 import { DEMO_ACCOUNT } from '@plainlist/shared';
 import { computed, nextTick, onMounted, ref } from 'vue';
 import { useAuthStore } from '@/features/auth/model/useAuthStore';
+import { useLocaleStore } from '@/features/locale/model/useLocaleStore';
 import { useApi } from '@/shared/api/useApi';
 import { useI18nStore } from '@/shared/i18n/useI18nStore';
 
@@ -104,10 +116,18 @@ const emit = defineEmits<{
 }>();
 
 const auth = useAuthStore();
+const localeStore = useLocaleStore();
 const { get, post } = useApi();
 const i18n = useI18nStore();
 function t(key: string, fallback: string) {
   return i18n.t(key, fallback);
+}
+
+const localeButtonLabel = computed(() => (localeStore.locale === 'zh-CN' ? 'EN' : '中'));
+
+function toggleLocale() {
+  const next = localeStore.locale === 'zh-CN' ? 'en' : 'zh-CN';
+  localeStore.setLocale(next);
 }
 
 type Mode = 'login' | 'register';
@@ -257,7 +277,33 @@ onMounted(() => {
 }
 
 .ag-head { border-bottom: 2px solid var(--dark, #111); padding-bottom: 16px; }
-.ag-brand { font-size: 30px; font-weight: 700; letter-spacing: -0.01em; }
+.ag-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.ag-brand { font-size: 30px; font-weight: 700; letter-spacing: -0.01em; line-height: 1; }
+.ag-locale {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  border: 0;
+  border-radius: 0;
+  background: #111;
+  color: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  line-height: 1;
+}
+.ag-locale:active {
+  transform: scale(0.96);
+}
 .ag-tagline { margin: 8px 0 0; color: var(--muted, #777); font-size: 13px; line-height: 1.6; }
 
 .ag-card { border: 1px solid var(--dark, #111); background: var(--surface, #fff); }

@@ -8,7 +8,7 @@
       </div>
     </div>
 
-    <div class="cal-grid">
+    <div class="cal-grid cal-grid-desktop">
       <div v-for="monthIndex in 12" :key="monthIndex" class="cal-month">
         <div class="cal-month-name">{{ MONTHS_S[monthIndex - 1] }}</div>
         <div class="cal-weekdays">
@@ -28,6 +28,48 @@
             :title="dayTitle(monthIndex - 1, day)"
             type="button"
             @click="openDayPopover(monthIndex - 1, day, $event)"
+          />
+        </div>
+      </div>
+    </div>
+
+    <div class="cal-mobile-pager">
+      <div class="cal-mobile-toolbar">
+        <button class="nav-btn" type="button" aria-label="Previous month" @click="shiftVisibleMonth(-1)">&#8592;</button>
+        <div class="cal-mobile-label">{{ MONTHS[visibleMonth] }}</div>
+        <button class="nav-btn" type="button" aria-label="Next month" @click="shiftVisibleMonth(1)">&#8594;</button>
+      </div>
+      <input
+        v-model.number="visibleMonth"
+        class="cal-mobile-slider"
+        type="range"
+        min="0"
+        max="11"
+        step="1"
+        :aria-label="t('calendar.month_slider', '选择月份')"
+      />
+      <div
+        class="cal-month cal-mobile-month"
+        @touchstart.passive="onMonthTouchStart"
+        @touchend.passive="onMonthTouchEnd"
+      >
+        <div class="cal-weekdays">
+          <div v-for="weekday in WDAYS_S" :key="`m-${weekday}`" class="cal-wd">{{ weekday }}</div>
+        </div>
+        <div class="cal-days-grid">
+          <div
+            v-for="emptyDay in firstDay(visibleMonth)"
+            :key="`mobile-empty-${visibleMonth}-${emptyDay}`"
+            class="cal-day empty"
+          />
+          <button
+            v-for="day in daysInMonth(visibleMonth)"
+            :key="`mobile-${visibleMonth}-${day}`"
+            class="cal-day clickable"
+            :class="dayClass(visibleMonth, day)"
+            :title="dayTitle(visibleMonth, day)"
+            type="button"
+            @click="openDayPopover(visibleMonth, day, $event)"
           />
         </div>
       </div>
@@ -171,7 +213,7 @@
     <DayReviewOverlay
       v-if="dayReviewOpen && dayPopover"
       :review="dayPopover"
-      @close="dayReviewOpen = false"
+      @close="closeDayReview"
     />
   </section>
 </template>
@@ -192,6 +234,40 @@ const i18n = useI18nStore()
 
 const year = ref(new Date().getFullYear())
 const today = new Date()
+const visibleMonth = ref(today.getMonth())
+let monthTouchX = null
+
+function shiftVisibleMonth(delta) {
+  const next = visibleMonth.value + delta
+  if (next < 0) {
+    year.value -= 1
+    visibleMonth.value = 11
+    return
+  }
+  if (next > 11) {
+    year.value += 1
+    visibleMonth.value = 0
+    return
+  }
+  visibleMonth.value = next
+}
+
+function onMonthTouchStart(event) {
+  monthTouchX = event.changedTouches?.[0]?.clientX ?? null
+}
+
+function onMonthTouchEnd(event) {
+  if (monthTouchX == null) return
+  const endX = event.changedTouches?.[0]?.clientX
+  if (endX == null) {
+    monthTouchX = null
+    return
+  }
+  const delta = endX - monthTouchX
+  monthTouchX = null
+  if (Math.abs(delta) < 48) return
+  shiftVisibleMonth(delta < 0 ? 1 : -1)
+}
 
 const dayPopoverOpen = ref(false)
 const dayPopover = ref(null)
@@ -423,7 +499,12 @@ function closeDayPopover() {
 }
 
 function openDayReview() {
+  dayPopoverOpen.value = false
   dayReviewOpen.value = true
+}
+
+function closeDayReview() {
+  dayReviewOpen.value = false
 }
 
 async function fetchVisibleYear() {
@@ -483,7 +564,13 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.section { padding: 2rem 1.5rem; }
+.section {
+  /* Keep global top padding so sticky nav does not cover the title */
+  padding-left: calc(20px + var(--safe-left, 0px));
+  padding-right: calc(20px + var(--safe-right, 0px));
+  padding-bottom: 2rem;
+  justify-content: flex-start;
+}
 .section-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; }
 .section-title { font-size: 1.4rem; font-weight: 700; margin: 0; }
 .year-nav { display: flex; gap: .4rem; }
@@ -491,6 +578,30 @@ onMounted(() => {
 .nav-btn:hover { background: var(--faint); }
 
 .cal-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.2rem; }
+.cal-mobile-pager { display: none; }
+.cal-mobile-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.cal-mobile-label {
+  flex: 1;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -.02em;
+  color: var(--dark);
+}
+.cal-mobile-slider {
+  width: 100%;
+  margin: 0 0 14px;
+  accent-color: var(--dark);
+}
+.cal-mobile-month .cal-days-grid { gap: 4px; }
+.cal-mobile-month .cal-day { border-radius: 4px; }
 .cal-month-name { font-size: .75rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; margin-bottom: .4rem; color: var(--muted); }
 .cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; margin-bottom: 2px; }
 .cal-wd { font-size: .6rem; text-align: center; color: var(--faint); }
@@ -863,7 +974,8 @@ onMounted(() => {
 }
 
 @media (max-width: 768px) {
-  .cal-grid { grid-template-columns: repeat(2, 1fr); }
+  .cal-grid-desktop { display: none; }
+  .cal-mobile-pager { display: block; }
   .year-journal-filters {
     flex-direction: column;
     align-items: stretch;
@@ -880,7 +992,6 @@ onMounted(() => {
 }
 
 @media (max-width: 520px) {
-  .cal-grid { grid-template-columns: 1fr; }
   .heatmap-row {
     align-items: flex-start;
     flex-direction: column;
