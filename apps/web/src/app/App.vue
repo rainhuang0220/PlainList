@@ -126,7 +126,10 @@ const marketplace = useMarketplaceStore();
 const i18n = useI18nStore();
 const { get } = useApi();
 
-const authMode = ref<'terminal' | 'graphic'>('terminal');
+import { isNativePlatform } from '@/shared/platform';
+
+// Phone WebView: start on the form login. ASCII terminal banners overflow on narrow screens.
+const authMode = ref<'terminal' | 'graphic'>(isNativePlatform() ? 'graphic' : 'terminal');
 const marketplaceOpen = ref(false);
 const userSettingsOpen = ref(false);
 const userSettingsSection = ref<'account' | 'ai' | 'profile' | 'theme'>('ai');

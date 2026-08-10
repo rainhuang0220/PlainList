@@ -153,6 +153,16 @@
       color: #111; background: transparent; caret-color: #555;
       width: 0; min-width: 0;
     }
+    @media (max-width: 640px) {
+      #auth-terminal {
+        padding: calc(28px + var(--safe-top)) calc(16px + var(--safe-right)) calc(24px + var(--safe-bottom)) calc(16px + var(--safe-left));
+        font-size: 12px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      .term-line { overflow-wrap: anywhere; }
+      .term-prompt-line input { font-size: 16px; } /* avoid mobile zoom on focus */
+    }
 
     @keyframes shake {
       0%,100% { transform: translateX(0); }

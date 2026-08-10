@@ -79,6 +79,11 @@ export function useApi() {
       if (error instanceof Error && /aborted/i.test(error.message)) {
         throw new Error('请求已取消。');
       }
+      if (Capacitor.isNativePlatform()) {
+        throw new Error(
+          `无法连接后端（${API_BASE || '未配置 API 地址'}）。请确认手机能访问该服务器，且应用允许明文 HTTP。`,
+        );
+      }
       throw new Error('无法连接后端 API。请确认 npm run dev 已启动且端口 3000 可用。');
     }
 

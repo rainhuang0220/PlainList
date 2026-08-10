@@ -354,4 +354,20 @@ onMounted(() => {
 }
 .ag-link:hover { color: var(--dark, #111); }
 .ag-sep { opacity: 0.5; }
+
+@media (max-width: 640px) {
+  .auth-graphic {
+    padding: max(20px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+    align-items: start;
+    place-items: start center;
+  }
+  .ag-shell { width: 100%; gap: 18px; margin-top: 12px; }
+  .ag-brand { font-size: 26px; }
+  .ag-tagline { font-size: 13px; }
+  .ag-tab { padding: 14px 0; font-size: 13px; min-height: 44px; }
+  .ag-form { padding: 18px 16px; gap: 16px; }
+  .ag-input { font-size: 16px; padding: 10px 0; } /* 16px avoids iOS zoom */
+  .ag-submit { padding: 14px 0; font-size: 13px; min-height: 48px; }
+  .ag-foot { flex-wrap: wrap; gap: 8px 10px; }
+}
 </style>

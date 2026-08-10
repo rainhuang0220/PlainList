@@ -22,9 +22,15 @@ const config: CapacitorConfig = {
       backgroundColor: '#F7F7F7',
     },
   },
+  // Public API is plain HTTP today. https://localhost + http://API is mixed
+  // content and gets blocked in Android WebView unless we allow cleartext.
+  android: {
+    allowMixedContent: true,
+  },
   server: {
-    androidScheme: 'https',
+    androidScheme: 'http',
     iosScheme: 'capacitor',
+    cleartext: true,
   },
 };
 

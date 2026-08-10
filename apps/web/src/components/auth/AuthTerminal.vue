@@ -112,16 +112,22 @@ function framedBox(content: string[], pad = 2, indent = ' '): string[] {
 }
 
 function welcomeLines(): TerminalLine[] {
+  const narrow = typeof window !== 'undefined' && window.innerWidth < 640;
   const lines: TerminalLine[] = [{ text: '', type: '' }];
-  BANNER.forEach((text) => lines.push({ text, type: '' }));
-  lines.push({ text: '', type: '' });
-  framedBox(WELCOME_BODY).forEach((text) => lines.push({ text, type: 'out' }));
+  if (!narrow) {
+    BANNER.forEach((text) => lines.push({ text, type: '' }));
+    lines.push({ text: '', type: '' });
+    framedBox(WELCOME_BODY).forEach((text) => lines.push({ text, type: 'out' }));
+  } else {
+    lines.push({ text: '  PlainList', type: '' });
+    lines.push({ text: '  habits · todos · reviews — one plain page.', type: 'out' });
+  }
   lines.push({ text: '', type: '' });
   lines.push({ text: '  quick start:', type: 'out' });
   lines.push({ text: '    pl cd <name>     log in', type: 'out' });
   lines.push({ text: '    pl new <name>    create account', type: 'out' });
   lines.push({ text: '    pl onboard       guided setup', type: 'out' });
-  lines.push({ text: '    pl guide         open the visual guide', type: 'out' });
+  lines.push({ text: '    pl graphic       visual login', type: 'out' });
   lines.push({ text: '  type /help to see all available commands.', type: 'out' });
   lines.push({ text: '', type: '' });
   return lines;
