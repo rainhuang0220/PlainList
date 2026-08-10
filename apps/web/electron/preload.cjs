@@ -2,10 +2,12 @@
  * PlainList Electron preload
  *
  * 通过 contextBridge 暴露一个最小化的 bridge 给渲染进程。
- * 当前 PlainList 前端不需要 node 能力，所以这里只暴露版本信息。
- * 后续要加 IPC（比如读本地文件、调本地工具），在这里加 bridge。
+ * FishTime 在桌面端走本机前台应用监测（见 fishtime-local.cjs）。
  */
 const { contextBridge } = require('electron');
+
+// Keep in sync with fishtime-local.cjs DEFAULT_PORT
+const FISHTIME_LOCAL_URL = 'http://127.0.0.1:18765/';
 
 contextBridge.exposeInMainWorld('plainlistDesktop', {
   platform: process.platform,
@@ -14,4 +16,6 @@ contextBridge.exposeInMainWorld('plainlistDesktop', {
     chrome: process.versions.chrome,
     node: process.versions.node,
   },
+  /** When set, marketplace routes the FishTime iframe here instead of cloud WakaTime. */
+  fishtimeLocalUrl: FISHTIME_LOCAL_URL,
 });

@@ -13,20 +13,30 @@
 const { app, BrowserWindow, shell, Menu, dialog } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
+const { startFishTimeLocal, DEFAULT_PORT: FISHTIME_PORT } = require('./fishtime-local.cjs');
 
 // Widget sidecars (Focus Bay 等) 走 http:// 公网反代访问。Chromium 把非
 // https 的 origin 视为 insecure context，navigator.mediaDevices 会直接
 // 不存在，摄像头 (getUserMedia) 无法使用。把 API 域标记为 secure。
-// 必须在 app ready 之前调用。
+// 必须在 app ready 之前调用。端口也要写全——Chromium 按完整 origin 匹配。
 app.commandLine.appendSwitch(
   'unsafely-treat-insecure-origin-as-secure',
-  'http://175.24.134.228',
+  [
+    'http://175.24.134.228',
+    'http://175.24.134.228:80',
+    'http://175.24.134.228:3001',
+    'http://175.24.134.228:8086',
+    'http://127.0.0.1:8800',
+    `http://127.0.0.1:${FISHTIME_PORT}`,
+  ].join(','),
 );
 
 const isDev = !app.isPackaged;
 const APP_NAME = 'PlainList';
 
 let mainWindow = null;
+/** @type {{ baseUrl: string, stop: () => Promise<void> } | null} */
+let fishTimeLocal = null;
 
 function resolveIndexHtml() {
   // 打包后 dist/ 在 Resources/app/dist/
@@ -86,7 +96,7 @@ function createMainWindow() {
   // 显式放行 media 权限确保 getUserMedia 不会静默挂起。
   const { session } = require('electron');
   const ses = mainWindow.webContents.session;
-  ses.setPermissionRequestHandler((_wc, permission, callback, details) => {
+  ses.setPermissionRequestHandler((_wc, permission, callback, _details) => {
     const ok =
       permission === 'media' ||
       permission === 'camera' ||
@@ -95,6 +105,18 @@ function createMainWindow() {
       permission === 'fullscreen' ||
       permission === 'clipboard-sanitized-write';
     callback(ok);
+  });
+  // Chromium also consults the check handler before showing prompts /
+  // enabling mediaDevices; always allow media-family permissions.
+  ses.setPermissionCheckHandler((_wc, permission) => {
+    return (
+      permission === 'media' ||
+      permission === 'camera' ||
+      permission === 'microphone' ||
+      permission === 'display-capture' ||
+      permission === 'fullscreen' ||
+      permission === 'clipboard-sanitized-write'
+    );
   });
   ses.setDevicePermissionHandler((_details) => true);
 
@@ -187,7 +209,20 @@ function buildMenu() {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  // Local FishTime: track frontmost apps on this Mac and serve UI + API.
+  try {
+    const staticDir = path.join(__dirname, 'fishtime-web');
+    fishTimeLocal = await startFishTimeLocal({
+      userDataPath: app.getPath('userData'),
+      staticDir,
+      port: FISHTIME_PORT,
+    });
+  } catch (e) {
+    console.error('[fishtime-local] failed to start:', e);
+    fishTimeLocal = null;
+  }
+
   buildMenu();
   createMainWindow();
 
@@ -199,6 +234,14 @@ app.whenReady().then(() => {
   });
 });
 
+app.on('before-quit', () => {
+  if (fishTimeLocal) {
+    // fire-and-forget flush/stop
+    fishTimeLocal.stop().catch(() => {});
+    fishTimeLocal = null;
+  }
+});
+
 app.on('window-all-closed', () => {
   // macOS 通常保持应用活跃，但这里遵循 PlainList 风格，关闭即退出
   if (process.platform !== 'darwin') {
@@ -208,14 +251,16 @@ app.on('window-all-closed', () => {
   }
 });
 
-// 阻止导航到外部地址
+// 阻止主窗口误跳到外部地址；放行 file:// 与本地/云端 widget iframe。
 app.on('web-contents-created', (_event, contents) => {
   contents.on('will-navigate', (event, url) => {
-    const indexHtml = resolveIndexHtml();
     const currentUrl = contents.getURL();
-    if (url !== currentUrl && !url.startsWith('file://')) {
-      event.preventDefault();
-      shell.openExternal(url);
-    }
+    if (url === currentUrl) return;
+    if (url.startsWith('file://')) return;
+    if (/^https?:\/\/127\.0\.0\.1(?::\d+)?\//i.test(url)) return;
+    if (/^https?:\/\/localhost(?::\d+)?\//i.test(url)) return;
+    if (/^https?:\/\/175\.24\.134\.228(?::\d+)?\//i.test(url)) return;
+    event.preventDefault();
+    shell.openExternal(url);
   });
 });

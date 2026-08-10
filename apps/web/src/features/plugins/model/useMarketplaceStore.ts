@@ -66,6 +66,14 @@ export const useMarketplaceStore = defineStore('marketplace', () => {
   //   origin (e.g. for Vite-served static widgets under
   //   `apps/web/public/widgets/<id>/`).
   function resolveWidgetUrl(pluginId: string, manifestUrl: string): string {
+    // Electron: FishTime uses local foreground-app monitor, not cloud WakaTime.
+    const desktop = (window as unknown as {
+      plainlistDesktop?: { fishtimeLocalUrl?: string };
+    }).plainlistDesktop;
+    if (pluginId === 'fishtime' && desktop?.fishtimeLocalUrl) {
+      return desktop.fishtimeLocalUrl;
+    }
+
     const apiBase =
       typeof __API_BASE_URL__ === 'string' && __API_BASE_URL__
         ? __API_BASE_URL__
