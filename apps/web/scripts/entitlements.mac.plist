@@ -9,8 +9,12 @@
   <true/>
   <key>com.apple.security.cs.disable-library-validation</key>
   <true/>
-  <!-- App can be opened on any Mac without Gatekeeper blocking it on first launch -->
   <key>com.apple.security.cs.allow-dyld-environment-variables</key>
+  <true/>
+  <!-- Media device access for Focus Bay (and future widgets) -->
+  <key>com.apple.security.device.camera</key>
+  <true/>
+  <key>com.apple.security.device.audio-input</key>
   <true/>
 </dict>
 </plist>
