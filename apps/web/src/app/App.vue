@@ -49,6 +49,7 @@
             {{ widget.name }}
           </button>
           <button
+            v-if="showPluginChrome"
             id="nav-marketplace"
             :title="t('marketplace.title', 'Marketplace')"
             @click="marketplaceOpen = true"
@@ -69,7 +70,7 @@
       <TrackerSection id="s4" class="app-section" style="--section-delay: 210ms" />
       <CalendarSection id="s5" class="app-section" style="--section-delay: 280ms" />
 
-      <Marketplace v-if="marketplaceOpen" @close="marketplaceOpen = false" />
+      <Marketplace v-if="showPluginChrome && marketplaceOpen" @close="marketplaceOpen = false" />
       <UserSettingsPanel
         v-if="userSettingsOpen"
         :username="auth.currentUser ?? ''"
@@ -101,6 +102,7 @@ import { useUserProfileStore } from '@/features/user-profile/model/useUserProfil
 import { useMarketplaceStore } from '@/features/plugins/model/useMarketplaceStore';
 import { useApi } from '@/shared/api/useApi';
 import { useI18nStore } from '@/shared/i18n/useI18nStore';
+import { isNativePlatform } from '@/shared/platform';
 import UserMenu from '@/components/settings/UserMenu.vue';
 import UserSettingsPanel from '@/components/settings/UserSettingsPanel.vue';
 import AuthTerminal from '@/components/auth/AuthTerminal.vue';
@@ -129,7 +131,10 @@ const userSettingsOpen = ref(false);
 const userSettingsSection = ref<'account' | 'ai' | 'profile'>('ai');
 const activeWidget = ref<string | null>(null);
 
-const installedWidgets = computed(() => marketplace.installedWidgets);
+const showPluginChrome = computed(() => !isNativePlatform());
+const installedWidgets = computed(() =>
+  showPluginChrome.value ? marketplace.installedWidgets : [],
+);
 const activeSection = ref('s1');
 const isDashboardLoading = ref(false);
 const dashboardReady = ref(false);
