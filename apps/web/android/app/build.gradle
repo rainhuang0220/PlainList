@@ -7,19 +7,33 @@ android {
         applicationId "com.plainlist.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode 20000
+        versionName "2.0.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
-             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
-             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    signingConfigs {
+        release {
+            def propsFile = rootProject.file("../android-signing/keystore.properties")
+            if (propsFile.exists()) {
+                def props = new Properties()
+                props.load(new FileInputStream(propsFile))
+                storeFile file("${propsFile.parentFile}/${props['storeFile']}")
+                storePassword props['storePassword']
+                keyAlias props['keyAlias']
+                keyPassword props['keyPassword']
+            }
         }
     }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (rootProject.file("../android-signing/keystore.properties").exists()) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 }
