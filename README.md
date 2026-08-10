@@ -23,12 +23,15 @@ GitHub Release（DMG 附件）：**[Releases](https://github.com/rainhuang0220/P
 curl -fsSL http://175.24.134.228/downloads/install.sh | bash
 ```
 
-| 架构 | 下载 |
+| 架构 / 平台 | 下载 |
 |------|------|
 | Apple Silicon (arm64) | [PlainList-2.0.0-arm64.dmg](http://175.24.134.228/downloads/PlainList-2.0.0-arm64.dmg) · [GitHub](https://github.com/rainhuang0220/PlainList/releases) |
 | Intel (x64) | [PlainList-2.0.0-x64.dmg](http://175.24.134.228/downloads/PlainList-2.0.0-x64.dmg) · [GitHub](https://github.com/rainhuang0220/PlainList/releases) |
+| Android APK | [PlainList-2.0.0.apk](http://175.24.134.228/downloads/PlainList-2.0.0.apk) |
 
-演示账号：`rainhuang` / `rainhuang`。当前为 ad-hoc 签名，首次打开若提示「无法验证」，在「隐私与安全性」点一次「仍要打开」即可。
+演示账号：`rainhuang` / `rainhuang`。macOS 当前为 ad-hoc 签名，首次打开若提示「无法验证」，在「隐私与安全性」点一次「仍要打开」即可。
+
+Android 为侧载 APK：下载后需在系统设置中允许「未知来源」或「安装未知应用」，再打开安装包。Release 签名 keystore 须离线备份，详见 [apps/web/android-signing/README.md](apps/web/android-signing/README.md)。
 
 桌面端 FishTime 为本机前台应用监测（Chrome / 微信等会实时累计）；Focus Bay 需摄像头权限。
 
@@ -209,8 +212,14 @@ TRUST_PROXY=true   # 在 Nginx 后取真实客户端 IP
 ```bash
 npm run mobile:android   # 构建并打开 Android Studio
 npm run mobile:ios       # 构建并打开 Xcode
+
+# Android release APK（需先配置 apps/web/android-signing/keystore.properties）
+VITE_API_BASE_URL=http://175.24.134.228 npm run mobile:android:release
+SSHPASS=… npm run deploy:android -w @plainlist/web
 ```
 `apps/web/src/app/main.ts` 在原生平台会异步加载 SplashScreen / StatusBar / Keyboard 插件；CORS 已自动放行 `capacitor://localhost` 与 `localhost` 来源。详见 [apps/web/capacitor.config.ts](apps/web/capacitor.config.ts)。
+
+**原生端与 Web 差异：** 插件市场与 FishTime / Focus Bay widget 入口在原生端隐藏；主题在 **设置 → 主题** 切换（不依赖插件市场）。带日期的待办会排程**本地通知**提醒；远程 push 暂未包含。
 ## 数据库
 显式 migrations 位于 [packages/db/migrations/](packages/db/migrations/)：
 | 文件 | 内容 |
