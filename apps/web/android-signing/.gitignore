@@ -1,0 +1,4 @@
+*
+!.gitignore
+!keystore.properties.example
+!README.md

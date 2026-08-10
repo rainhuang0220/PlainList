@@ -4,9 +4,14 @@ apps/*/dist/
 packages/*/node_modules/
 packages/*/dist/
 
-# Capacitor native projects (regenerated via `npx cap add`)
-apps/web/android/
+# Capacitor: track android/ for reproducible release signing; ios still local-only for now
 apps/web/ios/
+
+# Android signing secrets + local release staging
+apps/web/android-signing/*.jks
+apps/web/android-signing/*.keystore
+apps/web/android-signing/keystore.properties
+apps/web/.android-release/
 coverage/
 *.tsbuildinfo
 .DS_Store
