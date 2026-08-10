@@ -13,7 +13,8 @@
         :src="src"
         class="wp-frame"
         sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads"
-        allow="camera; microphone"
+        allow="camera *; microphone *; autoplay *; fullscreen *"
+        referrerpolicy="no-referrer-when-downgrade"
         @load="loading = false"
       />
     </div>

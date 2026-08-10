@@ -640,16 +640,19 @@
   }
 
   // ---------- yolo client ----------
+  // Use relative URLs so the page works both at http://127.0.0.1:8800/
+  // and behind the reverse proxy at /widget/focus-bay/. Absolute "/healthz"
+  // would hit the site root and return HTML, silently killing detection.
   async function pingHealth() {
     try {
-      const res = await fetch('/healthz');
+      const res = await fetch('healthz');
       if (!res.ok) return { ok: false };
       return await res.json();
     } catch { return { ok: false }; }
   }
 
   async function detect(dataUrl) {
-    const res = await fetch('/detect', {
+    const res = await fetch('detect', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ image: dataUrl, min_conf: settings.minConf, imgsz: settings.imgsz }),
@@ -667,25 +670,109 @@
   let inFlight = false;
   let detectTimer = null, uiTimer = null, probeTimer = null;
 
+  async function requestCameraStream() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      throw Object.assign(new Error('当前页面不是安全上下文，无法访问摄像头'), { name: 'SecurityError' });
+    }
+    const attempts = [
+      { video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
+      { video: { facingMode: 'user' }, audio: false },
+      { video: true, audio: false },
+    ];
+    let lastErr = null;
+    for (const constraints of attempts) {
+      try {
+        const gum = navigator.mediaDevices.getUserMedia(constraints);
+        const timeout = new Promise((_, rej) =>
+          setTimeout(() => rej(Object.assign(new Error('timeout'), { name: 'TimeoutError' })), 8000),
+        );
+        return await Promise.race([gum, timeout]);
+      } catch (err) {
+        lastErr = err;
+        if (err && (err.name === 'NotAllowedError' || err.name === 'TimeoutError')) throw err;
+      }
+    }
+    throw lastErr || new Error('无法访问摄像头');
+  }
+
+  function waitForVideoFrame(el, ms) {
+    return new Promise((resolve) => {
+      let done = false;
+      const finish = (ok) => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        el.removeEventListener('loadedmetadata', onMeta);
+        el.removeEventListener('playing', onMeta);
+        resolve(ok);
+      };
+      const onMeta = () => {
+        if (el.videoWidth > 0 && el.videoHeight > 0) finish(true);
+      };
+      const timer = setTimeout(() => finish(el.videoWidth > 0), ms);
+      el.addEventListener('loadedmetadata', onMeta);
+      el.addEventListener('playing', onMeta);
+      onMeta();
+    });
+  }
+
   async function startCamera() {
     const btn = $('camBtn'), btnTxt = $('camBtnTxt'), errEl = $('camError');
     btn.disabled = true; btnTxt.textContent = '请求权限…'; errEl.hidden = true;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
-        audio: false,
-      });
+      // Always show the live preview after a successful grant — a persisted
+      // showPreview:false made the page look "broken" (camera LED on, blank UI).
+      settings.showPreview = true;
+      saveSettings();
+      if (stream) {
+        stream.getTracks().forEach((t) => t.stop());
+        stream = null;
+      }
+      stream = await requestCameraStream();
+      video.muted = true;
+      video.playsInline = true;
+      video.setAttribute('playsinline', '');
+      video.setAttribute('autoplay', '');
       video.srcObject = stream;
-      await video.play().catch(() => {});
+      // play() can hang without an active user gesture; never block the UI.
+      await Promise.race([video.play().catch(() => {}), new Promise((r) => setTimeout(r, 1500))]);
+      let hasFrame = await waitForVideoFrame(video, 2500);
+      if (!hasFrame) {
+        // One more kick — some Electron builds need a second play() after metadata.
+        await Promise.race([video.play().catch(() => {}), new Promise((r) => setTimeout(r, 800))]);
+        hasFrame = await waitForVideoFrame(video, 2000);
+      }
       cameraOn = true;
       $('placeholder').hidden = true;
       $('previewBtn').hidden = false;
       $('startBtn').disabled = false;
       applyPreviewMode();
+      if (!hasFrame) {
+        errEl.textContent = '摄像头已授权，但还没有收到画面。请确认没有其他应用独占摄像头，或重启 PlainList 后再试。';
+        errEl.hidden = false;
+      } else {
+        errEl.hidden = true;
+      }
       checkEngine();
       startLoops();
     } catch (err) {
-      errEl.textContent = (err && err.message) || '无法访问摄像头，请检查浏览器权限。';
+      const name = (err && err.name) || '';
+      const msg = (err && err.message) || '';
+      let tip = '无法访问摄像头：' + msg;
+      if (name === 'NotAllowedError' || /permission|denied/i.test(msg)) {
+        tip = '摄像头权限被拒绝。请在 系统设置 → 隐私与安全性 → 摄像头 中允许 PlainList，然后重试。';
+      } else if (name === 'NotFoundError' || /no camera|not found/i.test(msg)) {
+        tip = '未检测到摄像头，请检查摄像头是否连接或被其他应用占用。';
+      } else if (name === 'NotReadableError' || /in use|busy/i.test(msg)) {
+        tip = '摄像头正被其他应用占用，请关闭其他使用摄像头的应用后重试。';
+      } else if (name === 'OverconstrainedError') {
+        tip = '摄像头不支持当前请求参数，请重试。';
+      } else if (name === 'TimeoutError' || msg === 'timeout') {
+        tip = '请求摄像头超时。若系统未弹出权限框，请到 系统设置 → 隐私与安全性 → 摄像头 手动允许 PlainList。';
+      } else if (name === 'SecurityError') {
+        tip = msg || '当前页面无法使用摄像头（安全上下文问题），请更新 PlainList 后重试。';
+      }
+      errEl.textContent = tip;
       errEl.hidden = false;
     } finally {
       btn.disabled = false; btnTxt.textContent = '开启摄像头';
