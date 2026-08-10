@@ -102,6 +102,7 @@ import { useUserProfileStore } from '@/features/user-profile/model/useUserProfil
 import { useMarketplaceStore } from '@/features/plugins/model/useMarketplaceStore';
 import { useApi } from '@/shared/api/useApi';
 import { useI18nStore } from '@/shared/i18n/useI18nStore';
+import { getNotificationScheduler } from '@/shared/notifications';
 import { isNativePlatform } from '@/shared/platform';
 import UserMenu from '@/components/settings/UserMenu.vue';
 import UserSettingsPanel from '@/components/settings/UserSettingsPanel.vue';
@@ -204,6 +205,7 @@ async function loadDashboard() {
     ]);
     await marketplace.ensureThemePack();
     await marketplace.loadActiveTheme();
+    await getNotificationScheduler().requestPermission();
   } finally {
     window.setTimeout(() => {
       isDashboardLoading.value = false;
@@ -221,6 +223,7 @@ async function onLogin() {
 async function logout() {
   dashboardReady.value = false;
   isDashboardLoading.value = false;
+  await getNotificationScheduler().clearAll();
   plans.clear();
   checks.clear();
   reviews.clear();

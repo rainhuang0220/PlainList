@@ -3,13 +3,19 @@ import { dedupeHabitPlans, sortPlansByTime } from '@plainlist/shared';
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { useApi } from '@/shared/api/useApi';
+import { getNotificationScheduler } from '@/shared/notifications';
 
 export const usePlansStore = defineStore('plans', () => {
   const { del, get, patch, post } = useApi();
   const plans = ref<PlanRecord[]>([]);
 
+  async function syncReminders() {
+    await getNotificationScheduler().syncFromPlans(plans.value);
+  }
+
   async function fetch() {
     plans.value = dedupeHabitPlans(sortPlansByTime(await get<PlanRecord[]>('/plans')));
+    await syncReminders();
   }
 
   async function add(name: string, type: PlanType, time: string, scheduledDate?: string, description?: string) {
@@ -31,6 +37,7 @@ export const usePlansStore = defineStore('plans', () => {
     const createdPlan = await post<PlanRecord>('/plans', payload);
     const withoutDuplicate = plans.value.filter((plan) => plan.id !== createdPlan.id);
     plans.value = dedupeHabitPlans(sortPlansByTime([...withoutDuplicate, createdPlan]));
+    await syncReminders();
     return createdPlan;
   }
 
@@ -39,12 +46,14 @@ export const usePlansStore = defineStore('plans', () => {
     plans.value = dedupeHabitPlans(sortPlansByTime(
       plans.value.map((plan) => plan.id === id ? updatedPlan : plan),
     ));
+    await syncReminders();
     return updatedPlan;
   }
 
   async function remove(id: number) {
     await del<{ ok: true }>(`/plans/${id}`);
     plans.value = plans.value.filter((plan) => plan.id !== id);
+    await syncReminders();
   }
 
   async function removeMany(ids: number[]): Promise<{ removed: number[]; failed: Array<{ id: number; reason: string }> }> {
@@ -63,11 +72,13 @@ export const usePlansStore = defineStore('plans', () => {
     if (removed.length > 0) {
       const removedSet = new Set(removed);
       plans.value = dedupeHabitPlans(sortPlansByTime(plans.value.filter((plan) => !removedSet.has(plan.id))));
+      await syncReminders();
     }
     return { removed, failed };
   }
 
   function clear() {
+    void getNotificationScheduler().clearAll();
     plans.value = [];
   }
 
