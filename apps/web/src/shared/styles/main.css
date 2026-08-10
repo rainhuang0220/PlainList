@@ -259,12 +259,27 @@
     .app-section {
       opacity: 0;
     }
+    /* Always reveal when ready — don't rely solely on animation fill
+       (Android WebView can drop CSS animations / choke on filter:blur). */
+    #app-root.dashboard-ready .app-nav,
+    #app-root.dashboard-ready .app-section {
+      opacity: 1;
+    }
     #app-root.dashboard-ready .app-nav {
       animation: navFloatIn .68s cubic-bezier(.22,1,.36,1) both;
     }
     #app-root.dashboard-ready .app-section {
       animation: sectionRiseIn .82s cubic-bezier(.22,1,.36,1) both;
       animation-delay: var(--section-delay, 0ms);
+    }
+    @media (max-width: 768px) {
+      #app-root.dashboard-ready .app-nav,
+      #app-root.dashboard-ready .app-section {
+        animation: none;
+        transform: none;
+        filter: none;
+        opacity: 1;
+      }
     }
 
     /* ══════════════════════════════════════════════════════════

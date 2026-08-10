@@ -204,16 +204,21 @@ async function loadDashboard() {
       marketplace.loadMyPlugins(),
       marketplace.loadAvailableManifests(),
     ]);
-    await marketplace.ensureThemePack();
-    await marketplace.loadActiveTheme();
-    await getNotificationScheduler().requestPermission();
+    try {
+      await marketplace.ensureThemePack();
+      await marketplace.loadActiveTheme();
+    } catch (themeError) {
+      console.warn('[PlainList] theme bootstrap failed', themeError);
+    }
+    // Never block first paint on the notification permission prompt.
+    void getNotificationScheduler().requestPermission().then(() =>
+      getNotificationScheduler().syncFromPlans(plans.plans),
+    );
+  } catch (error) {
+    console.error('[PlainList] dashboard load failed', error);
   } finally {
-    window.setTimeout(() => {
-      isDashboardLoading.value = false;
-      window.requestAnimationFrame(() => {
-        dashboardReady.value = true;
-      });
-    }, 220);
+    isDashboardLoading.value = false;
+    dashboardReady.value = true;
   }
 }
 
