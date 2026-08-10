@@ -23,7 +23,8 @@
     "desktop:build": "vue-tsc -p tsconfig.json --noEmit && vite build",
     "desktop:dist:mac": "npm run desktop:build && electron-builder --mac --config electron-builder.yml",
     "desktop:dist:mac:arm64": "npm run desktop:build && electron-builder --mac --arm64 --config electron-builder.yml",
-    "desktop:dist:mac:x64": "npm run desktop:build && electron-builder --mac --x64 --config electron-builder.yml"
+    "desktop:dist:mac:x64": "npm run desktop:build && electron-builder --mac --x64 --config electron-builder.yml",
+    "deploy:android": "bash scripts/deploy-android.sh"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.1",
