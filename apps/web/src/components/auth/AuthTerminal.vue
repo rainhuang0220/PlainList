@@ -185,7 +185,7 @@ function isValidUsername(value: string) {
 }
 
 async function completeAuth(response: AuthSuccessResponse, username: string, messageLines: string[]) {
-  auth.setAuth(response.token, username, response.isAdmin);
+  await auth.setAuth(response.token, username, response.isAdmin);
   messageLines.forEach((line) => print(line, 'ok'));
   print('  opening dashboard...', 'out');
   closing.value = true;

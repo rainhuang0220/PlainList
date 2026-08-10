@@ -1,63 +1,54 @@
 import { createPinia, setActivePinia } from 'pinia';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const memory = new Map<string, string>();
+
+vi.mock('@/shared/auth/tokenStorage', () => ({
+  TOKEN_KEY: 'pl_token',
+  getToken: vi.fn(async () => memory.get('pl_token') ?? null),
+  setToken: vi.fn(async (token: string) => {
+    memory.set('pl_token', token);
+  }),
+  clearToken: vi.fn(async () => {
+    memory.delete('pl_token');
+  }),
+}));
+
+import { clearToken, getToken, setToken } from '@/shared/auth/tokenStorage';
 import { useAuthStore } from './useAuthStore';
-
-function createSessionStorageMock() {
-  let state: Record<string, string> = {};
-
-  return {
-    getItem: vi.fn((key: string) => state[key] ?? null),
-    setItem: vi.fn((key: string, value: string) => {
-      state[key] = value;
-    }),
-    removeItem: vi.fn((key: string) => {
-      delete state[key];
-    }),
-    clear: vi.fn(() => {
-      state = {};
-    }),
-  };
-}
-
-const sessionStorageMock = createSessionStorageMock();
-
-Object.defineProperty(globalThis, 'sessionStorage', {
-  value: sessionStorageMock,
-  configurable: true,
-});
 
 describe('useAuthStore', () => {
   beforeEach(() => {
-    sessionStorageMock.clear();
+    memory.clear();
     vi.clearAllMocks();
     setActivePinia(createPinia());
   });
 
-  it('persists login state and clears it on logout', () => {
+  it('persists login state and clears it on logout', async () => {
     const auth = useAuthStore();
-
-    auth.setAuth('token-123', 'alice', true);
+    await auth.setAuth('token-123', 'alice', true);
 
     expect(auth.token).toBe('token-123');
     expect(auth.currentUser).toBe('alice');
     expect(auth.isAdmin).toBe(true);
     expect(auth.isLoggedIn).toBe(true);
-    expect(sessionStorageMock.setItem).toHaveBeenCalledWith('pl_token', 'token-123');
+    expect(setToken).toHaveBeenCalledWith('token-123');
 
-    auth.logout();
+    await auth.logout();
 
     expect(auth.token).toBeNull();
     expect(auth.currentUser).toBeNull();
     expect(auth.isAdmin).toBe(false);
     expect(auth.isLoggedIn).toBe(false);
-    expect(sessionStorageMock.removeItem).toHaveBeenCalledWith('pl_token');
+    expect(clearToken).toHaveBeenCalled();
   });
 
-  it('restores token from session storage before user hydration', () => {
-    sessionStorageMock.setItem('pl_token', 'demo-token');
-
+  it('hydrates token from storage before user hydration', async () => {
+    memory.set('pl_token', 'demo-token');
     const auth = useAuthStore();
+    await auth.hydrateFromStorage();
 
+    expect(getToken).toHaveBeenCalled();
     expect(auth.token).toBe('demo-token');
     expect(auth.currentUser).toBeNull();
     expect(auth.isLoggedIn).toBe(false);

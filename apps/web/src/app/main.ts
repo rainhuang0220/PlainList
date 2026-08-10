@@ -3,6 +3,7 @@ import { createApp } from 'vue';
 import { Capacitor } from '@capacitor/core';
 import App from './App.vue';
 import '../shared/styles/main.css';
+import { useAuthStore } from '@/features/auth/model/useAuthStore';
 
 async function initNativePlugins() {
   if (!Capacitor.isNativePlatform()) return;
@@ -25,8 +26,17 @@ async function initNativePlugins() {
   await SplashScreen.hide();
 }
 
-const app = createApp(App);
-app.use(createPinia());
-app.mount('#app');
+async function bootstrap() {
+  const app = createApp(App);
+  const pinia = createPinia();
+  app.use(pinia);
 
-initNativePlugins();
+  const auth = useAuthStore(pinia);
+  await auth.hydrateFromStorage();
+
+  app.mount('#app');
+
+  await initNativePlugins();
+}
+
+bootstrap();

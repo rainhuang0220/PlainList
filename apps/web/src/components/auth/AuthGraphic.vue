@@ -150,7 +150,7 @@ async function loadAccounts() {
 }
 
 async function finish(response: AuthSuccessResponse, name: string) {
-  auth.setAuth(response.token, name, response.isAdmin);
+  await auth.setAuth(response.token, name, response.isAdmin);
   emit('login');
 }
 

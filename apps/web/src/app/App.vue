@@ -220,7 +220,7 @@ async function logout() {
   reviews.clear();
   userProfile.clear();
   marketplace.clear();
-  auth.logout();
+  await auth.logout();
 }
 
 function openUserSettings(section: 'account' | 'ai' | 'profile') {
@@ -233,12 +233,12 @@ onMounted(async () => {
   if (auth.token) {
     try {
       const me = await get<AuthAccount>('/auth/me');
-      auth.setAuth(auth.token, me.username, me.isAdmin);
+      await auth.setAuth(auth.token, me.username, me.isAdmin);
       await loadDashboard();
     } catch {
       dashboardReady.value = false;
       isDashboardLoading.value = false;
-      auth.logout();
+      await auth.logout();
     }
   }
 });
