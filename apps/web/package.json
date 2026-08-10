@@ -18,6 +18,7 @@
     "cap:ios": "npx cap open ios",
     "mobile:build": "npm run build && npx cap sync",
     "mobile:android": "npm run mobile:build && npx cap open android",
+    "mobile:android:release": "bash scripts/build-android-release.sh",
     "mobile:ios": "npm run mobile:build && npx cap open ios",
     "desktop:build": "vue-tsc -p tsconfig.json --noEmit && vite build",
     "desktop:dist:mac": "npm run desktop:build && electron-builder --mac --config electron-builder.yml",

@@ -23,6 +23,7 @@
     "db:seed": "npm run db:seed -w @plainlist/db",
     "mobile:build": "npm run build:shared && npm run mobile:build -w @plainlist/web",
     "mobile:android": "npm run build:shared && npm run mobile:android -w @plainlist/web",
+    "mobile:android:release": "npm run mobile:android:release -w @plainlist/web",
     "mobile:ios": "npm run build:shared && npm run mobile:ios -w @plainlist/web",
     "desktop:build": "npm run build:shared && npm run desktop:build -w @plainlist/web",
     "desktop:dist:mac": "npm run desktop:build -w @plainlist/web -- --mac",
