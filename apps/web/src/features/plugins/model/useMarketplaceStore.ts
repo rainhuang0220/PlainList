@@ -149,6 +149,20 @@ export const useMarketplaceStore = defineStore('marketplace', () => {
     previewingThemeId.value = null;
   }
 
+  async function ensureThemePack() {
+    if (!isInstalled('theme-pack')) {
+      await install('theme-pack');
+    }
+    if (!isEnabled('theme-pack')) {
+      await toggle('theme-pack', true);
+    }
+  }
+
+  async function listThemePackThemes(): Promise<ThemeDefinition[]> {
+    const manifest = await get<PluginVersionManifest>('/marketplace/detail/theme-pack/manifest');
+    return manifest.themes ?? [];
+  }
+
   // --- Marketplace search/browse ---
   async function search(params: {
     q?: string;
@@ -306,6 +320,8 @@ export const useMarketplaceStore = defineStore('marketplace', () => {
     revertTheme,
     loadActiveTheme,
     saveTheme,
+    ensureThemePack,
+    listThemePackThemes,
     // Widgets
     availableManifests,
     installedWidgets,

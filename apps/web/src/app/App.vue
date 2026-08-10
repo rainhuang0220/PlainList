@@ -128,7 +128,7 @@ const { get } = useApi();
 const authMode = ref<'terminal' | 'graphic'>('terminal');
 const marketplaceOpen = ref(false);
 const userSettingsOpen = ref(false);
-const userSettingsSection = ref<'account' | 'ai' | 'profile'>('ai');
+const userSettingsSection = ref<'account' | 'ai' | 'profile' | 'theme'>('ai');
 const activeWidget = ref<string | null>(null);
 
 const showPluginChrome = computed(() => !isNativePlatform());
@@ -202,6 +202,7 @@ async function loadDashboard() {
       marketplace.loadMyPlugins(),
       marketplace.loadAvailableManifests(),
     ]);
+    await marketplace.ensureThemePack();
     await marketplace.loadActiveTheme();
   } finally {
     window.setTimeout(() => {
@@ -228,7 +229,7 @@ async function logout() {
   await auth.logout();
 }
 
-function openUserSettings(section: 'account' | 'ai' | 'profile') {
+function openUserSettings(section: 'account' | 'ai' | 'profile' | 'theme') {
   userSettingsSection.value = section;
   userSettingsOpen.value = true;
 }

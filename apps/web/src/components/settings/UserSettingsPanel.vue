@@ -33,6 +33,7 @@
         <div class="us-main-body">
           <AiSettingsForm v-if="activeSection === 'ai'" :key="formKey" />
           <UserProfileSettings v-else-if="activeSection === 'profile'" :key="formKey" />
+          <ThemeSettingsPanel v-else-if="activeSection === 'theme'" :key="formKey" />
           <div v-else class="us-account">
             <div class="us-account-card">
               <div class="us-account-row">
@@ -60,18 +61,21 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useI18nStore } from '@/shared/i18n/useI18nStore';
 import AiSettingsForm from '@/components/settings/AiSettingsForm.vue';
+import ThemeSettingsPanel from '@/components/settings/ThemeSettingsPanel.vue';
 import UserProfileSettings from '@/components/settings/UserProfileSettings.vue';
+
+type SettingsSection = 'account' | 'ai' | 'profile' | 'theme';
 
 const props = defineProps<{
   username: string;
   isAdmin: boolean;
-  initialSection?: 'account' | 'ai' | 'profile';
+  initialSection?: SettingsSection;
 }>();
 
 const emit = defineEmits<{ close: [] }>();
 
 const i18n = useI18nStore();
-const activeSection = ref<'account' | 'ai' | 'profile'>(props.initialSection ?? 'ai');
+const activeSection = ref<SettingsSection>(props.initialSection ?? 'ai');
 // 切换 tab 时强制重置子组件，避免不同 tab 状态污染
 const formKey = ref(0);
 
@@ -81,6 +85,7 @@ function t(key: string, fallback: string) {
 
 const navItems = computed(() => [
   { id: 'account' as const, label: t('settings.nav_account', '账户') },
+  { id: 'theme' as const, label: t('settings.nav_theme', '主题') },
   { id: 'ai' as const, label: t('settings.nav_ai', 'AI 速记') },
   { id: 'profile' as const, label: t('settings.nav_profile', 'AI 画像') },
 ]);
@@ -89,6 +94,9 @@ const activeTitle = computed(() => {
   if (activeSection.value === 'account') {
     return t('settings.title_account', '账户');
   }
+  if (activeSection.value === 'theme') {
+    return t('settings.title_theme', '主题');
+  }
   if (activeSection.value === 'profile') {
     return t('profile.title', '可解释的排程画像');
   }
@@ -96,7 +104,7 @@ const activeTitle = computed(() => {
 });
 
 // 切 tab 时子组件重新挂载，避免表单 / 画像状态残留
-function switchSection(id: 'account' | 'ai' | 'profile') {
+function switchSection(id: SettingsSection) {
   activeSection.value = id;
   formKey.value += 1;
 }
