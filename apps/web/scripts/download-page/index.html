@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#1c1c20">
-<title>PlainList 平原 · macOS 下载</title>
+<title>PlainList 平原 · 下载</title>
 <link rel="icon" href="/favicon.ico">
 <style>
   *,*::before,*::after { box-sizing: border-box; }
@@ -21,14 +21,13 @@
   .brand { display: flex; align-items: center; gap: 18px; margin-bottom: 56px; }
   .brand .mark {
     width: 64px; height: 64px; border-radius: 14px;
-    background: linear-gradient(180deg, #fafafa 0%, #d8d8dc 100%);
-    box-shadow: 0 6px 18px rgba(28,28,32,0.10), inset 0 0 0 1px rgba(255,255,255,0.5);
+    background: #fff;
+    box-shadow: 0 6px 18px rgba(28,28,32,0.10), inset 0 0 0 1px rgba(28,28,32,0.10);
     display: flex; align-items: center; justify-content: center;
+    font-family: Rockwell, 'Times New Roman', Times, serif;
+    font-weight: 700; font-size: 22px; letter-spacing: -0.02em;
+    color: #000; line-height: 1;
   }
-  .brand .mark .bars { display: flex; flex-direction: column; gap: 4px; width: 30px; }
-  .brand .mark .bar { height: 4px; border-radius: 2px; background: #1c1c20; }
-  .brand .mark .bar.mid { background: #1c1c20; width: 70%; }
-  .brand .mark .bar.dim { background: rgba(28,28,32,0.35); }
   .brand h1 { font-size: 22px; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
   .brand .sub { font-size: 13px; color: #5a5a60; margin-top: 2px; }
 
@@ -127,21 +126,18 @@
 <body>
   <div class="wrap">
     <div class="brand">
-      <div class="mark">
-        <div class="bars">
-          <div class="bar dim"></div>
-          <div class="bar mid"></div>
-          <div class="bar dim"></div>
-        </div>
-      </div>
+      <div class="mark" aria-hidden="true">PL/</div>
       <div>
         <h1>PlainList 平原</h1>
         <div class="sub">多尺度时间管理平台 · v2.0.0</div>
       </div>
     </div>
 
-    <h2>下载 macOS 客户端</h2>
-    <p class="lede">推荐用终端一键安装（curl 下载，避开浏览器隔离标记）。未做 Apple 公证前，系统仍可能要求在「隐私与安全性」里点一次「仍要打开」——这是正常的。</p>
+    <h2>下载客户端</h2>
+    <p class="lede">macOS 与 Android 侧载包。Web 版也可在线使用。</p>
+
+    <h3 style="font-size:22px;margin:36px 0 12px;">macOS</h3>
+    <p class="lede" style="margin-bottom:28px;">推荐用终端一键安装（curl 下载，避开浏览器隔离标记）。未做 Apple 公证前，系统仍可能要求在「隐私与安全性」里点一次「仍要打开」——这是正常的。</p>
 
     <div class="note" style="margin-bottom:28px;">
       <strong>一键安装（推荐，点复制 → 粘贴到「终端」回车）：</strong>
@@ -196,6 +192,34 @@
       <strong>关于「Apple 无法验证」：</strong>当前包是 ad-hoc 签名（无 Apple 开发者账号公证）。macOS 会拦一次；去设置点「仍要打开」即可，之后一般不再拦。DMG 里的 .command 会再多一次「允许终端」，所以感觉像两步——请改用上面的一键 curl。彻底零提示只能上 Developer ID + 公证。
     </div>
 
+    <h3 style="font-size:22px;margin:48px 0 12px;">Android</h3>
+    <p class="lede" style="margin-bottom:20px;">下载 APK 直接安装（需允许未知来源）。当前为自签名侧载包，非正式应用商店分发。</p>
+
+    <div class="card" style="max-width:420px;">
+      <span class="arch">Android</span>
+      <h3>通用 APK</h3>
+      <p class="meta">版本 <strong>2.0.0</strong> · 大小 <strong id="size-apk">—</strong> · arm64/x86_64</p>
+      <a class="btn" href="/downloads/PlainList-2.0.0.apk">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        下载 APK
+      </a>
+    </div>
+
+    <div class="steps">
+      <div class="step">
+        <div class="num">1</div>
+        <p>在系统设置中允许「安装未知应用」/「未知来源」（路径因品牌而异：设置 → 安全 / 应用 → 特殊权限）。</p>
+      </div>
+      <div class="step">
+        <div class="num">2</div>
+        <p>用手机浏览器打开本页，点「下载 APK」，下载完成后打开文件安装。</p>
+      </div>
+      <div class="step">
+        <div class="num">3</div>
+        <p>若被拦截：回到设置里对该浏览器/文件管理器开启安装许可，再点一次 APK。</p>
+      </div>
+    </div>
+
     <div class="links">
       <a href="http://175.24.134.228:8086/">在线使用 Web 版</a>
       <span class="sep">·</span>
@@ -207,7 +231,7 @@
     </div>
 
     <footer>
-      © 2026 rainhuang · Built with Vue 3 + Express + Electron
+      © 2026 rainhuang · Built with Vue 3 + Express + Electron + Capacitor
     </footer>
   </div>
 
@@ -226,6 +250,13 @@
         if (len) document.getElementById('size-' + arch).textContent = fmtSize(parseInt(len));
       }).catch(() => {});
   });
+
+  fetch('/downloads/PlainList-2.0.0.apk', { method: 'HEAD' })
+    .then((r) => {
+      const len = r.headers.get('content-length');
+      if (len) document.getElementById('size-apk').textContent = fmtSize(parseInt(len, 10));
+    })
+    .catch(() => {});
 
   (function () {
     const btn = document.getElementById('copy-install');
