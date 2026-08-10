@@ -60,7 +60,13 @@
       [hidden] { display: none !important; }
 
       .top { border-bottom: 2px solid var(--rule); padding-bottom: 22px; }
-      .top h1 { margin: 0; font-size: 30px; letter-spacing: -0.01em; }
+      .top h1 {
+        margin: 0;
+        font-size: clamp(20px, 5.6vw, 30px);
+        letter-spacing: -0.03em;
+        line-height: 1.2;
+        white-space: nowrap;
+      }
       .top .lead { margin: 10px 0 0; color: var(--mut); max-width: 62ch; }
 
       section { padding: 30px 0; border-bottom: 1px solid var(--line); }
@@ -94,6 +100,18 @@
       footer { margin-top: 36px; color: var(--mut); font-size: 12px; }
 
       @media (max-width: 640px) {
+        main {
+          width: min(860px, calc(100vw - 28px));
+          padding: 28px 0 72px;
+        }
+        .topbar { padding: 10px 12px; }
+        .top { padding-bottom: 16px; }
+        .top h1 {
+          font-size: 19px;
+          letter-spacing: -0.045em;
+        }
+        .top .lead { font-size: 13px; }
+        h2 { letter-spacing: 0.1em; }
         .row, .lane { grid-template-columns: 1fr; gap: 2px; }
         .lane { gap: 6px; }
       }

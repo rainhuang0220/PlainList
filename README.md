@@ -22,7 +22,7 @@ PlainList 是一个前后端分离的单仓库 TypeScript 项目。围绕「时�
 
 | 平台 | 下载 |
 |------|------|
-| **Android APK（推荐）** | [PlainList-2.0.11.apk](http://175.24.134.228/downloads/PlainList-2.0.11.apk) · [GitHub Release](https://github.com/rainhuang0220/PlainList/releases/tag/v2.0.11) |
+| **Android APK（推荐）** | [PlainList-2.0.12.apk](http://175.24.134.228/downloads/PlainList-2.0.12.apk) · [GitHub Release](https://github.com/rainhuang0220/PlainList/releases/tag/v2.0.12) |
 
 Android 为侧载 APK：下载后需在系统设置中允许「未知来源」或「安装未知应用」，再打开安装包。Release 签名 keystore 须离线备份，详见 [apps/web/android-signing/README.md](apps/web/android-signing/README.md)。
 
