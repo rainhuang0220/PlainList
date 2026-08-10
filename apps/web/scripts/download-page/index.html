@@ -94,6 +94,27 @@
   }
   .note strong { color: #1c1c20; }
 
+  .install-row {
+    display: flex; align-items: stretch; gap: 8px;
+    margin-top: 10px; flex-wrap: wrap;
+  }
+  .install-row code {
+    flex: 1 1 280px; margin: 0 !important;
+    background: rgba(28,28,32,0.06); padding: 10px 12px; border-radius: 8px;
+    font-size: 13px; user-select: all; word-break: break-all;
+    display: flex; align-items: center;
+  }
+  .copy-btn {
+    flex: 0 0 auto; border: 0; cursor: pointer;
+    background: #1c1c20; color: #fff;
+    padding: 0 16px; border-radius: 8px;
+    font-size: 13px; font-weight: 500;
+    font-family: inherit; min-height: 40px;
+    transition: background 0.15s ease;
+  }
+  .copy-btn:hover { background: #2c2c34; }
+  .copy-btn.copied { background: #2f6f4e; }
+
   .links { margin-top: 40px; display: flex; gap: 22px; flex-wrap: wrap; font-size: 13px; }
   .links a { color: #5a5a60; text-decoration: none; }
   .links a:hover { color: #1c1c20; }
@@ -120,14 +141,22 @@
     </div>
 
     <h2>下载 macOS 客户端</h2>
-    <p class="lede">选择你的芯片类型，把 PlainList 拖进 <code>Applications</code> 文件夹。首次启动如果 macOS 提示"无法打开，因为无法验证开发者"，在 <code>Applications/</code> 里找到 PlainList → 右键 → 打开 → 确认即可。</p>
+    <p class="lede">推荐用终端一键安装（curl 下载，避开浏览器隔离标记）。未做 Apple 公证前，系统仍可能要求在「隐私与安全性」里点一次「仍要打开」——这是正常的。</p>
+
+    <div class="note" style="margin-bottom:28px;">
+      <strong>一键安装（推荐，点复制 → 粘贴到「终端」回车）：</strong>
+      <div class="install-row">
+        <code id="install-cmd">curl -fsSL http://175.24.134.228/downloads/install.sh | bash</code>
+        <button type="button" class="copy-btn" id="copy-install" aria-label="复制安装命令">复制</button>
+      </div>
+    </div>
 
     <div class="grid">
       <div class="card">
         <span class="arch">Apple Silicon</span>
         <h3>M1 / M2 / M3 / M4</h3>
         <p class="meta">版本 <strong>2.0.0</strong> · 大小 <strong id="size-arm64">—</strong> · arm64</p>
-        <a class="btn" href="/downloads/PlainList-2.0.0-arm64.dmg" download>
+        <a class="btn" href="/downloads/PlainList-2.0.0-arm64.dmg">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           下载 DMG (arm64)
         </a>
@@ -137,7 +166,7 @@
         <span class="arch">Intel</span>
         <h3>Intel Mac</h3>
         <p class="meta">版本 <strong>2.0.0</strong> · 大小 <strong id="size-x64">—</strong> · x86_64</p>
-        <a class="btn" href="/downloads/PlainList-2.0.0-x64.dmg" download>
+        <a class="btn" href="/downloads/PlainList-2.0.0-x64.dmg">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           下载 DMG (x64)
         </a>
@@ -147,32 +176,32 @@
     <div class="steps">
       <div class="step">
         <div class="num">1</div>
-        <p>双击下载的 <code>.dmg</code> 文件，会自动挂载成一个虚拟磁盘。</p>
+        <p><strong>优先：</strong>打开「终端」，粘贴上面的一键安装命令并回车。装完会自动打开。</p>
       </div>
       <div class="step">
         <div class="num">2</div>
-        <p>把窗口里的 <strong>PlainList</strong> 拖到右边的 <strong>Applications</strong> 快捷方式。</p>
+        <p>若用 DMG：会多一步「允许终端运行脚本」，再装 app——比一键安装更绕，不推荐。不要只把 app 拖进 Applications。</p>
       </div>
       <div class="step">
         <div class="num">3</div>
-        <p>在启动台或 Applications 找到 PlainList，双击打开。首次启动会自动连接到 <code id="api-host">http://175.24.134.228</code> 的后端服务。</p>
+        <p>已经装过但仍被拦：终端执行 <code>xattr -cr /Applications/PlainList.app && open /Applications/PlainList.app</code>。</p>
       </div>
     </div>
 
     <div class="note">
-      <strong>提示：</strong>应用使用你部署在公网的 PlainList 后端（同一台服务器 175.24.134.228:3001）。账号 <code>rainhuang</code> / 密码 <code>rainhuang</code> 可直接登录。
+      <strong>提示：</strong>应用使用你部署在公网的 PlainList 后端（同一台服务器 175.24.134.228）。账号 <code>rainhuang</code> / 密码 <code>rainhuang</code> 可直接登录。
     </div>
 
     <div class="note" style="margin-top:12px;background:rgba(255,243,205,0.55);border-color:rgba(214,158,46,0.25);">
-      <strong>首次启动被 Gatekeeper 拦截？</strong> 这是 macOS 对未走 Apple Developer 签名的 app 的正常保护。在终端跑：<br>
-      <code style="display:inline-block;margin-top:6px;background:rgba(28,28,32,0.06);padding:4px 8px;border-radius:4px;font-size:12px;">xattr -cr /Applications/PlainList.app</code><br>
-      然后重新打开即可。
+      <strong>关于「Apple 无法验证」：</strong>当前包是 ad-hoc 签名（无 Apple 开发者账号公证）。macOS 会拦一次；去设置点「仍要打开」即可，之后一般不再拦。DMG 里的 .command 会再多一次「允许终端」，所以感觉像两步——请改用上面的一键 curl。彻底零提示只能上 Developer ID + 公证。
     </div>
 
     <div class="links">
       <a href="http://175.24.134.228:8086/">在线使用 Web 版</a>
       <span class="sep">·</span>
       <a href="https://github.com/rainhuang0220/PlainList">GitHub 仓库</a>
+      <span class="sep">·</span>
+      <a href="https://github.com/rainhuang0220/PlainList/releases">GitHub Releases</a>
       <span class="sep">·</span>
       <a href="/downloads/SHA256SUMS.txt">校验文件</a>
     </div>
@@ -197,6 +226,40 @@
         if (len) document.getElementById('size-' + arch).textContent = fmtSize(parseInt(len));
       }).catch(() => {});
   });
+
+  (function () {
+    const btn = document.getElementById('copy-install');
+    const cmd = document.getElementById('install-cmd');
+    if (!btn || !cmd) return;
+    btn.addEventListener('click', async () => {
+      const text = (cmd.textContent || '').trim();
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+        } else {
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.setAttribute('readonly', '');
+          ta.style.position = 'fixed';
+          ta.style.left = '-9999px';
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+        }
+        const prev = btn.textContent;
+        btn.textContent = '已复制';
+        btn.classList.add('copied');
+        setTimeout(() => {
+          btn.textContent = prev;
+          btn.classList.remove('copied');
+        }, 1600);
+      } catch (e) {
+        btn.textContent = '复制失败';
+        setTimeout(() => { btn.textContent = '复制'; }, 1600);
+      }
+    });
+  })();
 </script>
 </body>
 </html>

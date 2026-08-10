@@ -12,6 +12,26 @@ PlainList 是一个前后端分离的单仓库 TypeScript 项目。围绕「时�
 | Untitled | 🔨幻想中 (0%) | 网盘 |
 | docxEditor(TBD) | 🔨进行中 (25%) | 文档编辑器 |
 
+## 下载 macOS 客户端
+
+官网下载页（含一键安装指令）：**[http://175.24.134.228/](http://175.24.134.228/)**
+
+GitHub Release（DMG 附件）：**[Releases](https://github.com/rainhuang0220/PlainList/releases)**
+
+```bash
+# 推荐：终端一键安装（Apple Silicon / Intel 自动识别）
+curl -fsSL http://175.24.134.228/downloads/install.sh | bash
+```
+
+| 架构 | 下载 |
+|------|------|
+| Apple Silicon (arm64) | [PlainList-2.0.0-arm64.dmg](http://175.24.134.228/downloads/PlainList-2.0.0-arm64.dmg) · [GitHub](https://github.com/rainhuang0220/PlainList/releases) |
+| Intel (x64) | [PlainList-2.0.0-x64.dmg](http://175.24.134.228/downloads/PlainList-2.0.0-x64.dmg) · [GitHub](https://github.com/rainhuang0220/PlainList/releases) |
+
+演示账号：`rainhuang` / `rainhuang`。当前为 ad-hoc 签名，首次打开若提示「无法验证」，在「隐私与安全性」点一次「仍要打开」即可。
+
+桌面端 FishTime 为本机前台应用监测（Chrome / 微信等会实时累计）；Focus Bay 需摄像头权限。
+
 ## 核心特性
 - **多尺度时间视图**：当下时钟 · 今日计划 · 周回顾 · 月度追踪 · 年度日历，滚动切换
 - **计划与打卡**：习惯（每日重复）+ 任务（带 scheduledDate 的待办）；按时间段（清晨/上午/下午/晚上）自动分组
