@@ -10,12 +10,15 @@ export const usePlansStore = defineStore('plans', () => {
   const plans = ref<PlanRecord[]>([]);
 
   async function syncReminders() {
-    await getNotificationScheduler().syncFromPlans(plans.value);
+    // Fire-and-forget: LocalNotifications permission prompts must never block UI.
+    void getNotificationScheduler().syncFromPlans(plans.value).catch((error) => {
+      console.warn('[plans] reminder sync failed', error);
+    });
   }
 
   async function fetch() {
     plans.value = dedupeHabitPlans(sortPlansByTime(await get<PlanRecord[]>('/plans')));
-    await syncReminders();
+    void syncReminders();
   }
 
   async function add(name: string, type: PlanType, time: string, scheduledDate?: string, description?: string) {
@@ -37,7 +40,7 @@ export const usePlansStore = defineStore('plans', () => {
     const createdPlan = await post<PlanRecord>('/plans', payload);
     const withoutDuplicate = plans.value.filter((plan) => plan.id !== createdPlan.id);
     plans.value = dedupeHabitPlans(sortPlansByTime([...withoutDuplicate, createdPlan]));
-    await syncReminders();
+    void syncReminders();
     return createdPlan;
   }
 
@@ -46,14 +49,14 @@ export const usePlansStore = defineStore('plans', () => {
     plans.value = dedupeHabitPlans(sortPlansByTime(
       plans.value.map((plan) => plan.id === id ? updatedPlan : plan),
     ));
-    await syncReminders();
+    void syncReminders();
     return updatedPlan;
   }
 
   async function remove(id: number) {
     await del<{ ok: true }>(`/plans/${id}`);
     plans.value = plans.value.filter((plan) => plan.id !== id);
-    await syncReminders();
+    void syncReminders();
   }
 
   async function removeMany(ids: number[]): Promise<{ removed: number[]; failed: Array<{ id: number; reason: string }> }> {
@@ -72,7 +75,7 @@ export const usePlansStore = defineStore('plans', () => {
     if (removed.length > 0) {
       const removedSet = new Set(removed);
       plans.value = dedupeHabitPlans(sortPlansByTime(plans.value.filter((plan) => !removedSet.has(plan.id))));
-      await syncReminders();
+      void syncReminders();
     }
     return { removed, failed };
   }

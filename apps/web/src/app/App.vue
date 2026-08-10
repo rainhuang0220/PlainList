@@ -189,8 +189,9 @@ function onScroll() {
 }
 
 async function loadDashboard() {
+  // Show shell immediately on native so a hung API/plugin can't leave a white screen.
+  dashboardReady.value = true;
   isDashboardLoading.value = true;
-  dashboardReady.value = false;
 
   const now = new Date();
   const year = now.getFullYear();
@@ -210,10 +211,7 @@ async function loadDashboard() {
     } catch (themeError) {
       console.warn('[PlainList] theme bootstrap failed', themeError);
     }
-    // Never block first paint on the notification permission prompt.
-    void getNotificationScheduler().requestPermission().then(() =>
-      getNotificationScheduler().syncFromPlans(plans.plans),
-    );
+    void getNotificationScheduler().requestPermission();
   } catch (error) {
     console.error('[PlainList] dashboard load failed', error);
   } finally {

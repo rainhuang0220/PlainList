@@ -281,6 +281,14 @@
         opacity: 1;
       }
     }
+    /* Capacitor native: never hide the dashboard behind opacity/animation gates. */
+    html.pl-native .app-nav,
+    html.pl-native .app-section {
+      opacity: 1 !important;
+      animation: none !important;
+      transform: none !important;
+      filter: none !important;
+    }
 
     /* ══════════════════════════════════════════════════════════
        NAV

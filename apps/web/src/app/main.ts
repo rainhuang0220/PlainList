@@ -8,6 +8,8 @@ import { useAuthStore } from '@/features/auth/model/useAuthStore';
 async function initNativePlugins() {
   if (!Capacitor.isNativePlatform()) return;
 
+  document.documentElement.classList.add('pl-native');
+
   const [{ SplashScreen }, { StatusBar, Style }, { Keyboard }] = await Promise.all([
     import('@capacitor/splash-screen'),
     import('@capacitor/status-bar'),
