@@ -22,7 +22,12 @@ PAGE_DIR="${SCRIPT_DIR}/download-page"
 VERSION="2.0.0"
 APK="${WEB_DIR}/.android-release/PlainList-${VERSION}.apk"
 
-SSHPASS_OPTS=(-o StrictHostKeyChecking=accept-new -o ConnectTimeout=20)
+SSHPASS_OPTS=(
+  -o StrictHostKeyChecking=accept-new
+  -o ConnectTimeout=20
+  -o PreferredAuthentications=password
+  -o PubkeyAuthentication=no
+)
 export SSHPASS="$PASSWORD"
 
 [[ -f "$APK" ]] || { echo "missing $APK — run mobile:android:release first"; exit 1; }

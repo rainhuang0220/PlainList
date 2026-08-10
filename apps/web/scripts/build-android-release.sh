@@ -24,6 +24,28 @@ if [[ ! -d "${WEB_DIR}/android" ]]; then
   exit 1
 fi
 
+# Capacitor Android / AGP expect JDK 21+ for compileReleaseJavaWithJavac.
+if [[ -z "${JAVA_HOME:-}" ]]; then
+  for candidate in \
+    /opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home \
+    /usr/libexec/java_home; do
+    if [[ -x "${candidate}/bin/java" ]]; then
+      export JAVA_HOME="$candidate"
+      break
+    fi
+  done
+fi
+if command -v java >/dev/null 2>&1; then
+  echo "[android-release] java: $(java -version 2>&1 | head -1)"
+fi
+
+if [[ -z "${ANDROID_HOME:-}" && -z "${ANDROID_SDK_ROOT:-}" ]]; then
+  if [[ -d /opt/homebrew/share/android-commandlinetools ]]; then
+    export ANDROID_HOME=/opt/homebrew/share/android-commandlinetools
+    export ANDROID_SDK_ROOT="$ANDROID_HOME"
+  fi
+fi
+
 echo "[android-release] API_BASE=$API_BASE VERSION=$VERSION"
 cd "$ROOT_DIR"
 npm run build:shared
