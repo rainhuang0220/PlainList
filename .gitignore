@@ -46,6 +46,7 @@ backup-*/
 .runtime-logs/
 logs/
 .superpowers/
+.worktrees/
 
 # Competition documents (kept locally, not versioned)
 /*.docx
