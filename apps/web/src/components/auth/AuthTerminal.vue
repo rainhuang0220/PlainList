@@ -22,7 +22,7 @@
           v-if="isPasswordState && isNarrow"
           type="button"
           class="term-reveal"
-          @click.stop="revealPassphrase = !revealPassphrase"
+          @click.stop="toggleRevealPassphrase"
         >
           {{ revealPassphrase ? 'hide' : 'show' }}
         </button>
@@ -87,6 +87,11 @@ function scrollToBottom() {
 
 function focusInput() {
   inputEl.value?.focus();
+}
+
+function toggleRevealPassphrase() {
+  revealPassphrase.value = !revealPassphrase.value;
+  nextTick(() => focusInput());
 }
 
 function setPasswordMode(enabled: boolean) {
