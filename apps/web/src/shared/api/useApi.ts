@@ -17,6 +17,15 @@ function getApiBaseUrl(): string {
 }
 
 const API_BASE = getApiBaseUrl();
+const DEFAULT_TIMEOUT_MS = 20_000;
+const LONG_TIMEOUT_MS = 180_000;
+
+function timeoutForPath(path: string): number {
+  if (path.startsWith('/ai-intake') || path.startsWith('/user-profile/analyze')) {
+    return LONG_TIMEOUT_MS;
+  }
+  return DEFAULT_TIMEOUT_MS;
+}
 
 function formatApiError(status: number, message: string): string {
   if (status === 503 && message.includes('未配置可用的大模型')) {
@@ -43,7 +52,7 @@ function formatApiError(status: number, message: string): string {
   }
 
   if (status === 500 && (message === 'Internal Server Error' || message.includes('Internal Server Error'))) {
-    return '后端 API 无响应（500）。请确认已在项目根目录运行 npm run dev，且 MySQL 已启动。';
+    return '服务器暂时无响应（500）。请稍后重试；若持续失败，请检查服务是否在线。';
   }
 
   if (status === 401) {
@@ -51,6 +60,54 @@ function formatApiError(status: number, message: string): string {
   }
 
   return message || `请求失败（HTTP ${status}）`;
+}
+
+function connectionErrorMessage(timedOut = false): string {
+  const hint = timedOut
+    ? '请求超时。若开着梯子/VPN（尤其是 TUN 全局模式），请把 175.24.134.228 加入直连/绕过，或先关闭后再试。'
+    : '无法连接服务器。若开着梯子/VPN，请把 175.24.134.228 加入直连/绕过，或先关闭后再试。';
+
+  if (Capacitor.isNativePlatform()) {
+    return `${hint}（${API_BASE || '未配置 API 地址'}）`;
+  }
+  if (API_BASE) {
+    return `${hint}（${API_BASE}）`;
+  }
+  if (typeof window !== 'undefined' && !/localhost|127\.0\.0\.1/.test(window.location.hostname)) {
+    return hint;
+  }
+  return '无法连接后端 API。本地开发请确认 npm run dev 已启动。';
+}
+
+function mergeTimeoutSignal(external: AbortSignal | undefined, ms: number): {
+  signal: AbortSignal;
+  didTimeout: () => boolean;
+  cleanup: () => void;
+} {
+  const controller = new AbortController();
+  let timedOut = false;
+  const timer = window.setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, ms);
+
+  const onExternalAbort = () => controller.abort();
+  if (external) {
+    if (external.aborted) {
+      controller.abort();
+    } else {
+      external.addEventListener('abort', onExternalAbort, { once: true });
+    }
+  }
+
+  return {
+    signal: controller.signal,
+    didTimeout: () => timedOut,
+    cleanup: () => {
+      window.clearTimeout(timer);
+      external?.removeEventListener('abort', onExternalAbort);
+    },
+  };
 }
 
 export function useApi() {
@@ -64,28 +121,27 @@ export function useApi() {
       headers.Authorization = `Bearer ${auth.token}`;
     }
 
+    const timeout = mergeTimeoutSignal(signal, timeoutForPath(path));
     let response: Response;
     try {
       response = await fetch(`${API_BASE}/api${path}`, {
         method,
         headers,
         body: body === undefined ? undefined : JSON.stringify(body),
-        signal,
+        signal: timeout.signal,
       });
     } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') {
+      const timedOut = timeout.didTimeout();
+      timeout.cleanup();
+      if (!timedOut && error instanceof DOMException && error.name === 'AbortError') {
         throw error;
       }
-      if (error instanceof Error && /aborted/i.test(error.message)) {
+      if (!timedOut && error instanceof Error && /aborted/i.test(error.message)) {
         throw new Error('请求已取消。');
       }
-      if (Capacitor.isNativePlatform()) {
-        throw new Error(
-          `无法连接后端（${API_BASE || '未配置 API 地址'}）。请确认手机能访问该服务器，且应用允许明文 HTTP。`,
-        );
-      }
-      throw new Error('无法连接后端 API。请确认 npm run dev 已启动且端口 3000 可用。');
+      throw new Error(connectionErrorMessage(timedOut));
     }
+    timeout.cleanup();
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: response.statusText }));

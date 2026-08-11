@@ -524,6 +524,15 @@
     .apf-desc:focus { border-color: var(--dark); }
     .apf-desc::placeholder { color: var(--muted); }
     .apf-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
+    .apf-error {
+      margin: 8px 0 0;
+      font-family: var(--mono);
+      font-size: 11px;
+      line-height: 1.4;
+      color: #b42318;
+    }
+    .apf-save:disabled,
+    .apf-cancel:disabled { opacity: .45; cursor: not-allowed; }
     .apf-cancel {
       background: none; border: none; cursor: pointer;
       font-size: 11px; color: var(--muted); font-family: var(--font); transition: color .15s;

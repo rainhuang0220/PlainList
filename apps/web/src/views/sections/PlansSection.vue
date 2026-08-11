@@ -115,9 +115,12 @@
             rows="2"
           ></textarea>
           <div class="apf-actions">
-            <button class="apf-cancel" @click="cancelForm">{{ t('plan.add_cancel', 'Cancel') }}</button>
-            <button class="apf-save" @click="submitPlan">{{ t('plan.add_save', 'Add') }}</button>
+            <button class="apf-cancel" :disabled="saving" @click="cancelForm">{{ t('plan.add_cancel', 'Cancel') }}</button>
+            <button class="apf-save" :disabled="saving" @click="submitPlan">
+              {{ saving ? t('plan.add_saving', 'Saving…') : t('plan.add_save', 'Add') }}
+            </button>
           </div>
+          <p v-if="saveError" class="apf-error">{{ saveError }}</p>
         </div>
       </div>
     </div>
@@ -270,17 +273,22 @@ const newType = ref('habit')
 const newTime = ref('')
 const newDesc = ref('')
 const nameInput = ref(null)
+const saving = ref(false)
+const saveError = ref('')
 
 function openForm() {
   formOpen.value = true
+  saveError.value = ''
   nextTick(() => nameInput.value?.focus())
 }
 
 function cancelForm() {
+  if (saving.value) return
   formOpen.value = false
   newName.value = ''
   newTime.value = ''
   newDesc.value = ''
+  saveError.value = ''
 }
 
 async function submitPlan() {
@@ -291,8 +299,25 @@ async function submitPlan() {
     return
   }
   if (!/^\d{2}:\d{2}$/.test(time)) return
-  await plans.add(name, newType.value, time, undefined, newDesc.value.trim() || undefined)
-  cancelForm()
+  if (saving.value) return
+  saving.value = true
+  saveError.value = ''
+  try {
+    await plans.add(name, newType.value, time, undefined, newDesc.value.trim() || undefined)
+    // force-close even if saving guard would block cancelForm mid-success
+    saving.value = false
+    formOpen.value = false
+    newName.value = ''
+    newTime.value = ''
+    newDesc.value = ''
+    saveError.value = ''
+  } catch (error) {
+    saveError.value = error instanceof Error
+      ? error.message
+      : t('plan.add_failed', 'Failed to save. Check network / VPN bypass.')
+  } finally {
+    saving.value = false
+  }
 }
 
 // ─── Edit form ───────────────────────────────────────────────────────────────

@@ -210,6 +210,16 @@ function buildMenu() {
 }
 
 app.whenReady().then(async () => {
+  // 梯子 / Clash TUN / 系统代理会劫持所有出站流量；代理到国内云主机 IP
+  // 经常超时或空连接，表现成「连不上公网 API」。PlainList 只访问自有
+  // 服务器与本机 widget，强制直连，不走系统代理。
+  try {
+    const { session } = require('electron');
+    await session.defaultSession.setProxy({ mode: 'direct' });
+  } catch (e) {
+    console.error('[proxy] failed to set direct mode:', e);
+  }
+
   // Local FishTime: track frontmost apps on this Mac and serve UI + API.
   try {
     const staticDir = path.join(__dirname, 'fishtime-web');
