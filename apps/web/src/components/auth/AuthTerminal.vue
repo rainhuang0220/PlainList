@@ -13,11 +13,19 @@
         <input
           ref="inputEl"
           v-model="inputValue"
-          :type="isPasswordState ? 'password' : 'text'"
+          :type="(isPasswordState && !revealPassphrase) ? 'password' : 'text'"
           autocomplete="off"
           :spellcheck="false"
           @keydown="onKeyDown"
         >
+        <button
+          v-if="isPasswordState && isNarrow"
+          type="button"
+          class="term-reveal"
+          @click.stop="revealPassphrase = !revealPassphrase"
+        >
+          {{ revealPassphrase ? 'hide' : 'show' }}
+        </button>
       </div>
     </div>
   </div>
@@ -26,11 +34,12 @@
 <script setup lang="ts">
 import type { AuthAccount, AuthSuccessResponse } from '@plainlist/shared';
 import { DEMO_ACCOUNT } from '@plainlist/shared';
-import { nextTick, onMounted, ref } from 'vue';
+import { nextTick, onMounted, onUnmounted, ref } from 'vue';
+import { advanceRegisterPass } from '@/features/auth/lib/terminalRegisterFlow';
 import { useAuthStore } from '@/features/auth/model/useAuthStore';
 import { useApi } from '@/shared/api/useApi';
 
-type TerminalState = null | 'passphrase' | 'new-name' | 'new-pass';
+type TerminalState = null | 'passphrase' | 'new-name' | 'new-pass' | 'new-pass-confirm';
 type LineType = '' | 'out' | 'ok' | 'err';
 
 interface TerminalLine {
@@ -52,10 +61,17 @@ const inputValue = ref('');
 const state = ref<TerminalState>(null);
 const pendingUser = ref<string | null>(null);
 const pendingName = ref<string | null>(null);
+const pendingPass = ref<string | null>(null);
 const closing = ref(false);
 const history = ref<string[]>([]);
 const historyIndex = ref(-1);
 const isPasswordState = ref(false);
+const revealPassphrase = ref(false);
+const isNarrow = ref(typeof window !== 'undefined' && window.innerWidth < 640);
+
+function syncNarrow() {
+  isNarrow.value = window.innerWidth < 640;
+}
 
 function print(text = '', type: LineType = '') {
   lines.value.push({ text, type });
@@ -75,6 +91,9 @@ function focusInput() {
 
 function setPasswordMode(enabled: boolean) {
   isPasswordState.value = enabled;
+  if (!enabled) {
+    revealPassphrase.value = false;
+  }
 }
 
 const BANNER: string[] = [
@@ -129,6 +148,7 @@ function welcomeLines(): TerminalLine[] {
   lines.push({ text: '    pl onboard       guided setup', type: 'out' });
   lines.push({ text: '    pl graphic       visual login', type: 'out' });
   lines.push({ text: '  type /help to see all available commands.', type: 'out' });
+  lines.push({ text: '  tip: tab toggles passphrase visibility (desktop); use show/hide on mobile.', type: 'out' });
   lines.push({ text: '', type: '' });
   return lines;
 }
@@ -148,6 +168,7 @@ function helpLines(): TerminalLine[] {
     { text: '    clear          clear the terminal', type: 'out' },
     { text: '    /help          show this help', type: 'out' },
     { text: '  tip: every command also works with a leading "pl " prefix.', type: 'out' },
+    { text: '  tip: tab toggles passphrase visibility (desktop); use show/hide on mobile.', type: 'out' },
     { text: '', type: '' },
   ];
 }
@@ -178,6 +199,7 @@ function resetState() {
   state.value = null;
   pendingUser.value = null;
   pendingName.value = null;
+  pendingPass.value = null;
   setPasswordMode(false);
 }
 
@@ -298,8 +320,30 @@ async function executeCommand(rawValue: string) {
     return;
   }
 
-  if (state.value === 'new-pass') {
-    await handleRegistration(value);
+  if (state.value === 'new-pass' || state.value === 'new-pass-confirm') {
+    const result = advanceRegisterPass(state.value, value, pendingPass.value);
+    if (!result.ok) {
+      if (result.error === 'too_short') {
+        print('  passphrase must be at least 3 characters.', 'err');
+      } else {
+        print('  passphrases do not match.', 'err');
+        print('  set a passphrase (at least 3 chars):', 'out');
+      }
+      pendingPass.value = null;
+      state.value = 'new-pass';
+      setPasswordMode(true);
+      revealPassphrase.value = false;
+      return;
+    }
+    if (result.next === 'new-pass-confirm') {
+      pendingPass.value = result.pendingPass;
+      state.value = 'new-pass-confirm';
+      setPasswordMode(true);
+      revealPassphrase.value = false;
+      print('  confirm passphrase:', 'out');
+      return;
+    }
+    await handleRegistration(result.password);
     return;
   }
 
@@ -431,6 +475,12 @@ async function onKeyDown(event: KeyboardEvent) {
     return;
   }
 
+  if (event.key === 'Tab' && isPasswordState.value) {
+    event.preventDefault();
+    revealPassphrase.value = !revealPassphrase.value;
+    return;
+  }
+
   if (event.key !== 'Enter') {
     return;
   }
@@ -452,6 +502,12 @@ async function onKeyDown(event: KeyboardEvent) {
 }
 
 onMounted(() => {
+  syncNarrow();
+  window.addEventListener('resize', syncNarrow);
   showWelcome();
+});
+
+onUnmounted(() => {
+  window.removeEventListener('resize', syncNarrow);
 });
 </script>
