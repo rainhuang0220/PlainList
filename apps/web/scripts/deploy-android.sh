@@ -19,7 +19,7 @@ REMOTE_ROOT="/www/wwwroot/175.24.134.228"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 WEB_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 PAGE_DIR="${SCRIPT_DIR}/download-page"
-VERSION="2.0.12"
+VERSION="2.0.13"
 APK="${WEB_DIR}/.android-release/PlainList-${VERSION}.apk"
 GUIDE="${WEB_DIR}/public/guide.html"
 

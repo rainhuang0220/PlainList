@@ -327,7 +327,7 @@ async function executeCommand(rawValue: string) {
 
   if (state.value === 'new-pass' || state.value === 'new-pass-confirm') {
     const result = advanceRegisterPass(state.value, value, pendingPass.value);
-    if (!result.ok) {
+    if (result.ok === false) {
       if (result.error === 'too_short') {
         print('  passphrase must be at least 3 characters.', 'err');
       } else {

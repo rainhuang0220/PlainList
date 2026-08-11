@@ -436,10 +436,10 @@
         手机端更推荐——语音输入随时可用，人也更常带着。
       </p>
       <div class="hero-actions">
-        <a class="btn" href="/downloads/PlainList-2.0.12.apk">下载 Android APK</a>
+        <a class="btn" href="/downloads/PlainList-2.0.13.apk">下载 Android APK</a>
         <a class="btn ghost" href="/guide.html">使用指南</a>
         <a class="btn ghost" href="http://175.24.134.228:8086/">打开 Web 版</a>
-        <a class="btn ghost" href="https://github.com/rainhuang0220/PlainList/releases/tag/v2.0.12">GitHub Release</a>
+        <a class="btn ghost" href="https://github.com/rainhuang0220/PlainList/releases/tag/v2.0.13">GitHub Release</a>
       </div>
     </div>
 
@@ -518,8 +518,8 @@
         <div class="dl-card primary">
           <div class="arch">Recommended · Android</div>
           <h3>通用 APK</h3>
-          <p class="meta">版本 <strong>2.0.12</strong> · 大小 <strong id="size-apk">—</strong> · arm64 / x86_64</p>
-          <a class="btn" href="/downloads/PlainList-2.0.12.apk">下载 PlainList-2.0.12.apk</a>
+          <p class="meta">版本 <strong>2.0.13</strong> · 大小 <strong id="size-apk">—</strong> · arm64 / x86_64</p>
+          <a class="btn" href="/downloads/PlainList-2.0.13.apk">下载 PlainList-2.0.13.apk</a>
           <p class="hint">侧载安装：设置里允许「未知来源 / 安装未知应用」后打开 APK。演示账号 rainhuang / rainhuang。</p>
         </div>
 
@@ -576,7 +576,7 @@
       })
       .catch(() => {});
   });
-  fetch('/downloads/PlainList-2.0.12.apk', { method: 'HEAD' })
+  fetch('/downloads/PlainList-2.0.13.apk', { method: 'HEAD' })
     .then((r) => {
       const len = r.headers.get('content-length');
       if (len) document.getElementById('size-apk').textContent = fmtSize(parseInt(len, 10));
