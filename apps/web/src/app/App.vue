@@ -3,12 +3,10 @@
     <template v-if="!auth.isLoggedIn">
       <AuthTerminal
         v-if="authMode === 'terminal'"
-        @login="onLogin"
         @graphic="authMode = 'graphic'"
       />
       <AuthGraphic
         v-else
-        @login="onLogin"
         @terminal="authMode = 'terminal'"
       />
     </template>
@@ -197,8 +195,13 @@ function onScroll() {
   }, 50);
 }
 
+let dashboardLoadSeq = 0;
+
 async function loadDashboard() {
-  // Show shell immediately on native so a hung API/plugin can't leave a white screen.
+  const seq = ++dashboardLoadSeq;
+  // Show shell immediately so a hung API/plugin can't leave a white screen.
+  // Also required after login: auth children unmount once isLoggedIn flips, so
+  // we must not rely on their @login emit (it can fire after unmount).
   dashboardReady.value = true;
   isDashboardLoading.value = true;
 
@@ -224,18 +227,25 @@ async function loadDashboard() {
   } catch (error) {
     console.error('[PlainList] dashboard load failed', error);
   } finally {
+    if (seq !== dashboardLoadSeq) return;
     isDashboardLoading.value = false;
     dashboardReady.value = true;
   }
 }
 
-async function onLogin() {
-  await loadDashboard();
-}
+watch(
+  () => auth.isLoggedIn,
+  (loggedIn) => {
+    if (loggedIn) {
+      void loadDashboard();
+      return;
+    }
+    dashboardReady.value = false;
+    isDashboardLoading.value = false;
+  },
+);
 
 async function logout() {
-  dashboardReady.value = false;
-  isDashboardLoading.value = false;
   await getNotificationScheduler().clearAll();
   plans.clear();
   checks.clear();
@@ -256,7 +266,7 @@ onMounted(async () => {
     try {
       const me = await get<AuthAccount>('/auth/me');
       await auth.setAuth(auth.token, me.username, me.isAdmin);
-      await loadDashboard();
+      // loadDashboard runs via the isLoggedIn watch
     } catch {
       dashboardReady.value = false;
       isDashboardLoading.value = false;

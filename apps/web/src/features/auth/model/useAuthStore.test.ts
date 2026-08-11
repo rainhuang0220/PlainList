@@ -43,6 +43,27 @@ describe('useAuthStore', () => {
     expect(clearToken).toHaveBeenCalled();
   });
 
+  it('marks the session logged-in before token persistence finishes', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    vi.mocked(setToken).mockImplementationOnce(async (token: string) => {
+      await gate;
+      memory.set('pl_token', token);
+    });
+
+    const auth = useAuthStore();
+    const pending = auth.setAuth('token-race', 'bob', false);
+
+    expect(auth.isLoggedIn).toBe(true);
+    expect(auth.currentUser).toBe('bob');
+
+    release();
+    await pending;
+    expect(setToken).toHaveBeenCalledWith('token-race');
+  });
+
   it('hydrates token from storage before user hydration', async () => {
     memory.set('pl_token', 'demo-token');
     const auth = useAuthStore();

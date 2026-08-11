@@ -14,6 +14,9 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function setAuth(nextToken: string, user: string, admin: boolean) {
+    // Set session state first so App can react (load dashboard) in the same turn.
+    // Persisting the token must not gate UI: awaiting storage yields a microtask,
+    // Vue unmounts the auth screen, and a late @login emit is dropped → blank UI.
     token.value = nextToken;
     currentUser.value = user;
     isAdmin.value = admin;

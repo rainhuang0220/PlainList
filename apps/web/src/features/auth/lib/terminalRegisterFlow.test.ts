@@ -35,4 +35,36 @@ describe('advanceRegisterPass', () => {
       pendingPass: null,
     });
   });
+
+  it('never registers from new-pass alone (confirm always required)', () => {
+    const first = advanceRegisterPass('new-pass', 'same-pass', null);
+    expect(first).toEqual({
+      ok: true,
+      next: 'new-pass-confirm',
+      pendingPass: 'same-pass',
+    });
+    // Even if a stale pendingPass matches, new-pass still only advances to confirm.
+    const again = advanceRegisterPass('new-pass', 'same-pass', 'same-pass');
+    expect(again).toEqual({
+      ok: true,
+      next: 'new-pass-confirm',
+      pendingPass: 'same-pass',
+    });
+  });
+
+  it('second account flow still requires confirm after a completed first pass', () => {
+    const a1 = advanceRegisterPass('new-pass', 'alice-secret', null);
+    expect(a1.ok && a1.next === 'new-pass-confirm').toBe(true);
+    if (!(a1.ok && a1.next === 'new-pass-confirm')) return;
+    const a2 = advanceRegisterPass('new-pass-confirm', 'alice-secret', a1.pendingPass);
+    expect(a2.ok && a2.next === 'register').toBe(true);
+
+    // Fresh registration for another account — must not skip confirm.
+    const b1 = advanceRegisterPass('new-pass', 'bob-secret', null);
+    expect(b1).toEqual({
+      ok: true,
+      next: 'new-pass-confirm',
+      pendingPass: 'bob-secret',
+    });
+  });
 });

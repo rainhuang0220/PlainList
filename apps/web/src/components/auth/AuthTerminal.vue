@@ -15,7 +15,13 @@
           v-model="inputValue"
           :type="(isPasswordState && !revealPassphrase) ? 'password' : 'text'"
           autocomplete="off"
-          :spellcheck="false"
+          autocapitalize="off"
+          autocorrect="off"
+          spellcheck="false"
+          data-1p-ignore="true"
+          data-lpignore="true"
+          data-form-type="other"
+          :readonly="passwordInputLocked"
           @keydown="onKeyDown"
         >
         <button
@@ -35,6 +41,10 @@
 import type { AuthAccount, AuthSuccessResponse } from '@plainlist/shared';
 import { DEMO_ACCOUNT } from '@plainlist/shared';
 import { nextTick, onMounted, onUnmounted, ref } from 'vue';
+import {
+  createPasswordPromptGate,
+  isPasswordEditKey,
+} from '@/features/auth/lib/passwordPromptGate';
 import { advanceRegisterPass } from '@/features/auth/lib/terminalRegisterFlow';
 import { useAuthStore } from '@/features/auth/model/useAuthStore';
 import { useApi } from '@/shared/api/useApi';
@@ -67,10 +77,33 @@ const history = ref<string[]>([]);
 const historyIndex = ref(-1);
 const isPasswordState = ref(false);
 const revealPassphrase = ref(false);
+const passwordInputLocked = ref(false);
 const isNarrow = ref(typeof window !== 'undefined' && window.innerWidth < 640);
+const passwordGate = createPasswordPromptGate({ minArmMs: 350 });
+let passwordUnlockTimer: number | null = null;
 
 function syncNarrow() {
   isNarrow.value = window.innerWidth < 640;
+}
+
+function clearPasswordUnlockTimer() {
+  if (passwordUnlockTimer !== null) {
+    window.clearTimeout(passwordUnlockTimer);
+    passwordUnlockTimer = null;
+  }
+}
+
+/** Arm anti-autofill gate and briefly lock the field so managers cannot instant-submit. */
+function armPasswordPrompt() {
+  passwordGate.arm();
+  clearPasswordUnlockTimer();
+  passwordInputLocked.value = true;
+  inputValue.value = '';
+  passwordUnlockTimer = window.setTimeout(() => {
+    passwordInputLocked.value = false;
+    passwordUnlockTimer = null;
+    nextTick(() => focusInput());
+  }, 350);
 }
 
 function print(text = '', type: LineType = '') {
@@ -154,6 +187,7 @@ function welcomeLines(): TerminalLine[] {
   lines.push({ text: '    pl graphic       visual login', type: 'out' });
   lines.push({ text: '  type /help to see all available commands.', type: 'out' });
   lines.push({ text: '  tip: tab toggles passphrase visibility (desktop); use show/hide on mobile.', type: 'out' });
+  lines.push({ text: '  tip: creating an account always asks you to type the passphrase twice.', type: 'out' });
   lines.push({ text: '', type: '' });
   return lines;
 }
@@ -191,8 +225,17 @@ function showWelcome() {
   });
 }
 
-async function listAccounts() {
-  return get<AuthAccount[]>('/auth/accounts').catch(() => []);
+async function listAccounts(options?: { quiet?: boolean }) {
+  try {
+    return await get<AuthAccount[]>('/auth/accounts');
+  } catch (error) {
+    if (!options?.quiet) {
+      const message = error instanceof Error ? error.message : 'network error';
+      print(`  could not reach accounts API (${message}).`, 'err');
+      print('  check your connection / API base, then try ls again.', 'out');
+    }
+    return null;
+  }
 }
 
 function freezeInput(value: string) {
@@ -206,11 +249,18 @@ function resetState() {
   pendingName.value = null;
   pendingPass.value = null;
   setPasswordMode(false);
+  passwordGate.reset();
+  clearPasswordUnlockTimer();
+  passwordInputLocked.value = false;
 }
 
-function startPasswordPrompt(nextState: Extract<TerminalState, 'passphrase' | 'new-pass'>) {
+function startPasswordPrompt(nextState: Extract<TerminalState, 'passphrase' | 'new-pass' | 'new-pass-confirm'>) {
+  if (nextState === 'new-pass') {
+    pendingPass.value = null;
+  }
   state.value = nextState;
   setPasswordMode(true);
+  armPasswordPrompt();
 }
 
 function isValidUsername(value: string) {
@@ -255,6 +305,7 @@ async function handleNameEntry(value: string) {
   }
 
   const accounts = await listAccounts();
+  if (!accounts) return;
   if (accounts.some((account) => account.username === normalized)) {
     print(`  "${normalized}" is already taken.`, 'err');
     return;
@@ -326,7 +377,8 @@ async function executeCommand(rawValue: string) {
   }
 
   if (state.value === 'new-pass' || state.value === 'new-pass-confirm') {
-    const result = advanceRegisterPass(state.value, value, pendingPass.value);
+    const phase = state.value;
+    const result = advanceRegisterPass(phase, value, pendingPass.value);
     if (result.ok === false) {
       if (result.error === 'too_short') {
         print('  passphrase must be at least 3 characters.', 'err');
@@ -335,17 +387,19 @@ async function executeCommand(rawValue: string) {
         print('  set a passphrase (at least 3 chars):', 'out');
       }
       pendingPass.value = null;
-      state.value = 'new-pass';
-      setPasswordMode(true);
-      revealPassphrase.value = false;
+      startPasswordPrompt('new-pass');
       return;
     }
     if (result.next === 'new-pass-confirm') {
       pendingPass.value = result.pendingPass;
-      state.value = 'new-pass-confirm';
-      setPasswordMode(true);
-      revealPassphrase.value = false;
+      startPasswordPrompt('new-pass-confirm');
       print('  confirm passphrase:', 'out');
+      return;
+    }
+    // Only register after an explicit confirm step (phase must be new-pass-confirm).
+    if (phase !== 'new-pass-confirm' || result.next !== 'register') {
+      print('  confirm passphrase:', 'out');
+      startPasswordPrompt('new-pass');
       return;
     }
     await handleRegistration(result.password);
@@ -364,6 +418,7 @@ async function executeCommand(rawValue: string) {
 
   if (value === 'ls') {
     const accounts = await listAccounts();
+    if (!accounts) return;
     if (accounts.length > 0) {
       print(
         `  accounts: ${accounts.map((account) => account.username).join(', ')}`,
@@ -417,6 +472,7 @@ async function executeCommand(rawValue: string) {
     }
 
     const accounts = await listAccounts();
+    if (!accounts) return;
     if (!accounts.some((account) => account.username === arg)) {
       print(`  account "${arg}" not found.`, 'err');
       return;
@@ -430,6 +486,7 @@ async function executeCommand(rawValue: string) {
 
   if (value === 'cd') {
     const accounts = await listAccounts();
+    if (!accounts) return;
     if (accounts.length > 0) {
       print(`  accounts: ${accounts.map((account) => account.username).join(', ')}`, 'out');
     } else {
@@ -459,6 +516,10 @@ async function executeCommand(rawValue: string) {
 }
 
 async function onKeyDown(event: KeyboardEvent) {
+  if (isPasswordState.value && isPasswordEditKey(event)) {
+    passwordGate.markTouched();
+  }
+
   if (event.key === 'ArrowUp') {
     event.preventDefault();
     if (historyIndex.value < history.value.length - 1) {
@@ -490,8 +551,22 @@ async function onKeyDown(event: KeyboardEvent) {
     return;
   }
 
+  if (passwordInputLocked.value) {
+    event.preventDefault();
+    return;
+  }
+
   const value = inputValue.value.trim();
   if (!value) {
+    return;
+  }
+
+  if (isPasswordState.value && !passwordGate.canSubmit()) {
+    // Block password-manager autofill that fills + synthesizes Enter without typing.
+    event.preventDefault();
+    print('  type the passphrase (autofill submit ignored).', 'out');
+    inputValue.value = '';
+    armPasswordPrompt();
     return;
   }
 
@@ -514,5 +589,6 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', syncNarrow);
+  clearPasswordUnlockTimer();
 });
 </script>
