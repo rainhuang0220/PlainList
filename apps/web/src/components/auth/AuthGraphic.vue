@@ -56,14 +56,62 @@
 
           <label class="ag-field">
             <span class="ag-label">{{ t('graphic.passphrase', 'passphrase') }}</span>
-            <input
-              v-model="password"
-              class="ag-input"
-              type="password"
-              :autocomplete="mode === 'login' ? 'current-password' : 'new-password'"
-              :placeholder="mode === 'login' ? '••••••' : t('graphic.passphrase_new_ph', 'at least 3 chars')"
-              @input="error = ''"
-            />
+            <div class="ag-pass-row">
+              <input
+                v-model="password"
+                class="ag-input"
+                :type="showPassword ? 'text' : 'password'"
+                :autocomplete="mode === 'login' ? 'current-password' : 'new-password'"
+                :placeholder="mode === 'login' ? '••••••' : t('graphic.passphrase_new_ph', 'at least 3 chars')"
+                @input="error = ''"
+              />
+              <button
+                type="button"
+                class="ag-eye"
+                :aria-label="showPassword ? t('graphic.hide_pass', 'Hide passphrase') : t('graphic.show_pass', 'Show passphrase')"
+                @click="showPassword = !showPassword"
+              >
+                <svg v-if="!showPassword" width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+                  <ellipse cx="9" cy="9" rx="6.5" ry="4" fill="none" stroke="currentColor" stroke-width="1.5" />
+                  <circle cx="9" cy="9" r="1.75" fill="none" stroke="currentColor" stroke-width="1.5" />
+                </svg>
+                <svg v-else width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+                  <ellipse cx="9" cy="9" rx="6.5" ry="4" fill="none" stroke="currentColor" stroke-width="1.5" />
+                  <circle cx="9" cy="9" r="1.75" fill="none" stroke="currentColor" stroke-width="1.5" />
+                  <line x1="3.5" y1="14.5" x2="14.5" y2="3.5" stroke="currentColor" stroke-width="1.5" />
+                </svg>
+              </button>
+            </div>
+          </label>
+
+          <label v-if="mode === 'register'" class="ag-field">
+            <span class="ag-label">{{ t('graphic.passphrase_confirm', 'confirm passphrase') }}</span>
+            <div class="ag-pass-row">
+              <input
+                v-model="passwordConfirm"
+                class="ag-input"
+                :type="showPasswordConfirm ? 'text' : 'password'"
+                autocomplete="new-password"
+                :placeholder="t('graphic.passphrase_confirm_ph', 're-enter passphrase')"
+                @input="error = ''"
+              />
+              <button
+                type="button"
+                class="ag-eye"
+                :aria-label="showPasswordConfirm ? t('graphic.hide_pass', 'Hide passphrase') : t('graphic.show_pass', 'Show passphrase')"
+                @click="showPasswordConfirm = !showPasswordConfirm"
+              >
+                <svg v-if="!showPasswordConfirm" width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+                  <ellipse cx="9" cy="9" rx="6.5" ry="4" fill="none" stroke="currentColor" stroke-width="1.5" />
+                  <circle cx="9" cy="9" r="1.75" fill="none" stroke="currentColor" stroke-width="1.5" />
+                </svg>
+                <svg v-else width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+                  <ellipse cx="9" cy="9" rx="6.5" ry="4" fill="none" stroke="currentColor" stroke-width="1.5" />
+                  <circle cx="9" cy="9" r="1.75" fill="none" stroke="currentColor" stroke-width="1.5" />
+                  <line x1="3.5" y1="14.5" x2="14.5" y2="3.5" stroke="currentColor" stroke-width="1.5" />
+                </svg>
+              </button>
+            </div>
           </label>
 
           <div class="ag-status" :class="{ err: !!error }">
@@ -105,6 +153,7 @@
 import type { AuthAccount, AuthSuccessResponse } from '@plainlist/shared';
 import { DEMO_ACCOUNT } from '@plainlist/shared';
 import { computed, nextTick, onMounted, ref } from 'vue';
+import { isPassphraseLongEnough, passwordsMatch } from '@/features/auth/lib/passwordConfirm';
 import { useAuthStore } from '@/features/auth/model/useAuthStore';
 import { useLocaleStore } from '@/features/locale/model/useLocaleStore';
 import { useApi } from '@/shared/api/useApi';
@@ -134,6 +183,9 @@ type Mode = 'login' | 'register';
 const mode = ref<Mode>('login');
 const username = ref('');
 const password = ref('');
+const passwordConfirm = ref('');
+const showPassword = ref(false);
+const showPasswordConfirm = ref(false);
 const error = ref('');
 const busy = ref(false);
 const accounts = ref<AuthAccount[]>([]);
@@ -153,6 +205,9 @@ const submitLabel = computed(() => {
 function switchMode(next: Mode) {
   mode.value = next;
   error.value = '';
+  passwordConfirm.value = '';
+  showPassword.value = false;
+  showPasswordConfirm.value = false;
   nextTick(() => userInput.value?.focus());
 }
 
@@ -197,8 +252,12 @@ async function doRegister() {
     error.value = t('graphic.err_username', 'Usernames must be 2-20 chars: letters, digits, _ . or -.');
     return;
   }
-  if (password.value.length < 3) {
+  if (!isPassphraseLongEnough(password.value)) {
     error.value = t('graphic.err_pass', 'Passphrase must be at least 3 characters.');
+    return;
+  }
+  if (!passwordsMatch(password.value, passwordConfirm.value)) {
+    error.value = t('graphic.err_pass_mismatch', 'Passphrases do not match.');
     return;
   }
   if (accounts.value.some((account) => account.username === name)) {
@@ -339,6 +398,34 @@ onMounted(() => {
 }
 .ag-input:focus { border-bottom-color: var(--dark, #111); }
 
+.ag-pass-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--faint, #e2e2e2);
+}
+.ag-pass-row .ag-input {
+  flex: 1;
+  border-bottom: 0;
+  min-width: 0;
+}
+.ag-pass-row:focus-within {
+  border-bottom-color: var(--dark, #111);
+}
+.ag-eye {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  background: transparent;
+  color: var(--muted, #777);
+  padding: 0;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+.ag-eye:hover { color: var(--dark, #111); }
+
 .ag-status { min-height: 16px; font-size: 11px; line-height: 1.5; color: var(--muted, #777); }
 .ag-status.err { color: #c0392b; }
 
@@ -413,6 +500,7 @@ onMounted(() => {
   .ag-tab { padding: 14px 0; font-size: 13px; min-height: 44px; }
   .ag-form { padding: 18px 16px; gap: 16px; }
   .ag-input { font-size: 16px; padding: 10px 0; } /* 16px avoids iOS zoom */
+  .ag-eye { width: 44px; height: 44px; }
   .ag-submit { padding: 14px 0; font-size: 13px; min-height: 48px; }
   .ag-foot { flex-wrap: wrap; gap: 8px 10px; }
 }
