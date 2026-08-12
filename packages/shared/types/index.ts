@@ -124,6 +124,7 @@ export interface PlanRecord {
   description?: string | null;
   time: string;
   sortOrder: number;
+  durationMinutes?: number | null;
   /** For todos: which calendar day this task belongs to. Habits omit this. */
   scheduledDate?: string | null;
   /**
@@ -134,7 +135,22 @@ export interface PlanRecord {
   visibleFrom?: string | null;
 }
 
-export type ChecksByPlan = Record<string, Record<string, boolean>>;
+export interface CheckDayState {
+  done: boolean;
+  actualMinutes?: number | null;
+}
+
+export type ChecksByPlan = Record<string, Record<string, CheckDayState>>;
+
+export interface DurationChartMerge {
+  label: string;
+  planIds: number[];
+}
+
+export interface DurationChartPrefs {
+  hiddenPlanIds: number[];
+  merges: DurationChartMerge[];
+}
 
 export type AiIntakePriority = 'high' | 'normal' | 'low';
 

@@ -9,6 +9,7 @@ export const checkUpsertSchema = z.object({
   planId: z.coerce.number().int().positive(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   done: z.boolean(),
+  actualMinutes: z.number().int().positive().max(24 * 60).nullable().optional(),
 });
 
 export const batchChecksSchema = z.object({
