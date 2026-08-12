@@ -90,10 +90,55 @@ async function loadPlanDurations(planIds: number[]): Promise<Map<number, number 
   return durations;
 }
 
+function checkCellKey(planId: number, date: string): string {
+  return `${planId}|${date}`;
+}
+
+async function loadExistingActualMinutes(
+  cells: Array<{ planId: number; date: string }>,
+): Promise<Map<string, number | null>> {
+  const existing = new Map<string, number | null>();
+  if (cells.length === 0) {
+    return existing;
+  }
+
+  const placeholders = cells.map(() => '(?, ?)').join(', ');
+  const [rows] = await pool.query(
+    `SELECT plan_id, check_date, actual_minutes
+     FROM checks
+     WHERE (plan_id, check_date) IN (${placeholders})`,
+    cells.flatMap((cell) => [cell.planId, cell.date]),
+  );
+
+  if (Array.isArray(rows)) {
+    for (const row of rows) {
+      const record = row as {
+        plan_id: number;
+        check_date: Date | string;
+        actual_minutes: number | null;
+      };
+      const dateKey = record.check_date instanceof Date
+        ? toDateKey(record.check_date)
+        : String(record.check_date).slice(0, 10);
+      existing.set(checkCellKey(Number(record.plan_id), dateKey), record.actual_minutes ?? null);
+    }
+  }
+
+  return existing;
+}
+
+/**
+ * Resolve actual_minutes for upsert:
+ * 1. done=false → null
+ * 2. done=true + number → that number
+ * 3. done=true + omitted (undefined) → COALESCE(existing, plan duration, null)
+ * 4. done=true + explicit null → COALESCE(plan duration, null) (reset to plan default)
+ */
 function resolveActualMinutes(
   done: boolean,
   actualMinutes: number | null | undefined,
   planDurationMinutes: number | null | undefined,
+  existingActualMinutes: number | null | undefined,
 ): number | null {
   if (!done) {
     return null;
@@ -101,6 +146,10 @@ function resolveActualMinutes(
 
   if (actualMinutes != null) {
     return actualMinutes;
+  }
+
+  if (actualMinutes === undefined) {
+    return existingActualMinutes ?? planDurationMinutes ?? null;
   }
 
   return planDurationMinutes ?? null;
@@ -111,10 +160,12 @@ export async function upsertCheck(user: AuthenticatedUser, payload: unknown): Pr
   await ensurePlanOwnership(user, [input.planId]);
 
   const durations = await loadPlanDurations([input.planId]);
+  const existing = await loadExistingActualMinutes([{ planId: input.planId, date: input.date }]);
   const actualMinutes = resolveActualMinutes(
     input.done,
     input.actualMinutes,
     durations.get(input.planId),
+    existing.get(checkCellKey(input.planId, input.date)),
   );
 
   await pool.query(
@@ -130,11 +181,19 @@ export async function upsertChecksBatch(user: AuthenticatedUser, payload: unknow
   await ensurePlanOwnership(user, planIds);
 
   const durations = await loadPlanDurations(planIds);
+  const existing = await loadExistingActualMinutes(
+    input.checks.map((item) => ({ planId: item.planId, date: item.date })),
+  );
   const values = input.checks.map((item) => [
     item.planId,
     item.date,
     item.done ? 1 : 0,
-    resolveActualMinutes(item.done, item.actualMinutes, durations.get(item.planId)),
+    resolveActualMinutes(
+      item.done,
+      item.actualMinutes,
+      durations.get(item.planId),
+      existing.get(checkCellKey(item.planId, item.date)),
+    ),
   ]);
   if (values.length > 0) {
     const placeholders = values.map(() => '(?, ?, ?, ?)').join(', ');
