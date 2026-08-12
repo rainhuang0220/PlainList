@@ -95,12 +95,23 @@
         <div class="diagnostic-copy">{{ structureCopy }}</div>
       </div>
     </div>
+
+    <DurationHoursPanel
+      scope="week"
+      :scope-key="durationScopeKey"
+      :from="durationFrom"
+      :to="durationTo"
+    />
+    <HabitCheckCountsPanel :from="durationFrom" :to="durationTo" />
   </section>
 </template>
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import * as echarts from 'echarts'
+import DurationHoursPanel from '@/components/stats/DurationHoursPanel.vue'
+import HabitCheckCountsPanel from '@/components/stats/HabitCheckCountsPanel.vue'
+import { isoWeekScopeKey, weekDateRange } from '@/features/duration-stats/scopeKeys'
 import { usePlansStore } from '@/features/plans/model/usePlansStore'
 import { useChecksStore } from '@/features/checks/model/useChecksStore'
 import { useMarketplaceStore } from '@/features/plugins/model/useMarketplaceStore'
@@ -137,6 +148,11 @@ const monday = computed(() => {
   date.setHours(0, 0, 0, 0)
   return date
 })
+
+const durationRange = computed(() => weekDateRange(today))
+const durationFrom = computed(() => durationRange.value.from)
+const durationTo = computed(() => durationRange.value.to)
+const durationScopeKey = computed(() => isoWeekScopeKey(today))
 
 const weekNumber = computed(() => {
   const start = new Date(today.getFullYear(), 0, 0)

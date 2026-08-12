@@ -91,6 +91,14 @@
       </div>
     </div>
 
+    <DurationHoursPanel
+      scope="year"
+      :scope-key="durationScopeKey"
+      :from="durationFrom"
+      :to="durationTo"
+    />
+    <HabitCheckCountsPanel :from="durationFrom" :to="durationTo" />
+
     <div class="year-journal-section">
       <div class="year-journal-head">
         <div class="year-journal-copy">
@@ -242,6 +250,9 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { isPlanVisibleOnDate } from '@plainlist/shared'
+import DurationHoursPanel from '@/components/stats/DurationHoursPanel.vue'
+import HabitCheckCountsPanel from '@/components/stats/HabitCheckCountsPanel.vue'
+import { yearDateRange, yearScopeKey } from '@/features/duration-stats/scopeKeys'
 import { usePlansStore } from '@/features/plans/model/usePlansStore'
 import { useChecksStore } from '@/features/checks/model/useChecksStore'
 import { useReviewsStore } from '@/features/reviews/model/useReviewsStore'
@@ -263,6 +274,15 @@ const visibleMonth = ref(today.getMonth())
 let monthTouchX = null
 let longPressTimer = null
 let longPressOrigin = null
+
+const durationRange = computed(() => yearDateRange(year.value))
+const durationFrom = computed(() => durationRange.value.from)
+const durationTo = computed(() => {
+  const end = durationRange.value.to
+  const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+  return end > todayKey && year.value === today.getFullYear() ? todayKey : end
+})
+const durationScopeKey = computed(() => yearScopeKey(year.value))
 
 function shiftVisibleMonth(delta) {
   const next = visibleMonth.value + delta
