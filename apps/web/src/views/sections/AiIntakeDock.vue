@@ -269,7 +269,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
-import { findHabitByName, isPlanVisibleOnDate, toDateKey, type PlanType } from '@plainlist/shared';
+import { findHabitByName, isPlanVisibleOnDate, timeToMinutes, toDateKey, type PlanType } from '@plainlist/shared';
 import { useAiIntakeStore } from '@/features/ai-intake/model/useAiIntakeStore';
 import IntakeGanttChart from '@/features/ai-intake/viz/IntakeGanttChart.vue';
 import { usePlansStore } from '@/features/plans/model/usePlansStore';
@@ -296,6 +296,16 @@ const sessionDateKey = ref(toDateKey(new Date()));
 
 function todayKey() {
   return toDateKey(new Date());
+}
+
+/** Map intake end-time hint (`why` as HH:MM) into plan duration when parseable. */
+function durationFromDraft(draft: { time: string; why?: string }): number | undefined {
+  if (!draft.why || !/^\d{2}:\d{2}$/.test(draft.why) || !/^\d{2}:\d{2}$/.test(draft.time)) {
+    return undefined;
+  }
+  const minutes = timeToMinutes(draft.why) - timeToMinutes(draft.time);
+  if (!Number.isFinite(minutes) || minutes <= 0 || minutes > 24 * 60) return undefined;
+  return minutes;
 }
 
 function syncSessionDate() {
@@ -559,7 +569,14 @@ async function commitAll() {
         continue;
       }
       try {
-        await plans.add(draft.name, draft.type, draft.time, draft.type === 'todo' ? today : undefined);
+        await plans.add(
+          draft.name,
+          draft.type,
+          draft.time,
+          draft.type === 'todo' ? today : undefined,
+          undefined,
+          durationFromDraft(draft),
+        );
         addedCount += 1;
       } catch (error) {
         console.error('[ai-intake] commit failed', draft.name, error);

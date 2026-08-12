@@ -146,13 +146,24 @@
           <div class="tsumm-lbl">{{ item.lbl }}</div>
         </div>
       </div>
+
+      <DurationHoursPanel
+        scope="month"
+        :scope-key="durationScopeKey"
+        :from="durationFrom"
+        :to="durationTo"
+      />
+      <HabitCheckCountsPanel :from="durationFrom" :to="durationTo" />
     </template>
   </section>
 </template>
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
-import { dedupeHabitPlans, normalizePlanName } from '@plainlist/shared'
+import { dedupeHabitPlans, getMonthRange, normalizePlanName } from '@plainlist/shared'
+import DurationHoursPanel from '@/components/stats/DurationHoursPanel.vue'
+import HabitCheckCountsPanel from '@/components/stats/HabitCheckCountsPanel.vue'
+import { monthScopeKey } from '@/features/duration-stats/scopeKeys'
 import { usePlansStore } from '@/features/plans/model/usePlansStore'
 import { useChecksStore } from '@/features/checks/model/useChecksStore'
 import { useI18nStore } from '@/shared/i18n/useI18nStore'
@@ -166,6 +177,11 @@ const now = new Date()
 const trackerYear = ref(now.getFullYear())
 const trackerMonth = ref(now.getMonth())
 const selectedTaskDateKey = ref(todayKey())
+
+const durationRange = computed(() => getMonthRange(trackerYear.value, trackerMonth.value))
+const durationFrom = computed(() => durationRange.value.from)
+const durationTo = computed(() => durationRange.value.to)
+const durationScopeKey = computed(() => monthScopeKey(trackerYear.value, trackerMonth.value))
 
 const MONTHS_DEFAULT = ['January','February','March','April','May','June','July','August','September','October','November','December']
 const MONTHS_SHORT_DEFAULT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']

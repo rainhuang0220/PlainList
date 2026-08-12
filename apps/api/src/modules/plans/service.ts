@@ -11,6 +11,7 @@ interface PlanRow {
   type: 'habit' | 'todo';
   name: string;
   description?: string | null;
+  duration_minutes?: number | null;
   time: string;
   sort_order: number;
   scheduled_date?: string | Date | null;
@@ -36,7 +37,7 @@ function toLocalDateKey(value: string | Date | null | undefined): string | null 
 }
 
 const PLAN_SELECT = `
-  SELECT p.id, p.type, p.name, p.description, p.time, p.sort_order, p.scheduled_date,
+  SELECT p.id, p.type, p.name, p.description, p.duration_minutes, p.time, p.sort_order, p.scheduled_date,
          DATE_FORMAT(LEAST(DATE(p.created_at), COALESCE(MIN(c.check_date), DATE(p.created_at))), '%Y-%m-%d') AS visible_from
   FROM plans p
   LEFT JOIN checks c ON c.plan_id = p.id
@@ -48,6 +49,7 @@ function mapPlan(row: PlanRow): PlanRecord {
     type: row.type,
     name: row.name,
     description: row.description ?? null,
+    durationMinutes: row.duration_minutes ?? null,
     time: row.time,
     sortOrder: row.sort_order,
     scheduledDate: row.type === 'todo' ? toLocalDateKey(row.scheduled_date) : null,
@@ -159,9 +161,10 @@ export async function createPlan(user: AuthenticatedUser, payload: unknown): Pro
   }
 
   const description = input.description ?? null;
+  const durationMinutes = input.durationMinutes ?? null;
   const [result] = await pool.query(
-    'INSERT INTO plans (user_id, type, name, description, time, scheduled_date) VALUES (?, ?, ?, ?, ?, ?)',
-    [user.id, input.type, input.name, description, input.time, scheduledDate],
+    'INSERT INTO plans (user_id, type, name, description, duration_minutes, time, scheduled_date) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [user.id, input.type, input.name, description, durationMinutes, input.time, scheduledDate],
   );
 
   return {
@@ -169,6 +172,7 @@ export async function createPlan(user: AuthenticatedUser, payload: unknown): Pro
     type: input.type,
     name: input.name,
     description,
+    durationMinutes,
     time: input.time,
     sortOrder: 0,
     scheduledDate,
@@ -190,6 +194,10 @@ export async function updatePlan(user: AuthenticatedUser, planIdInput: unknown, 
   if (input.description !== undefined) {
     fields.push('description = ?');
     values.push(input.description);
+  }
+  if (input.durationMinutes !== undefined) {
+    fields.push('duration_minutes = ?');
+    values.push(input.durationMinutes);
   }
   if (input.type !== undefined) {
     fields.push('type = ?');

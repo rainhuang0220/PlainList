@@ -1,6 +1,7 @@
 export * from './auth';
 export * from './plans';
 export * from './checks';
+export * from './duration-chart-prefs';
 export * from './plugins';
 export * from './ai-intake';
 export * from './ai-settings';

@@ -24,6 +24,12 @@
         <span class="day-primary-status-copy">{{ dayStatusCopy }}</span>
       </div>
 
+      <DayScheduleAxis
+        v-if="todayPlans.length"
+        :plans="todayPlans"
+        :done-map="todayDoneMap"
+      />
+
       <div class="plan-list">
         <div v-if="!todayPlans.length" class="empty-state">
           <div class="empty-state-icon">○</div>
@@ -55,6 +61,7 @@
                   :placeholder="t('plan.add_desc_ph', 'Description (optional)')"
                   rows="2"
                 ></textarea>
+                <DurationMinutesField v-model="editDurationMinutes" />
                 <div class="apf-actions">
                   <button class="apf-cancel" @click="cancelEdit">{{ t('plan.add_cancel', 'Cancel') }}</button>
                   <button class="apf-save" @click="saveEdit">{{ t('plan.edit_save', 'Save') }}</button>
@@ -114,6 +121,7 @@
             :placeholder="t('plan.add_desc_ph', 'Description (optional)')"
             rows="2"
           ></textarea>
+          <DurationMinutesField v-model="newDurationMinutes" />
           <div class="apf-actions">
             <button class="apf-cancel" :disabled="saving" @click="cancelForm">{{ t('plan.add_cancel', 'Cancel') }}</button>
             <button class="apf-save" :disabled="saving" @click="submitPlan">
@@ -202,6 +210,8 @@ import { useChecksStore } from '@/features/checks/model/useChecksStore'
 import { useAuthStore } from '@/features/auth/model/useAuthStore'
 import { useReviewsStore } from '@/features/reviews/model/useReviewsStore'
 import { useI18nStore } from '@/shared/i18n/useI18nStore'
+import DayScheduleAxis from '@/components/plans/DayScheduleAxis.vue'
+import DurationMinutesField from '@/components/plans/DurationMinutesField.vue'
 import AiIntakeDock from '@/views/sections/AiIntakeDock.vue'
 
 const plans = usePlansStore()
@@ -224,6 +234,15 @@ const todayPlans = computed(() =>
     sortPlansByTime(plans.plans.filter((plan) => isPlanVisibleOnDate(plan, todayKey()))),
   ),
 )
+
+const todayDoneMap = computed(() => {
+  const map = {}
+  const day = todayKey()
+  for (const plan of todayPlans.value) {
+    map[plan.id] = checks.isChecked(plan.id, day)
+  }
+  return map
+})
 
 function dateKey(year, month, day) {
   return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
@@ -272,6 +291,7 @@ const newName = ref('')
 const newType = ref('habit')
 const newTime = ref('')
 const newDesc = ref('')
+const newDurationMinutes = ref(null)
 const nameInput = ref(null)
 const saving = ref(false)
 const saveError = ref('')
@@ -288,6 +308,7 @@ function cancelForm() {
   newName.value = ''
   newTime.value = ''
   newDesc.value = ''
+  newDurationMinutes.value = null
   saveError.value = ''
 }
 
@@ -303,13 +324,21 @@ async function submitPlan() {
   saving.value = true
   saveError.value = ''
   try {
-    await plans.add(name, newType.value, time, undefined, newDesc.value.trim() || undefined)
+    await plans.add(
+      name,
+      newType.value,
+      time,
+      undefined,
+      newDesc.value.trim() || undefined,
+      newDurationMinutes.value,
+    )
     // force-close even if saving guard would block cancelForm mid-success
     saving.value = false
     formOpen.value = false
     newName.value = ''
     newTime.value = ''
     newDesc.value = ''
+    newDurationMinutes.value = null
     saveError.value = ''
   } catch (error) {
     saveError.value = error instanceof Error
@@ -326,6 +355,7 @@ const editName = ref('')
 const editType = ref('habit')
 const editTime = ref('')
 const editDesc = ref('')
+const editDurationMinutes = ref(null)
 
 function startEdit(plan) {
   editingId.value = plan.id
@@ -333,6 +363,7 @@ function startEdit(plan) {
   editType.value = plan.type
   editTime.value = plan.time
   editDesc.value = plan.description ?? ''
+  editDurationMinutes.value = plan.durationMinutes ?? null
 }
 
 function cancelEdit() {
@@ -348,6 +379,7 @@ async function saveEdit() {
     description: editDesc.value.trim() || null,
     type: editType.value,
     time,
+    durationMinutes: editDurationMinutes.value,
   })
   editingId.value = null
 }

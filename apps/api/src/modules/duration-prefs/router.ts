@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { ZodError } from 'zod';
 import { authMiddleware, type AuthRequest } from '../../middleware/auth';
-import { listChecks, upsertCheck, upsertChecksBatch } from './service';
+import { getDurationChartPrefs, upsertDurationChartPrefs } from './service';
 
 function respondError(error: unknown, res: any): void {
   if (error instanceof ZodError) {
@@ -13,31 +13,21 @@ function respondError(error: unknown, res: any): void {
   res.status(status).json({ error: error instanceof Error ? error.message : 'server error' });
 }
 
-export const checksRouter = Router();
+export const durationPrefsRouter = Router();
 
-checksRouter.use(authMiddleware);
+durationPrefsRouter.use(authMiddleware);
 
-checksRouter.get('/', async (req, res) => {
+durationPrefsRouter.get('/', async (req, res) => {
   try {
-    res.json(await listChecks((req as AuthRequest).user, req.query));
+    res.json(await getDurationChartPrefs((req as AuthRequest).user, req.query));
   } catch (error) {
     respondError(error, res);
   }
 });
 
-checksRouter.put('/', async (req, res) => {
+durationPrefsRouter.put('/', async (req, res) => {
   try {
-    const cell = await upsertCheck((req as AuthRequest).user, req.body);
-    res.json(cell);
-  } catch (error) {
-    respondError(error, res);
-  }
-});
-
-checksRouter.put('/batch', async (req, res) => {
-  try {
-    const count = await upsertChecksBatch((req as AuthRequest).user, req.body);
-    res.json({ ok: true, count });
+    res.json(await upsertDurationChartPrefs((req as AuthRequest).user, req.query, req.body));
   } catch (error) {
     respondError(error, res);
   }

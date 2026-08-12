@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS plans (
   type ENUM('habit', 'todo') NOT NULL DEFAULT 'habit',
   name VARCHAR(200) NOT NULL,
   description TEXT NULL,
+  duration_minutes INT NULL,
   time CHAR(5) NOT NULL DEFAULT '09:00',
   scheduled_date DATE NULL,
   sort_order INT NOT NULL DEFAULT 0,
@@ -32,6 +33,7 @@ CREATE TABLE IF NOT EXISTS checks (
   plan_id BIGINT UNSIGNED NOT NULL,
   check_date DATE NOT NULL,
   done TINYINT(1) NOT NULL DEFAULT 0,
+  actual_minutes INT NULL,
   UNIQUE KEY uk_plan_date (plan_id, check_date),
   INDEX idx_checks_date (check_date),
   CONSTRAINT fk_checks_plan FOREIGN KEY (plan_id) REFERENCES plans(id) ON DELETE CASCADE
@@ -107,4 +109,16 @@ CREATE TABLE IF NOT EXISTS user_profile_runs (
   analyzed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_profile_runs_user_date (user_id, analyzed_at),
   CONSTRAINT fk_profile_runs_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS duration_chart_prefs (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id INT UNSIGNED NOT NULL,
+  scope ENUM('week','month','year') NOT NULL,
+  scope_key VARCHAR(32) NOT NULL,
+  hidden_plan_ids JSON NOT NULL,
+  merges JSON NOT NULL,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_user_scope (user_id, scope, scope_key),
+  CONSTRAINT fk_dcp_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
