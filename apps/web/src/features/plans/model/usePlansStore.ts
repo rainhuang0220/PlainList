@@ -21,13 +21,21 @@ export const usePlansStore = defineStore('plans', () => {
     void syncReminders();
   }
 
-  async function add(name: string, type: PlanType, time: string, scheduledDate?: string, description?: string) {
+  async function add(
+    name: string,
+    type: PlanType,
+    time: string,
+    scheduledDate?: string,
+    description?: string,
+    durationMinutes?: number | null,
+  ) {
     const payload: {
       name: string;
       type: PlanType;
       time: string;
       scheduledDate?: string;
       description?: string;
+      durationMinutes?: number | null;
     } = { name, type, time };
 
     if (type === 'todo' && scheduledDate) {
@@ -35,6 +43,9 @@ export const usePlansStore = defineStore('plans', () => {
     }
     if (description) {
       payload.description = description;
+    }
+    if (durationMinutes !== undefined) {
+      payload.durationMinutes = durationMinutes;
     }
 
     const createdPlan = await post<PlanRecord>('/plans', payload);
@@ -44,7 +55,13 @@ export const usePlansStore = defineStore('plans', () => {
     return createdPlan;
   }
 
-  async function update(id: number, updates: { name?: string; description?: string | null; type?: PlanType; time?: string }) {
+  async function update(id: number, updates: {
+    name?: string;
+    description?: string | null;
+    type?: PlanType;
+    time?: string;
+    durationMinutes?: number | null;
+  }) {
     const updatedPlan = await patch<PlanRecord>(`/plans/${id}`, updates);
     plans.value = dedupeHabitPlans(sortPlansByTime(
       plans.value.map((plan) => plan.id === id ? updatedPlan : plan),
