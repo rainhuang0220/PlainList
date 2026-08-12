@@ -188,12 +188,23 @@
                 :key="task.id"
                 class="day-popover-item"
                 :class="{ done: task.done }"
+                @pointerdown="onTaskPointerDown(task, $event)"
+                @pointermove="onTaskPointerMove($event)"
+                @pointerup="onTaskPointerUp"
+                @pointercancel="onTaskPointerUp"
+                @contextmenu.prevent="onTaskContextMenu(task, $event)"
               >
                 <span class="day-popover-bullet" :class="task.type"></span>
                 <div class="day-popover-copy">
                   <div class="day-popover-name">{{ task.name }}</div>
                   <div class="day-popover-type">
                     {{ task.type === 'habit' ? t('plan.type.habit', 'daily habit') : t('plan.type.todo', 'task') }}
+                    <template v-if="task.actualMinutes != null">
+                      · {{ task.actualMinutes }}m
+                    </template>
+                    <template v-else-if="task.durationMinutes != null">
+                      · {{ task.durationMinutes }}m
+                    </template>
                   </div>
                 </div>
                 <div class="day-popover-time">{{ task.time }}</div>
@@ -210,6 +221,16 @@
         </div>
       </Transition>
     </Teleport>
+    <DayTaskActionMenu
+      :open="actionMenu.open"
+      :x="actionMenu.x"
+      :y="actionMenu.y"
+      :done="actionMenu.task?.done ?? false"
+      :default-minutes="actionMenuDefaultMinutes"
+      @close="closeActionMenu"
+      @toggle-done="onActionToggleDone"
+      @edit-minutes="onActionEditMinutes"
+    />
     <DayReviewOverlay
       v-if="dayReviewOpen && dayPopover"
       :review="dayPopover"
@@ -219,13 +240,17 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { isPlanVisibleOnDate } from '@plainlist/shared'
 import { usePlansStore } from '@/features/plans/model/usePlansStore'
 import { useChecksStore } from '@/features/checks/model/useChecksStore'
 import { useReviewsStore } from '@/features/reviews/model/useReviewsStore'
 import { useI18nStore } from '@/shared/i18n/useI18nStore'
+import DayTaskActionMenu from '@/components/calendar/DayTaskActionMenu.vue'
 import DayReviewOverlay from '@/views/sections/DayReviewOverlay.vue'
+
+const LONG_PRESS_MS = 500
+const LONG_PRESS_MOVE_PX = 10
 
 const plansStore = usePlansStore()
 const checksStore = useChecksStore()
@@ -236,6 +261,8 @@ const year = ref(new Date().getFullYear())
 const today = new Date()
 const visibleMonth = ref(today.getMonth())
 let monthTouchX = null
+let longPressTimer = null
+let longPressOrigin = null
 
 function shiftVisibleMonth(delta) {
   const next = visibleMonth.value + delta
@@ -273,11 +300,25 @@ const dayPopoverOpen = ref(false)
 const dayPopover = ref(null)
 const dayReviewOpen = ref(false)
 const popoverStyle = ref({})
+const actionMenu = ref({
+  open: false,
+  x: 0,
+  y: 0,
+  task: null,
+})
 
 const selectedJournalKey = ref('')
 const journalQuery = ref('')
 const journalQuarter = ref('all')
 const journalMonth = ref('all')
+
+const actionMenuDefaultMinutes = computed(() => {
+  const task = actionMenu.value.task
+  if (!task) return null
+  if (task.actualMinutes != null) return task.actualMinutes
+  if (task.durationMinutes != null) return task.durationMinutes
+  return null
+})
 
 const MONTHS_S_DEFAULT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 const MONTHS_DEFAULT = ['January','February','March','April','May','June','July','August','September','October','November','December']
@@ -411,6 +452,8 @@ function allTasksForDay(month, day) {
     type: task.type,
     time: task.time,
     done: checksStore.isChecked(task.id, key),
+    durationMinutes: task.durationMinutes ?? null,
+    actualMinutes: checksStore.getActualMinutes(task.id, key),
   }))
 }
 
@@ -465,8 +508,21 @@ function buildPopoverStyle(event) {
   if (!target) return {}
   const rect = target.getBoundingClientRect()
   const width = Math.min(360, window.innerWidth - 24)
-  const left = Math.min(Math.max(12, rect.left + rect.width / 2 - width / 2), window.innerWidth - width - 12)
-  const top = Math.min(rect.bottom + 14, window.innerHeight - 260)
+  const left = Math.min(
+    Math.max(12, rect.left + rect.width / 2 - width / 2),
+    window.innerWidth - width - 12,
+  )
+  const estimatedHeight = 320
+  const gap = 14
+  const below = rect.bottom + gap
+  const spaceBelow = window.innerHeight - below
+  let top
+  if (spaceBelow < estimatedHeight) {
+    // Prefer upper third when space below is tight
+    top = Math.max(16, Math.min(window.innerHeight / 3, window.innerHeight - estimatedHeight - 16))
+  } else {
+    top = Math.min(below, window.innerHeight - estimatedHeight - 16)
+  }
   return {
     left: `${left}px`,
     top: `${Math.max(16, top)}px`,
@@ -474,7 +530,109 @@ function buildPopoverStyle(event) {
   }
 }
 
+function refreshDayPopoverTasks() {
+  if (!dayPopover.value?.dateKey) return
+  const key = dayPopover.value.dateKey
+  const [y, m, d] = key.split('-').map(Number)
+  if (y !== year.value) return
+  const month = m - 1
+  const visible = visiblePlansForDay(month, d)
+  const completed = completedTasksForDay(month, d)
+  dayPopover.value = {
+    ...dayPopover.value,
+    completed: completed.length,
+    total: visible.length,
+    tasks: allTasksForDay(month, d),
+    review: reviewsStore.getReview(key),
+  }
+}
+
+function clearLongPress() {
+  if (longPressTimer != null) {
+    clearTimeout(longPressTimer)
+    longPressTimer = null
+  }
+  longPressOrigin = null
+}
+
+function openActionMenu(task, x, y) {
+  actionMenu.value = {
+    open: true,
+    x,
+    y,
+    task: { ...task },
+  }
+}
+
+function closeActionMenu() {
+  actionMenu.value = {
+    open: false,
+    x: 0,
+    y: 0,
+    task: null,
+  }
+}
+
+function onTaskPointerDown(task, event) {
+  // Fine pointer: right-click only. Coarse/touch: long-press.
+  if (event.pointerType === 'mouse') return
+  clearLongPress()
+  longPressOrigin = { x: event.clientX, y: event.clientY, task }
+  longPressTimer = window.setTimeout(() => {
+    if (!longPressOrigin) return
+    openActionMenu(longPressOrigin.task, longPressOrigin.x, longPressOrigin.y)
+    longPressTimer = null
+    longPressOrigin = null
+  }, LONG_PRESS_MS)
+}
+
+function onTaskPointerMove(event) {
+  if (!longPressOrigin) return
+  const dx = event.clientX - longPressOrigin.x
+  const dy = event.clientY - longPressOrigin.y
+  if ((dx * dx) + (dy * dy) > LONG_PRESS_MOVE_PX * LONG_PRESS_MOVE_PX) {
+    clearLongPress()
+  }
+}
+
+function onTaskPointerUp() {
+  clearLongPress()
+}
+
+function onTaskContextMenu(task, event) {
+  clearLongPress()
+  openActionMenu(task, event.clientX, event.clientY)
+}
+
+async function onActionToggleDone() {
+  const task = actionMenu.value.task
+  const key = dayPopover.value?.dateKey
+  if (!task || !key) return
+  try {
+    await checksStore.setCheck(Number(task.id), key, { done: !task.done })
+    refreshDayPopoverTasks()
+  } finally {
+    closeActionMenu()
+  }
+}
+
+async function onActionEditMinutes(minutes) {
+  const task = actionMenu.value.task
+  const key = dayPopover.value?.dateKey
+  if (!task || !key) return
+  try {
+    await checksStore.setCheck(Number(task.id), key, {
+      done: true,
+      actualMinutes: minutes,
+    })
+    refreshDayPopoverTasks()
+  } finally {
+    closeActionMenu()
+  }
+}
+
 function openDayPopover(month, day, event) {
+  closeActionMenu()
   const key = dateKey(month, day)
   const visible = visiblePlansForDay(month, day)
   const tasks = completedTasksForDay(month, day)
@@ -495,6 +653,8 @@ function openDayPopover(month, day, event) {
 }
 
 function closeDayPopover() {
+  closeActionMenu()
+  clearLongPress()
   dayPopoverOpen.value = false
 }
 
@@ -554,13 +714,28 @@ watch(year, async () => {
   journalQuarter.value = 'all'
   journalMonth.value = 'all'
   selectedJournalKey.value = ''
-  journalText.value = ''
+  closeDayPopover()
   await fetchVisibleYear()
 })
 
 onMounted(() => {
   fetchVisibleYear()
+  document.addEventListener('keydown', onGlobalEscape)
 })
+
+onUnmounted(() => {
+  clearLongPress()
+  document.removeEventListener('keydown', onGlobalEscape)
+})
+
+function onGlobalEscape(event) {
+  if (event.key !== 'Escape') return
+  if (actionMenu.value.open) {
+    closeActionMenu()
+    return
+  }
+  if (dayPopoverOpen.value) closeDayPopover()
+}
 </script>
 
 <style scoped>
@@ -899,6 +1074,9 @@ onMounted(() => {
   border: 1px solid var(--faint2);
   border-radius: 12px;
   background: color-mix(in srgb, var(--surface) 94%, var(--bg));
+  user-select: none;
+  touch-action: manipulation;
+  cursor: context-menu;
 }
 
 .day-popover-item.done {
@@ -988,6 +1166,13 @@ onMounted(() => {
     left: 12px !important;
     right: 12px !important;
     width: auto !important;
+    top: max(12px, 10vh) !important;
+    bottom: auto !important;
+    max-height: min(70vh, 520px);
+    overflow: auto;
+  }
+  .day-popover-list {
+    max-height: none;
   }
 }
 
