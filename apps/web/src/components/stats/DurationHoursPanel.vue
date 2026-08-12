@@ -368,12 +368,25 @@ function buildChartOption() {
   }
 }
 
+function disposeChart() {
+  chartInst?.dispose()
+  chartInst = null
+}
+
 function ensureChart() {
-  if (!chartEl.value) return
+  if (!chartEl.value) {
+    disposeChart()
+    return
+  }
+  // v-if remounts the chart DOM after empty→rows; old instance is bound to a dead node
+  if (chartInst && chartInst.getDom() !== chartEl.value) {
+    disposeChart()
+  }
   if (!chartInst) {
     chartInst = echarts.init(chartEl.value, null, { renderer: 'svg' })
   }
   chartInst.setOption(buildChartOption(), true)
+  chartInst.resize()
 }
 
 function resizeChart() {
@@ -381,7 +394,8 @@ function resizeChart() {
 }
 
 function onThemeChanged() {
-  chartInst?.setOption(buildChartOption(), true)
+  if (!chartInst) return
+  chartInst.setOption(buildChartOption(), true)
 }
 
 watch(
@@ -400,6 +414,10 @@ watch(
       chartMode.value = 'bar'
     }
     await nextTick()
+    if (!stats.value.hourRows.length) {
+      disposeChart()
+      return
+    }
     ensureChart()
   },
   { deep: true },
@@ -416,8 +434,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   window.removeEventListener('resize', resizeChart)
   document.removeEventListener('theme:changed', onThemeChanged)
-  chartInst?.dispose()
-  chartInst = null
+  disposeChart()
 })
 </script>
 
