@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 WEB_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 ROOT_DIR="$(cd "${WEB_DIR}/../.." && pwd)"
-VERSION="${PLAINLIST_VERSION:-2.0.16}"
+VERSION="${PLAINLIST_VERSION:-2.0.17}"
 API_BASE="${VITE_API_BASE_URL:-}"
 OUT_DIR="${WEB_DIR}/.android-release"
 KEYPROPS="${WEB_DIR}/android-signing/keystore.properties"
