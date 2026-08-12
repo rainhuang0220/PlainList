@@ -1,129 +1,141 @@
 <template>
-  <div class="dhp">
-    <div class="dhp-head">
-      <div class="dhp-title">{{ t('stats.hours.title', '投入小时') }}</div>
-      <div class="dhp-total" v-if="stats.totalHours > 0">
-        {{ t('stats.hours.total', '{hours} h', { hours: formatHours(stats.totalHours) }) }}
+  <div class="dhp" :class="{ open: expanded }">
+    <button
+      type="button"
+      class="dhp-toggle"
+      :aria-expanded="expanded ? 'true' : 'false'"
+      @click="toggleExpanded"
+    >
+      <span class="dhp-toggle-main">
+        <span class="dhp-chevron" aria-hidden="true">{{ expanded ? '▾' : '▸' }}</span>
+        <span class="dhp-title">{{ t('stats.hours.title', '投入小时') }}</span>
+      </span>
+      <span class="dhp-total">
+        {{ stats.totalHours > 0
+          ? t('stats.hours.total', '{hours} h', { hours: formatHours(stats.totalHours) })
+          : t('stats.hours.summary_empty', '暂无') }}
+      </span>
+    </button>
+
+    <div v-show="expanded" class="dhp-body">
+      <div v-if="!stats.hourRows.length" class="dhp-empty">
+        {{ t('stats.hours.empty', '完成且带时长的事项才会计入') }}
       </div>
-    </div>
 
-    <div v-if="!stats.hourRows.length" class="dhp-empty">
-      {{ t('stats.hours.empty', '完成且带时长的事项才会计入') }}
-    </div>
+      <template v-else>
+        <ul class="dhp-list">
+          <li
+            v-for="(row, index) in stats.hourRows"
+            :key="rowKey(row, index)"
+            class="dhp-row"
+            :class="{ selected: isSelected(row) }"
+          >
+            <button type="button" class="dhp-row-main" @click="toggleSelect(row)">
+              <span class="dhp-row-name">{{ row.label }}</span>
+              <span class="dhp-row-hours">{{ formatHours(row.hours) }} h</span>
+            </button>
+            <div class="dhp-row-actions">
+              <button
+                v-if="row.planIds.length === 1"
+                type="button"
+                class="dhp-action"
+                :title="t('stats.hours.hide', '移出')"
+                @click="onHide(row.planIds[0])"
+              >
+                {{ t('stats.hours.hide_short', '隐') }}
+              </button>
+              <button
+                v-else
+                type="button"
+                class="dhp-action"
+                :title="t('stats.hours.unmerge', '拆分')"
+                @click="onUnmergeRow(row)"
+              >
+                {{ t('stats.hours.unmerge_short', '拆') }}
+              </button>
+            </div>
+          </li>
+        </ul>
 
-    <template v-else>
-      <ul class="dhp-list">
-        <li
-          v-for="(row, index) in stats.hourRows"
-          :key="rowKey(row, index)"
-          class="dhp-row"
-          :class="{ selected: isSelected(row) }"
-        >
-          <button type="button" class="dhp-row-main" @click="toggleSelect(row)">
-            <span class="dhp-row-name">{{ row.label }}</span>
-            <span class="dhp-row-hours">{{ formatHours(row.hours) }} h</span>
+        <div class="dhp-merge-bar" v-if="selectedRows.length > 0">
+          <span class="dhp-merge-hint">
+            {{ selectedRows.length === 1
+              ? t('stats.hours.pick_second', '再选一项合并')
+              : t('stats.hours.ready_merge', '可合并两项') }}
+          </span>
+          <input
+            v-if="selectedRows.length === 2"
+            v-model="mergeLabel"
+            class="dhp-merge-input"
+            type="text"
+            maxlength="100"
+            :placeholder="t('stats.hours.merge_ph', '合并名称')"
+            @keydown.enter.prevent="onMerge"
+          />
+          <button
+            v-if="selectedRows.length === 2"
+            type="button"
+            class="dhp-merge-btn"
+            :disabled="!mergeLabel.trim()"
+            @click="onMerge"
+          >
+            {{ t('stats.hours.merge', '合并') }}
           </button>
-          <div class="dhp-row-actions">
-            <button
-              v-if="row.planIds.length === 1"
-              type="button"
-              class="dhp-action"
-              :title="t('stats.hours.hide', '移出')"
-              @click="onHide(row.planIds[0])"
-            >
-              {{ t('stats.hours.hide_short', '隐') }}
-            </button>
-            <button
-              v-else
-              type="button"
-              class="dhp-action"
-              :title="t('stats.hours.unmerge', '拆分')"
-              @click="onUnmergeRow(row)"
-            >
-              {{ t('stats.hours.unmerge_short', '拆') }}
-            </button>
-          </div>
-        </li>
-      </ul>
+          <button type="button" class="dhp-action" @click="clearSelection">
+            {{ t('stats.hours.cancel', '取消') }}
+          </button>
+        </div>
 
-      <div class="dhp-merge-bar" v-if="selectedRows.length > 0">
-        <span class="dhp-merge-hint">
-          {{ selectedRows.length === 1
-            ? t('stats.hours.pick_second', '再选一项合并')
-            : t('stats.hours.ready_merge', '可合并两项') }}
-        </span>
-        <input
-          v-if="selectedRows.length === 2"
-          v-model="mergeLabel"
-          class="dhp-merge-input"
-          type="text"
-          maxlength="100"
-          :placeholder="t('stats.hours.merge_ph', '合并名称')"
-          @keydown.enter.prevent="onMerge"
-        />
-        <button
-          v-if="selectedRows.length === 2"
-          type="button"
-          class="dhp-merge-btn"
-          :disabled="!mergeLabel.trim()"
-          @click="onMerge"
-        >
-          {{ t('stats.hours.merge', '合并') }}
-        </button>
-        <button type="button" class="dhp-action" @click="clearSelection">
-          {{ t('stats.hours.cancel', '取消') }}
-        </button>
+        <div class="dhp-chart-switch">
+          <button
+            v-for="tab in chartTabs"
+            :key="tab.key"
+            type="button"
+            class="dhp-chart-btn"
+            :class="{ active: chartMode === tab.key }"
+            :disabled="tab.key === 'radar' && !radarEnabled"
+            :title="tab.key === 'radar' && !radarEnabled
+              ? t('stats.hours.radar_need', '至少 3 项才可用雷达图')
+              : undefined"
+            @click="setChartMode(tab.key)"
+          >
+            {{ tab.label }}
+          </button>
+        </div>
+
+        <div ref="chartEl" class="dhp-chart" />
+      </template>
+
+      <div v-if="hiddenPlans.length" class="dhp-hidden">
+        <div class="dhp-subhead">{{ t('stats.hours.hidden', '已隐藏') }}</div>
+        <div class="dhp-chips">
+          <button
+            v-for="plan in hiddenPlans"
+            :key="plan.id"
+            type="button"
+            class="dhp-chip"
+            @click="onRestore(plan.id)"
+          >
+            {{ plan.name }}
+            <span class="dhp-chip-x">×</span>
+          </button>
+        </div>
       </div>
 
-      <div class="dhp-chart-switch">
-        <button
-          v-for="tab in chartTabs"
-          :key="tab.key"
-          type="button"
-          class="dhp-chart-btn"
-          :class="{ active: chartMode === tab.key }"
-          :disabled="tab.key === 'radar' && !radarEnabled"
-          :title="tab.key === 'radar' && !radarEnabled
-            ? t('stats.hours.radar_need', '至少 3 项才可用雷达图')
-            : undefined"
-          @click="setChartMode(tab.key)"
-        >
-          {{ tab.label }}
-        </button>
-      </div>
-
-      <div ref="chartEl" class="dhp-chart" />
-    </template>
-
-    <div v-if="hiddenPlans.length" class="dhp-hidden">
-      <div class="dhp-subhead">{{ t('stats.hours.hidden', '已隐藏') }}</div>
-      <div class="dhp-chips">
-        <button
-          v-for="plan in hiddenPlans"
-          :key="plan.id"
-          type="button"
-          class="dhp-chip"
-          @click="onRestore(plan.id)"
-        >
-          {{ plan.name }}
-          <span class="dhp-chip-x">×</span>
-        </button>
-      </div>
-    </div>
-
-    <div v-if="prefs.merges.length" class="dhp-merges">
-      <div class="dhp-subhead">{{ t('stats.hours.merges', '合并组') }}</div>
-      <div class="dhp-chips">
-        <button
-          v-for="(merge, index) in prefs.merges"
-          :key="`${merge.label}-${index}`"
-          type="button"
-          class="dhp-chip merge"
-          @click="onUnmerge(index)"
-        >
-          {{ merge.label }}
-          <span class="dhp-chip-x">×</span>
-        </button>
+      <div v-if="prefs.merges.length" class="dhp-merges">
+        <div class="dhp-subhead">{{ t('stats.hours.merges', '合并组') }}</div>
+        <div class="dhp-chips">
+          <button
+            v-for="(merge, index) in prefs.merges"
+            :key="`${merge.label}-${index}`"
+            type="button"
+            class="dhp-chip merge"
+            @click="onUnmerge(index)"
+          >
+            {{ merge.label }}
+            <span class="dhp-chip-x">×</span>
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -159,7 +171,19 @@ const chartEl = ref(null)
 const chartMode = ref('bar')
 const selectedRows = ref([])
 const mergeLabel = ref('')
+const expanded = ref(false)
 let chartInst = null
+
+async function toggleExpanded() {
+  expanded.value = !expanded.value
+  if (!expanded.value) {
+    clearSelection()
+    disposeChart()
+    return
+  }
+  await nextTick()
+  ensureChart()
+}
 
 const prefs = computed(() => prefsStore.getPrefs(props.scope, props.scopeKey))
 
@@ -408,8 +432,12 @@ watch(
 )
 
 watch(
-  () => [stats.value.hourRows, chartMode.value, prefs.value],
+  () => [stats.value.hourRows, chartMode.value, prefs.value, expanded.value],
   async () => {
+    if (!expanded.value) {
+      disposeChart()
+      return
+    }
     if (chartMode.value === 'radar' && !radarEnabled.value) {
       chartMode.value = 'bar'
     }
@@ -425,8 +453,6 @@ watch(
 
 onMounted(async () => {
   await ensurePrefs()
-  await nextTick()
-  ensureChart()
   window.addEventListener('resize', resizeChart)
   document.addEventListener('theme:changed', onThemeChanged)
 })
@@ -440,16 +466,33 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .dhp {
-  margin-top: 1.5rem;
+  margin-top: 1.1rem;
   border-top: 1px solid var(--faint);
-  padding-top: 1.1rem;
+  padding-top: .85rem;
 }
-.dhp-head {
+.dhp-toggle {
+  width: 100%;
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: .75rem;
-  margin-bottom: .75rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: .15rem 0;
+  cursor: pointer;
+  text-align: left;
+}
+.dhp-toggle-main {
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  min-width: 0;
+}
+.dhp-chevron {
+  font-size: .7rem;
+  color: var(--muted);
+  width: .7rem;
 }
 .dhp-title {
   font-size: .95rem;
@@ -459,6 +502,10 @@ onBeforeUnmount(() => {
   font-family: var(--mono);
   font-size: .75rem;
   color: var(--muted);
+  white-space: nowrap;
+}
+.dhp-body {
+  margin-top: .75rem;
 }
 .dhp-empty {
   font-size: .8rem;
