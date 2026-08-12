@@ -56,4 +56,30 @@ describe('useDurationChartPrefsStore', () => {
     await store.unmerge('month', '2026-08', 0);
     expect(store.getPrefs('month', '2026-08').merges).toEqual([]);
   });
+
+  it('hidePlan without prior load GETs then PUTs merged with server prefs', async () => {
+    api.get.mockResolvedValueOnce({
+      hiddenPlanIds: [3],
+      merges: [{ label: 'Study', planIds: [1, 2] }],
+    });
+    api.put.mockImplementation(async (_path: string, body: unknown) => body);
+
+    const store = useDurationChartPrefsStore();
+    expect(store.getPrefs('week', '2026-W33')).toEqual({ hiddenPlanIds: [], merges: [] });
+
+    await store.hidePlan('week', '2026-W33', 9);
+
+    expect(api.get).toHaveBeenCalledWith('/duration-chart-prefs?scope=week&scopeKey=2026-W33');
+    expect(api.put).toHaveBeenCalledWith(
+      '/duration-chart-prefs?scope=week&scopeKey=2026-W33',
+      {
+        hiddenPlanIds: [3, 9],
+        merges: [{ label: 'Study', planIds: [1, 2] }],
+      },
+    );
+    expect(store.getPrefs('week', '2026-W33')).toEqual({
+      hiddenPlanIds: [3, 9],
+      merges: [{ label: 'Study', planIds: [1, 2] }],
+    });
+  });
 });

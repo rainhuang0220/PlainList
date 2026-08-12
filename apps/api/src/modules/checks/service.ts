@@ -1,4 +1,4 @@
-import type { AuthenticatedUser, ChecksByPlan } from '@plainlist/shared';
+import type { AuthenticatedUser, CheckDayState, ChecksByPlan } from '@plainlist/shared';
 import { batchChecksSchema, checksQuerySchema, checkUpsertSchema } from '@plainlist/shared';
 import { getMonthRange, getPreviousMonth, toDateKey } from '@plainlist/shared';
 import { pool } from '../../db/pool';
@@ -134,7 +134,7 @@ async function loadExistingActualMinutes(
  * 3. done=true + omitted (undefined) → COALESCE(existing, plan duration, null)
  * 4. done=true + explicit null → COALESCE(plan duration, null) (reset to plan default)
  */
-function resolveActualMinutes(
+export function resolveActualMinutes(
   done: boolean,
   actualMinutes: number | null | undefined,
   planDurationMinutes: number | null | undefined,
@@ -155,7 +155,7 @@ function resolveActualMinutes(
   return planDurationMinutes ?? null;
 }
 
-export async function upsertCheck(user: AuthenticatedUser, payload: unknown): Promise<void> {
+export async function upsertCheck(user: AuthenticatedUser, payload: unknown): Promise<CheckDayState> {
   const input = checkUpsertSchema.parse(payload);
   await ensurePlanOwnership(user, [input.planId]);
 
@@ -173,6 +173,8 @@ export async function upsertCheck(user: AuthenticatedUser, payload: unknown): Pr
      ON DUPLICATE KEY UPDATE done = VALUES(done), actual_minutes = VALUES(actual_minutes)`,
     [input.planId, input.date, input.done ? 1 : 0, actualMinutes],
   );
+
+  return { done: input.done, actualMinutes };
 }
 
 export async function upsertChecksBatch(user: AuthenticatedUser, payload: unknown): Promise<number> {

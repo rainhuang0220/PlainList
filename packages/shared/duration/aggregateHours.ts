@@ -132,7 +132,11 @@ export function aggregateDurationStats({
   hourRows.sort((left, right) => right.hours - left.hours);
   habitCounts.sort((left, right) => right.count - left.count);
 
-  const totalHours = Math.round(hourRows.reduce((sum, row) => sum + row.hours, 0) * 10) / 10;
+  let totalMinutes = 0;
+  for (const planId of new Set(hourRows.flatMap((row) => row.planIds))) {
+    totalMinutes += minutesByPlanId.get(planId) ?? 0;
+  }
+  const totalHours = minutesToHours(totalMinutes);
 
   return { hourRows, habitCounts, totalHours };
 }

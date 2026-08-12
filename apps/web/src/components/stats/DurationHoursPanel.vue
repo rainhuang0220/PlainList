@@ -246,7 +246,7 @@ async function onMerge() {
   const label = mergeLabel.value.trim()
   if (!label) return
   const planIds = [...new Set(selectedRows.value.flatMap((row) => row.planIds))]
-  const current = prefs.value
+  const current = await prefsStore.ensureLoaded(props.scope, props.scopeKey)
   const nextMerges = current.merges.filter(
     (merge) => !merge.planIds.some((id) => planIds.includes(id)),
   )

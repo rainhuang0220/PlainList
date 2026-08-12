@@ -3,6 +3,7 @@ import { getMonthRange } from '@plainlist/shared';
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { useApi } from '@/shared/api/useApi';
+import { usePlansStore } from '@/features/plans/model/usePlansStore';
 
 export const useChecksStore = defineStore('checks', () => {
   const { get, put } = useApi();
@@ -33,6 +34,24 @@ export const useChecksStore = defineStore('checks', () => {
     return value ?? null;
   }
 
+  function resolveOptimisticActual(
+    planId: number,
+    next: { done: boolean; actualMinutes?: number | null },
+    previous: CheckDayState | undefined,
+  ): number | null | undefined {
+    if (!next.done) {
+      return null;
+    }
+    if (next.actualMinutes !== undefined) {
+      return next.actualMinutes;
+    }
+    if (previous?.actualMinutes != null) {
+      return previous.actualMinutes;
+    }
+    const plan = usePlansStore().plans.find((item) => item.id === planId);
+    return plan?.durationMinutes ?? null;
+  }
+
   async function setCheck(
     planId: number,
     dateKey: string,
@@ -45,14 +64,11 @@ export const useChecksStore = defineStore('checks', () => {
       checks.value[planKey] = {};
     }
 
+    const optimisticActual = resolveOptimisticActual(planId, next, previous);
     const optimistic: CheckDayState = next.done
       ? {
           done: true,
-          ...(next.actualMinutes !== undefined
-            ? { actualMinutes: next.actualMinutes }
-            : previous?.actualMinutes != null
-              ? { actualMinutes: previous.actualMinutes }
-              : {}),
+          ...(optimisticActual !== undefined ? { actualMinutes: optimisticActual } : {}),
         }
       : { done: false, actualMinutes: null };
 
@@ -73,7 +89,11 @@ export const useChecksStore = defineStore('checks', () => {
     }
 
     try {
-      await put<{ ok: true }>('/checks', body);
+      const cell = await put<CheckDayState>('/checks', body);
+      checks.value[planKey][dateKey] = {
+        done: cell.done,
+        actualMinutes: cell.actualMinutes ?? null,
+      };
     } catch (error) {
       if (previous === undefined) {
         delete checks.value[planKey][dateKey];

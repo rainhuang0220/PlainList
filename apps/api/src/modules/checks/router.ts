@@ -27,8 +27,8 @@ checksRouter.get('/', async (req, res) => {
 
 checksRouter.put('/', async (req, res) => {
   try {
-    await upsertCheck((req as AuthRequest).user, req.body);
-    res.json({ ok: true });
+    const cell = await upsertCheck((req as AuthRequest).user, req.body);
+    res.json(cell);
   } catch (error) {
     respondError(error, res);
   }

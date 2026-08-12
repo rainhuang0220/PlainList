@@ -152,4 +152,53 @@ describe('aggregateDurationStats', () => {
     expect(result.hourRows).toEqual([]);
     expect(result.totalHours).toBe(0);
   });
+
+  it('rounds totalHours from total minutes once (not sum of per-row rounded hours)', () => {
+    const plans: PlanRecord[] = [
+      {
+        id: 1,
+        type: 'todo',
+        name: 'A',
+        time: '09:00',
+        sortOrder: 0,
+        durationMinutes: 20,
+        scheduledDate: '2026-08-10',
+      },
+      {
+        id: 2,
+        type: 'todo',
+        name: 'B',
+        time: '10:00',
+        sortOrder: 1,
+        durationMinutes: 20,
+        scheduledDate: '2026-08-10',
+      },
+      {
+        id: 3,
+        type: 'todo',
+        name: 'C',
+        time: '11:00',
+        sortOrder: 2,
+        durationMinutes: 20,
+        scheduledDate: '2026-08-10',
+      },
+    ];
+    const checks = {
+      '1': { '2026-08-10': { done: true } },
+      '2': { '2026-08-10': { done: true } },
+      '3': { '2026-08-10': { done: true } },
+    };
+
+    const result = aggregateDurationStats({
+      plans,
+      checks,
+      from: '2026-08-10',
+      to: '2026-08-10',
+      prefs: emptyPrefs,
+    });
+
+    // Per-row: 0.3 + 0.3 + 0.3 = 0.9 if summed; from total minutes: 60 → 1.0
+    expect(result.hourRows.map((row) => row.hours)).toEqual([0.3, 0.3, 0.3]);
+    expect(result.totalHours).toBe(1);
+  });
 });
