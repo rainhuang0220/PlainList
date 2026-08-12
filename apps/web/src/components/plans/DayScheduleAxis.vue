@@ -1,7 +1,22 @@
 <template>
-  <div v-if="blocks.length" class="dsa">
-    <div class="dsa-label">{{ t('plan.day.axis', '今日时间轴') }}</div>
-    <div ref="chartEl" class="dsa-canvas" :style="{ height: `${chartHeight}px` }" />
+  <div v-if="blocks.length" class="dsa" :class="{ open: expanded }">
+    <button
+      type="button"
+      class="dsa-toggle"
+      :aria-expanded="expanded ? 'true' : 'false'"
+      @click="toggleExpanded"
+    >
+      <span class="dsa-toggle-main">
+        <span class="dsa-chevron" aria-hidden="true">{{ expanded ? '▾' : '▸' }}</span>
+        <span class="dsa-label">{{ t('plan.day.axis', '今日时间轴') }}</span>
+      </span>
+      <span class="dsa-summary">
+        {{ t('plan.day.axis_summary', '{count} 项', { count: blocks.length }) }}
+      </span>
+    </button>
+    <div v-show="expanded" class="dsa-body">
+      <div ref="chartEl" class="dsa-canvas" :style="{ height: `${chartHeight}px` }" />
+    </div>
   </div>
 </template>
 
@@ -18,12 +33,23 @@ const props = defineProps({
 })
 
 const i18n = useI18nStore()
-function t(key, fallback) {
-  return i18n.t(key, fallback)
+function t(key, fallback, params) {
+  return i18n.t(key, fallback, params)
 }
 
 const chartEl = ref(null)
+const expanded = ref(false)
 let chart = null
+
+async function toggleExpanded() {
+  expanded.value = !expanded.value
+  if (!expanded.value) {
+    disposeChart()
+    return
+  }
+  await nextTick()
+  render()
+}
 
 const DAY_SPAN = DAY_VIEW_END - DAY_VIEW_START
 
@@ -178,9 +204,7 @@ function onResize() {
   chart?.resize()
 }
 
-onMounted(async () => {
-  await nextTick()
-  render()
+onMounted(() => {
   window.addEventListener('resize', onResize)
 })
 
@@ -190,8 +214,12 @@ onBeforeUnmount(() => {
 })
 
 watch(
-  () => [blocks.value, chartHeight.value],
+  () => [blocks.value, chartHeight.value, expanded.value],
   async () => {
+    if (!expanded.value) {
+      disposeChart()
+      return
+    }
     await nextTick()
     render()
   },
@@ -201,9 +229,36 @@ watch(
 
 <style scoped>
 .dsa {
-  margin: 0 0 18px;
-  padding: 12px 0 8px;
+  margin: 0 0 14px;
+  padding: 10px 0 6px;
   border-bottom: 1px solid var(--faint);
+}
+
+.dsa-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: .1rem 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.dsa-toggle-main {
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  min-width: 0;
+}
+
+.dsa-chevron {
+  font-size: .7rem;
+  color: var(--muted);
+  width: .7rem;
 }
 
 .dsa-label {
@@ -212,7 +267,17 @@ watch(
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--muted);
-  margin-bottom: 6px;
+}
+
+.dsa-summary {
+  font-family: var(--mono);
+  font-size: .75rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.dsa-body {
+  margin-top: 6px;
 }
 
 .dsa-canvas {
