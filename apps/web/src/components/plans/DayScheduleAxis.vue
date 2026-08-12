@@ -1,48 +1,14 @@
 <template>
   <div v-if="blocks.length" class="dsa">
     <div class="dsa-label">{{ t('plan.day.axis', '今日时间轴') }}</div>
-    <div class="dsa-track" aria-hidden="true">
-      <span
-        v-for="tick in ticks"
-        :key="tick.minutes"
-        class="dsa-tick"
-        :style="{ left: `${tick.left}%` }"
-      >
-        {{ tick.label }}
-      </span>
-      <div class="dsa-rail" />
-      <div
-        v-for="block in blocks"
-        :key="block.id"
-        class="dsa-block"
-        :class="[block.kind, { done: block.done }]"
-        :style="blockStyle(block)"
-        :title="blockTitle(block)"
-      />
-    </div>
-    <div class="dsa-legend">
-      <div
-        v-for="block in blocks"
-        :key="`legend-${block.id}`"
-        class="dsa-legend-row"
-        :class="{ done: block.done }"
-      >
-        <span class="dsa-legend-mark" :class="block.kind" />
-        <span class="dsa-legend-name">{{ block.label }}</span>
-        <span class="dsa-legend-time">{{ block.timeLabel }}</span>
-      </div>
-    </div>
+    <div ref="chartEl" class="dsa-canvas" :style="{ height: `${chartHeight}px` }" />
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
-import {
-  DAY_VIEW_END,
-  DAY_VIEW_START,
-  minutesToPercent,
-  timeToMinutes,
-} from '@plainlist/shared'
+import { DAY_VIEW_END, DAY_VIEW_START, timeToMinutes } from '@plainlist/shared'
+import * as echarts from 'echarts'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18nStore } from '@/shared/i18n/useI18nStore'
 
 const props = defineProps({
@@ -56,24 +22,21 @@ function t(key, fallback) {
   return i18n.t(key, fallback)
 }
 
-function fmtTime(totalMinutes) {
-  const clamped = ((Math.round(totalMinutes) % (24 * 60)) + (24 * 60)) % (24 * 60)
+const chartEl = ref(null)
+let chart = null
+
+const DAY_SPAN = DAY_VIEW_END - DAY_VIEW_START
+
+function fmtMinutes(minutes) {
+  const clamped = ((Math.round(minutes) % (24 * 60)) + (24 * 60)) % (24 * 60)
   const hour = Math.floor(clamped / 60)
   const minute = clamped % 60
   return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
 }
 
-const ticks = computed(() => {
-  const out = []
-  for (let minutes = DAY_VIEW_START; minutes <= DAY_VIEW_END; minutes += 120) {
-    out.push({
-      minutes,
-      label: fmtTime(minutes),
-      left: minutesToPercent(minutes),
-    })
-  }
-  return out
-})
+function fmtTimeFromPlan(totalMinutes) {
+  return fmtMinutes(totalMinutes)
+}
 
 const blocks = computed(() => {
   return props.plans
@@ -86,16 +49,15 @@ const blocks = computed(() => {
       const done = Boolean(props.doneMap?.[plan.id])
       if (duration != null) {
         const endMin = startMin + duration
-        const left = minutesToPercent(startMin)
-        const right = minutesToPercent(endMin)
         return {
           id: plan.id,
           kind: 'bar',
           label: plan.name,
           done,
-          left,
-          width: Math.max(1.5, right - left),
-          timeLabel: `${plan.time}–${fmtTime(endMin)} · ${duration}m`,
+          start: plan.time,
+          end: fmtTimeFromPlan(endMin),
+          startMin,
+          endMin,
         }
       }
       return {
@@ -103,33 +65,144 @@ const blocks = computed(() => {
         kind: 'point',
         label: plan.name,
         done,
-        left: minutesToPercent(startMin),
-        width: 0,
-        timeLabel: plan.time,
+        start: plan.time,
+        end: fmtTimeFromPlan(startMin + 30),
+        startMin,
+        endMin: startMin + 30,
       }
     })
-    .sort((a, b) => a.left - b.left)
+    .sort((a, b) => a.startMin - b.startMin || String(a.id).localeCompare(String(b.id)))
 })
 
-function blockStyle(block) {
-  if (block.kind === 'point') {
-    return { left: `calc(${block.left}% - 4px)` }
-  }
-  return {
-    left: `${block.left}%`,
-    width: `${block.width}%`,
-  }
+const chartHeight = computed(() => Math.max(120, blocks.value.length * 40 + 48))
+
+function disposeChart() {
+  chart?.dispose()
+  chart = null
 }
 
-function blockTitle(block) {
-  return `${block.label} · ${block.timeLabel}`
+function render() {
+  if (!chartEl.value || blocks.value.length === 0) {
+    disposeChart()
+    return
+  }
+
+  if (chart && chart.getDom() !== chartEl.value) {
+    disposeChart()
+  }
+  if (!chart) {
+    chart = echarts.init(chartEl.value, null, { renderer: 'svg' })
+  }
+
+  const styles = getComputedStyle(document.documentElement)
+  const muted = styles.getPropertyValue('--muted').trim() || '#888888'
+
+  const labels = blocks.value.map((block) => block.label)
+  const offsets = blocks.value.map((block) => Math.max(0, block.startMin - DAY_VIEW_START))
+  const durations = blocks.value.map((block) =>
+    Math.max(8, block.endMin - block.startMin),
+  )
+
+  chart.setOption({
+    backgroundColor: 'transparent',
+    animation: true,
+    animationDuration: 900,
+    animationEasing: 'cubicOut',
+    animationDelay: (idx) => idx * 140,
+    grid: { left: 4, right: 8, top: 4, bottom: 4, containLabel: true },
+    xAxis: {
+      type: 'value',
+      min: 0,
+      max: DAY_SPAN,
+      axisLabel: {
+        color: muted,
+        fontSize: 10,
+        formatter: (value) => fmtMinutes(DAY_VIEW_START + value),
+      },
+      splitLine: { lineStyle: { color: 'rgba(0,0,0,0.05)' } },
+    },
+    yAxis: {
+      type: 'category',
+      data: labels,
+      inverse: true,
+      axisLabel: { color: muted, fontSize: 11, width: 88, overflow: 'truncate' },
+      axisTick: { show: false },
+      axisLine: { show: false },
+    },
+    tooltip: {
+      trigger: 'item',
+      formatter: (params) => {
+        const block = blocks.value[params.dataIndex]
+        if (!block) return ''
+        if (block.kind === 'point') {
+          return `${block.label}<br/>${block.start}`
+        }
+        return `${block.label}<br/>${block.start} – ${block.end}`
+      },
+    },
+    series: [
+      {
+        name: 'offset',
+        type: 'bar',
+        stack: 'day',
+        silent: true,
+        itemStyle: { color: 'transparent' },
+        data: offsets,
+        animation: false,
+      },
+      {
+        name: 'task',
+        type: 'bar',
+        stack: 'day',
+        barMinHeight: 6,
+        data: durations.map((value, index) => {
+          const block = blocks.value[index]
+          const base = block?.kind === 'point' ? '#1d3557' : '#2d6a4f'
+          return {
+            value,
+            itemStyle: {
+              color: base,
+              opacity: block?.done ? 0.35 : 0.92,
+              borderRadius: block?.kind === 'point' ? 999 : 6,
+            },
+          }
+        }),
+        animationDelay: (idx) => idx * 140,
+      },
+    ],
+  }, true)
+  chart.resize()
 }
+
+function onResize() {
+  chart?.resize()
+}
+
+onMounted(async () => {
+  await nextTick()
+  render()
+  window.addEventListener('resize', onResize)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', onResize)
+  disposeChart()
+})
+
+watch(
+  () => [blocks.value, chartHeight.value],
+  async () => {
+    await nextTick()
+    render()
+  },
+  { deep: true },
+)
 </script>
 
 <style scoped>
 .dsa {
   margin: 0 0 18px;
-  padding: 12px 0 4px;
+  padding: 12px 0 8px;
   border-bottom: 1px solid var(--faint);
 }
 
@@ -139,113 +212,11 @@ function blockTitle(block) {
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--muted);
-  margin-bottom: 10px;
+  margin-bottom: 6px;
 }
 
-.dsa-track {
-  position: relative;
-  height: 36px;
-  margin: 0 0 10px;
-}
-
-.dsa-rail {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 22px;
-  height: 1px;
-  background: var(--faint);
-}
-
-.dsa-tick {
-  position: absolute;
-  top: 0;
-  transform: translateX(-50%);
-  font-family: var(--mono);
-  font-size: 9px;
-  letter-spacing: 0.04em;
-  color: var(--muted);
-  white-space: nowrap;
-}
-
-.dsa-block {
-  position: absolute;
-  top: 18px;
-  box-sizing: border-box;
-}
-
-.dsa-block.bar {
-  height: 8px;
-  border-radius: 2px;
-  background: var(--dark);
-  opacity: 0.85;
-}
-
-.dsa-block.point {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--dark);
-  border: 1.5px solid var(--dark);
-}
-
-.dsa-block.done {
-  opacity: 0.35;
-}
-
-.dsa-block.point.done {
-  background: transparent;
-  opacity: 0.55;
-}
-
-.dsa-legend {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  max-height: 120px;
-  overflow: auto;
-}
-
-.dsa-legend-row {
-  display: grid;
-  grid-template-columns: 12px minmax(0, 1fr) auto;
-  gap: 8px;
-  align-items: center;
-  font-size: 11px;
-  color: var(--dark);
-}
-
-.dsa-legend-row.done {
-  opacity: 0.45;
-}
-
-.dsa-legend-mark {
-  width: 8px;
-  height: 8px;
-  background: var(--dark);
-  justify-self: center;
-}
-
-.dsa-legend-mark.bar {
-  border-radius: 1px;
-  width: 10px;
-  height: 4px;
-}
-
-.dsa-legend-mark.point {
-  border-radius: 50%;
-}
-
-.dsa-legend-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.dsa-legend-time {
-  font-family: var(--mono);
-  font-size: 10px;
-  color: var(--muted);
-  white-space: nowrap;
+.dsa-canvas {
+  width: 100%;
+  min-height: 120px;
 }
 </style>
