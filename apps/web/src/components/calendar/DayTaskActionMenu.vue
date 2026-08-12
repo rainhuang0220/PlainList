@@ -74,7 +74,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18nStore } from '@/shared/i18n/useI18nStore'
 
 const PRESETS = [15, 30, 60, 120]
@@ -96,9 +96,50 @@ const i18n = useI18nStore()
 const panel = ref('actions')
 const minutesInput = ref('')
 const minutesInputEl = ref(null)
+/** Bump when visualViewport changes so keyboard open still keeps the panel visible. */
+const viewportTick = ref(0)
+let viewportBound = false
 
 function t(key, fallback) {
   return i18n.t(key, fallback)
+}
+
+function isCompactPointer() {
+  if (typeof window === 'undefined') return false
+  return window.matchMedia('(max-width: 720px), (pointer: coarse)').matches
+}
+
+function viewportBox() {
+  const vv = typeof window !== 'undefined' ? window.visualViewport : null
+  return {
+    width: vv?.width ?? window?.innerWidth ?? 360,
+    height: vv?.height ?? window?.innerHeight ?? 640,
+    offsetTop: vv?.offsetTop ?? 0,
+    offsetLeft: vv?.offsetLeft ?? 0,
+  }
+}
+
+function bumpViewport() {
+  viewportTick.value += 1
+}
+
+function bindViewport() {
+  if (viewportBound || typeof window === 'undefined') return
+  const vv = window.visualViewport
+  if (!vv) return
+  vv.addEventListener('resize', bumpViewport)
+  vv.addEventListener('scroll', bumpViewport)
+  viewportBound = true
+}
+
+function unbindViewport() {
+  if (!viewportBound || typeof window === 'undefined') return
+  const vv = window.visualViewport
+  if (vv) {
+    vv.removeEventListener('resize', bumpViewport)
+    vv.removeEventListener('scroll', bumpViewport)
+  }
+  viewportBound = false
 }
 
 const toggleLabel = computed(() =>
@@ -113,13 +154,24 @@ const minutesPlaceholder = computed(() => {
 })
 
 const menuStyle = computed(() => {
-  const width = Math.min(MENU_WIDTH, typeof window !== 'undefined' ? window.innerWidth - 24 : MENU_WIDTH)
-  const left = typeof window !== 'undefined'
-    ? Math.min(Math.max(12, props.x), window.innerWidth - width - 12)
-    : props.x
-  const top = typeof window !== 'undefined'
-    ? Math.min(Math.max(12, props.y), window.innerHeight - 200)
-    : props.y
+  void viewportTick.value
+  const box = viewportBox()
+  const width = Math.min(MENU_WIDTH, box.width - 24)
+
+  // Minutes editor on phone: pin top-right of the visible viewport so the
+  // soft keyboard does not cover the input that opened from a low long-press.
+  if (panel.value === 'minutes' && isCompactPointer()) {
+    const left = box.offsetLeft + Math.max(12, box.width - width - 12)
+    const top = box.offsetTop + Math.max(12, Math.min(24, box.height * 0.04))
+    return {
+      left: `${left}px`,
+      top: `${top}px`,
+      width: `${width}px`,
+    }
+  }
+
+  const left = Math.min(Math.max(box.offsetLeft + 12, props.x), box.offsetLeft + box.width - width - 12)
+  const top = Math.min(Math.max(box.offsetTop + 12, props.y), box.offsetTop + box.height - 200)
   return {
     left: `${left}px`,
     top: `${top}px`,
@@ -130,9 +182,11 @@ const menuStyle = computed(() => {
 function resetPanel() {
   panel.value = 'actions'
   minutesInput.value = props.defaultMinutes != null ? String(props.defaultMinutes) : ''
+  unbindViewport()
 }
 
 function close() {
+  unbindViewport()
   emit('close')
 }
 
@@ -143,6 +197,10 @@ function emitToggle() {
 function openMinutesPanel() {
   panel.value = 'minutes'
   minutesInput.value = props.defaultMinutes != null ? String(props.defaultMinutes) : ''
+  if (isCompactPointer()) {
+    bindViewport()
+    bumpViewport()
+  }
   nextTick(() => minutesInputEl.value?.focus?.())
 }
 
@@ -156,6 +214,7 @@ watch(
   () => props.open,
   (open) => {
     if (open) resetPanel()
+    else unbindViewport()
   },
 )
 
@@ -167,6 +226,14 @@ watch(
     }
   },
 )
+
+watch(panel, (value) => {
+  if (value !== 'minutes') unbindViewport()
+})
+
+onBeforeUnmount(() => {
+  unbindViewport()
+})
 </script>
 
 <style scoped>

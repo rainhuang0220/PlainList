@@ -25,7 +25,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 STAGE_DIR="${SCRIPT_DIR}/../.electron-stage"
 PAGE_DIR="${SCRIPT_DIR}/download-page"
 DMG_DIR="${STAGE_DIR}/release"
-VERSION="2.0.17"
+VERSION="2.0.18"
 
 if [[ -z "${SSHPASS:-}" ]]; then
   export SSHPASS="$PASSWORD"
@@ -42,7 +42,7 @@ sshpass -e ssh "${SSHPASS_OPTS[@]}" "$SERVER" \
 # 2. Generate SHA256SUMS locally
 echo "[deploy] generating SHA256SUMS..."
 SUMS_FILE="${STAGE_DIR}/SHA256SUMS.txt"
-(cd "${DMG_DIR}" && shasum -a 256 PlainList-2.0.17-*.dmg) > "${SUMS_FILE}"
+(cd "${DMG_DIR}" && shasum -a 256 PlainList-2.0.18-*.dmg) > "${SUMS_FILE}"
 cat "${SUMS_FILE}"
 
 # 3. Upload DMG files via scp directly to the target dir
