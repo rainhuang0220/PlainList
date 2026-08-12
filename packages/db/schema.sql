@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS plans (
   type ENUM('habit', 'todo') NOT NULL DEFAULT 'habit',
   name VARCHAR(200) NOT NULL,
   description TEXT NULL,
+  duration_minutes INT NULL,
   time CHAR(5) NOT NULL DEFAULT '09:00',
   scheduled_date DATE NULL,
   sort_order INT NOT NULL DEFAULT 0,
@@ -32,6 +33,7 @@ CREATE TABLE IF NOT EXISTS checks (
   plan_id BIGINT UNSIGNED NOT NULL,
   check_date DATE NOT NULL,
   done TINYINT(1) NOT NULL DEFAULT 0,
+  actual_minutes INT NULL,
   UNIQUE KEY uk_plan_date (plan_id, check_date),
   INDEX idx_checks_date (check_date),
   CONSTRAINT fk_checks_plan FOREIGN KEY (plan_id) REFERENCES plans(id) ON DELETE CASCADE
