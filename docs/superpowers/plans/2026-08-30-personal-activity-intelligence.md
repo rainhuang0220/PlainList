@@ -29,6 +29,7 @@
 
 - 基线：API 55、Web 50、Shared 39，共 144 tests passed。
 - 文档完成后：`git diff --check`、Markdown link/path 检查、`npm run typecheck`、`npm run lint`、`npm test`。
+- 当前全仓 lint 基线并非 clean：API 1 个 error、Web 2 个 errors，均位于本分支未修改的源码；Phase 0 记录但不夹带修复。
 
 ### Exit Gate
 
