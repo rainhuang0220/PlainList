@@ -2,8 +2,8 @@
 
 **目标：** 在不破坏日记、计划、打卡和现有用户数据的前提下，交付 Activity Facts → Daily Digest → Weekly Intelligence，并通过官方 remote MCP 支持用户显式保存当前 ChatGPT 对话及紧凑双向检索。
 
-**设计依据：** [2026-08-30-personal-activity-intelligence-design.md](../specs/2026-08-30-personal-activity-intelligence-design.md)  
-**官方能力依据：** [openai-capability-research.md](../../activity-intelligence/openai-capability-research.md)
+- **设计依据：** [2026-08-30-personal-activity-intelligence-design.md](../specs/2026-08-30-personal-activity-intelligence-design.md)
+- **官方能力依据：** [openai-capability-research.md](../../activity-intelligence/openai-capability-research.md)
 
 ## 全局约束
 
@@ -567,4 +567,3 @@ npm test
 - 新 Week panel 与旧 summary 并行一个发布周期；失败时切回旧 view，不删除新表。
 - MCP endpoint 与 OAuth metadata 在 staging 完成 host evaluation 后才公开。
 - 回滚应用版本时不 drop 新表；停止写入即可。数据清理由后续显式、可审查 migration 完成，绝不紧急 destructive rollback。
-

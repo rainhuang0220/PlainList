@@ -1,9 +1,9 @@
 # PlainList Personal Activity Intelligence — Phase 0 设计规格与接入 ADR
 
-**日期：** 2026-08-30  
-**状态：** Phase 0 设计完成，待按计划实现  
-**决策范围：** 仓库审计、OpenAI / ChatGPT 能力边界、数据接入、领域模型、数据模型、隐私与 token 策略、渐进交付  
-**非目标：** 本阶段不改生产功能、不执行 migration、不导入用户数据、不重做现有 Dashboard
+- **日期：** 2026-08-30
+- **状态：** Phase 0 设计完成，待按计划实现
+- **决策范围：** 仓库审计、OpenAI / ChatGPT 能力边界、数据接入、领域模型、数据模型、隐私与 token 策略、渐进交付
+- **非目标：** 本阶段不改生产功能、不执行 migration、不导入用户数据、不重做现有 Dashboard
 
 相关文档：
 
