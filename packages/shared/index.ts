@@ -6,4 +6,6 @@ export * from './duration';
 export * from './plans/visibility';
 export * from './plans/sort';
 export * from './plans/dedupe';
+export * from './plans/completionPct';
+export * from './plans/makeupTodo';
 export * from './intake';

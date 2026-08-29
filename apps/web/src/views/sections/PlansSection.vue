@@ -192,8 +192,16 @@
         ></textarea>
         <div class="review-save-row">
           <span class="review-manual-hint">{{ t('review.hint', '手写记录，自动保存') }}</span>
-          <span class="review-save-hint" :class="{ saved: reviewSaved }">
-            {{ reviewSaved ? t('review.saved', '已保存') : '' }}
+          <span
+            class="review-save-hint"
+            :class="{
+              saved: saveStatus === 'saved',
+              saving: saveStatus === 'saving',
+              error: saveStatus === 'error',
+            }"
+            @click="onSaveHintClick"
+          >
+            {{ saveStatusLabel }}
           </span>
         </div>
       </div>
@@ -204,11 +212,13 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import * as echarts from 'echarts'
-import { isPlanVisibleOnDate, sortPlansByTime, dedupeHabitPlans } from '@plainlist/shared'
+import { isPlanVisibleOnDate, sortPlansByTime, dedupeHabitPlans, toDateKey } from '@plainlist/shared'
 import { usePlansStore } from '@/features/plans/model/usePlansStore'
 import { useChecksStore } from '@/features/checks/model/useChecksStore'
 import { useAuthStore } from '@/features/auth/model/useAuthStore'
 import { useReviewsStore } from '@/features/reviews/model/useReviewsStore'
+import { createDailyReviewSession } from '@/features/reviews/model/dailyReviewSession'
+import { getAppDayClock } from '@/shared/clock/localDayClock'
 import { useI18nStore } from '@/shared/i18n/useI18nStore'
 import DayScheduleAxis from '@/components/plans/DayScheduleAxis.vue'
 import DurationMinutesField from '@/components/plans/DurationMinutesField.vue'
@@ -224,9 +234,11 @@ function t(key, fallback, params) { return i18n.t(key, fallback, params) }
 const MONTHS_DEFAULT = ['January','February','March','April','May','June','July','August','September','October','November','December']
 const secondaryView = ref('overview')
 
+const currentDate = ref(toDateKey(new Date()))
+const editingDate = ref(currentDate.value)
+
 function todayKey() {
-  const date = new Date()
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+  return currentDate.value
 }
 
 const todayPlans = computed(() =>
@@ -243,10 +255,6 @@ const todayDoneMap = computed(() => {
   }
   return map
 })
-
-function dateKey(year, month, day) {
-  return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-}
 
 const monthNames = computed(() => i18n.L('MONTHS', MONTHS_DEFAULT))
 
@@ -472,39 +480,95 @@ watch(secondaryView, (view) => {
   }
   if (view === 'review') {
     loadReview()
+  } else {
+    void reviewSession.flush()
   }
 })
 
 // ─── Daily review ─────────────────────────────────────────────────────────────
 const reviewText = ref('')
-const reviewSaved = ref(false)
-let reviewDebounce = null
-let reviewSavedTimer = null
-
-const reviewDateLabel = computed(() => {
-  const d = new Date()
-  return i18n.locale === 'zh-CN'
-    ? `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`
-    : `${monthNames.value[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`
+const saveStatus = ref('idle')
+let savedHintTimer = null
+const clock = getAppDayClock()
+const reviewSession = createDailyReviewSession({
+  now: () => new Date(),
+  persist: (dateKey, content) => reviews.persist(dateKey, content),
+  load: async (dateKey) => {
+    await reviews.fetchRange(dateKey, dateKey)
+    return reviews.getReview(dateKey)
+  },
 })
 
+const saveStatusLabel = computed(() => {
+  if (saveStatus.value === 'saving') return t('review.saving', '保存中…')
+  if (saveStatus.value === 'saved') return t('review.saved', '已保存')
+  if (saveStatus.value === 'error') return t('review.save_failed', '保存失败，重试')
+  return ''
+})
+
+const reviewDateLabel = computed(() => {
+  const [year, month, day] = editingDate.value.split('-').map(Number)
+  return i18n.locale === 'zh-CN'
+    ? `${year}年${month}月${day}日`
+    : `${monthNames.value[month - 1]} ${day}, ${year}`
+})
+
+function syncReviewView() {
+  currentDate.value = reviewSession.getCurrentDate()
+  editingDate.value = reviewSession.getEditingDate()
+  reviewText.value = reviewSession.getText()
+  saveStatus.value = reviewSession.getStatus()
+}
+
 function loadReview() {
-  reviewText.value = reviews.getReview(todayKey())
+  if (reviewSession.isDirty()) return
+  reviewText.value = reviews.getReview(editingDate.value)
 }
 
 function onReviewInput() {
-  reviewSaved.value = false
-  clearTimeout(reviewDebounce)
-  reviewDebounce = setTimeout(async () => {
-    await reviews.upsert(todayKey(), reviewText.value)
-    reviewSaved.value = true
-    clearTimeout(reviewSavedTimer)
-    reviewSavedTimer = setTimeout(() => { reviewSaved.value = false }, 2000)
-  }, 800)
+  reviewSession.noteInput(reviewText.value)
+  saveStatus.value = reviewSession.getStatus()
 }
 
+function onSaveHintClick() {
+  if (saveStatus.value === 'error') {
+    void reviewSession.flush()
+  }
+}
+
+function onBackground() {
+  void reviewSession.flush()
+}
+
+async function onDayChanged() {
+  await reviewSession.applyNow()
+  syncReviewView()
+}
+
+let unsubClock = () => {}
+let unsubSession = () => {}
+let unsubStatus = () => {}
+
 onMounted(() => {
-  reviews.fetchRange(todayKey(), todayKey())
+  clock.start()
+  unsubClock = clock.subscribe(() => { void onDayChanged() })
+  unsubSession = reviewSession.onChange(syncReviewView)
+  unsubStatus = reviewSession.onStatus((dateKey, status) => {
+    if (dateKey === reviewSession.getEditingDate()) {
+      saveStatus.value = status
+      if (status === 'saved') {
+        clearTimeout(savedHintTimer)
+        savedHintTimer = setTimeout(() => {
+          if (saveStatus.value === 'saved') saveStatus.value = 'idle'
+        }, 2000)
+      }
+    }
+  })
+  window.addEventListener('plainlist:background', onBackground)
+  reviews.fetchRange(todayKey(), todayKey()).then(() => {
+    reviewSession.attach(todayKey(), reviews.getReview(todayKey()))
+    syncReviewView()
+  })
   nextTick(() => {
     renderChart()
     resizeChart()
@@ -514,9 +578,13 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', resizeChart)
+  window.removeEventListener('plainlist:background', onBackground)
+  unsubClock()
+  unsubSession()
+  unsubStatus()
   chartInst?.dispose()
   chartInst = null
-  clearTimeout(reviewDebounce)
-  clearTimeout(reviewSavedTimer)
+  clearTimeout(savedHintTimer)
+  void reviewSession.flush().finally(() => reviewSession.dispose())
 })
 </script>

@@ -237,6 +237,32 @@ export interface UserProfileAnalyzeResponse {
   model?: string | null;
 }
 
+export const WEEKLY_SUMMARY_PROMPT_VERSION = 'weekly-summary-v1';
+
+export interface WeeklySummaryContent {
+  overall: string;
+  summary: string;
+  comparison: string;
+  positive: string;
+  concerns: string;
+  nextFocus: string[];
+}
+
+export type WeeklySummaryStatus = 'ready' | 'missing' | 'unavailable';
+
+export interface WeeklySummaryResponse {
+  status: WeeklySummaryStatus;
+  weekStart: string;
+  weekEnd: string;
+  promptVersion: string;
+  sourceHash?: string;
+  model?: string | null;
+  generatedAt?: string;
+  cached?: boolean;
+  reason?: string;
+  content?: WeeklySummaryContent;
+}
+
 export interface InstalledPlugin {
   id: string;
   enabled: boolean;

@@ -22,7 +22,7 @@ PlainList 是一个前后端分离的单仓库 TypeScript 项目。围绕「时�
 
 | 平台 | 下载 |
 |------|------|
-| **Android APK（推荐）** | [PlainList-2.0.13.apk](http://175.24.134.228/downloads/PlainList-2.0.13.apk) · [GitHub Release](https://github.com/rainhuang0220/PlainList/releases/tag/v2.0.13) |
+| **Android APK（推荐）** | [PlainList-2.1.0.apk](http://175.24.134.228/downloads/PlainList-2.1.0.apk) · [GitHub Release](https://github.com/rainhuang0220/PlainList/releases/tag/v2.1.0) |
 
 Android 为侧载 APK：下载后需在系统设置中允许「未知来源」或「安装未知应用」，再打开安装包。Release 签名 keystore 须离线备份，详见 [apps/web/android-signing/README.md](apps/web/android-signing/README.md)。
 
@@ -37,8 +37,8 @@ curl -fsSL http://175.24.134.228/downloads/install.sh | bash
 
 | 架构 | 下载 |
 |------|------|
-| Apple Silicon (arm64) | [PlainList-2.0.0-arm64.dmg](http://175.24.134.228/downloads/PlainList-2.0.0-arm64.dmg) · [GitHub](https://github.com/rainhuang0220/PlainList/releases) |
-| Intel (x64) | [PlainList-2.0.0-x64.dmg](http://175.24.134.228/downloads/PlainList-2.0.0-x64.dmg) · [GitHub](https://github.com/rainhuang0220/PlainList/releases) |
+| Apple Silicon (arm64) | [PlainList-2.1.0-arm64.dmg](http://175.24.134.228/downloads/PlainList-2.1.0-arm64.dmg) · [GitHub](https://github.com/rainhuang0220/PlainList/releases/tag/v2.1.0) |
+| Intel (x64) | [PlainList-2.1.0-x64.dmg](http://175.24.134.228/downloads/PlainList-2.1.0-x64.dmg) · [GitHub](https://github.com/rainhuang0220/PlainList/releases/tag/v2.1.0) |
 
 macOS 当前为 ad-hoc 签名，首次打开若提示「无法验证」，在「隐私与安全性」点一次「仍要打开」即可。
 

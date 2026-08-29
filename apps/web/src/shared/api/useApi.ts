@@ -21,7 +21,11 @@ const DEFAULT_TIMEOUT_MS = 20_000;
 const LONG_TIMEOUT_MS = 180_000;
 
 function timeoutForPath(path: string): number {
-  if (path.startsWith('/ai-intake') || path.startsWith('/user-profile/analyze')) {
+  if (
+    path.startsWith('/ai-intake')
+    || path.startsWith('/user-profile/analyze')
+    || path.startsWith('/reviews/weekly-summary')
+  ) {
     return LONG_TIMEOUT_MS;
   }
   return DEFAULT_TIMEOUT_MS;

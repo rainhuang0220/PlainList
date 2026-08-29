@@ -1,5 +1,5 @@
 import type { AuthenticatedUser } from '@plainlist/shared';
-import { toDateKey } from '@plainlist/shared';
+import { isReviewWriteAllowed, toDateKey } from '@plainlist/shared';
 import { pool } from '../../db/pool';
 import { z } from 'zod';
 
@@ -48,9 +48,10 @@ export async function upsertReview(user: AuthenticatedUser, params: unknown, pay
   const { date } = reviewDateSchema.parse(params);
   const { content } = reviewBodySchema.parse(payload);
 
-  const todayKey = toDateKey(new Date());
-  if (date !== todayKey) {
-    throw serviceError(403, 'only today\'s review can be edited');
+  // Today + yesterday: yesterday is a technical grace for in-flight
+  // midnight flushes, not a historical-edit API.
+  if (!isReviewWriteAllowed(date, new Date())) {
+    throw serviceError(403, 'review date is outside the save window');
   }
 
   await pool.query(

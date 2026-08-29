@@ -5,104 +5,162 @@
       <span class="week-range">{{ rangeLabel }}</span>
     </div>
 
-    <div class="week-days-row">
-      <div
-        v-for="(day, index) in weekDays"
-        :key="index"
-        class="week-day-card"
-        :class="weekDayClasses(day)"
-      >
-        <div class="wdc-label">{{ day.label }}</div>
-        <div class="wdc-date-num">{{ pad(day.date.getDate()) }}</div>
-        <div class="wdc-pct">{{ day.pct !== null ? `${day.pct}%` : '—' }}</div>
-        <div class="wdc-bar-track">
-          <div class="wdc-bar-fill" :style="{ width: `${day.pct || 0}%` }" />
-        </div>
-        <div class="wdc-tasks">
-          {{ day.pct !== null
-            ? `${Math.round(totalPlans * (day.pct / 100))}/${totalPlans}`
-            : totalPlans
-              ? t('week.upcoming', 'upcoming')
-              : t('week.no_data', 'no plans') }}
-        </div>
-      </div>
-    </div>
-
-    <div class="week-chart-switch">
+    <div class="week-view-switch">
       <button
-        v-for="tab in chartTabs"
-        :key="tab.key"
-        class="week-chart-switch-btn"
-        :class="{ active: activeChart === tab.key }"
-        @click="activeChart = tab.key"
+        class="week-view-switch-btn"
+        :class="{ active: weekView === 'ai' }"
+        type="button"
+        @click="weekView = 'ai'"
       >
-        {{ tab.label }}
+        {{ t('week.view.ai', 'AI 总结') }}
+      </button>
+      <button
+        class="week-view-switch-btn"
+        :class="{ active: weekView === 'data' }"
+        type="button"
+        @click="weekView = 'data'"
+      >
+        {{ t('week.view.data', '数据详情') }}
       </button>
     </div>
 
-    <div class="charts-row">
-      <div class="chart-card" :class="{ active: activeChart === 'radar' }">
-        <div class="chart-card-label">{{ t('week.chart.radar', 'Habit balance') }}</div>
-        <div ref="radarEl" class="chart chart-radar" />
+    <p v-if="aiError" class="week-ai-banner">{{ aiError }}</p>
+
+    <div v-show="weekView === 'ai'" class="week-ai-panel">
+      <div class="week-ai-kicker">{{ t('week.summary.title', '本周总结') }}</div>
+      <div v-if="aiStatus === 'loading'" class="week-ai-loading">
+        {{ t('week.summary.loading', '正在整理本周观察…') }}
       </div>
-      <div class="chart-card" :class="{ active: activeChart === 'bar' }">
-        <div class="chart-card-label">{{ t('week.chart.bar', 'Daily completion') }}</div>
-        <div ref="barEl" class="chart chart-bar" />
-      </div>
-      <div class="chart-card" :class="{ active: activeChart === 'line' }">
-        <div class="chart-card-label">{{ t('week.chart.line', '28-day momentum') }}</div>
-        <div ref="lineEl" class="chart chart-line" />
-      </div>
+      <template v-else-if="aiSummary">
+        <section class="week-ai-block">
+          <h3>{{ t('week.summary.overall', '总体状态') }}</h3>
+          <p>{{ aiSummary.overall }}</p>
+        </section>
+        <section class="week-ai-block">
+          <h3>{{ t('week.summary.what', '本周发生了什么') }}</h3>
+          <p>{{ aiSummary.summary }}</p>
+        </section>
+        <section class="week-ai-block">
+          <h3>{{ t('week.summary.comparison', '与过去相比') }}</h3>
+          <p>{{ aiSummary.comparison }}</p>
+        </section>
+        <section class="week-ai-block">
+          <h3>{{ t('week.summary.positive', '值得肯定') }}</h3>
+          <p>{{ aiSummary.positive }}</p>
+        </section>
+        <section class="week-ai-block">
+          <h3>{{ t('week.summary.concerns', '值得注意') }}</h3>
+          <p>{{ aiSummary.concerns }}</p>
+        </section>
+        <section class="week-ai-block">
+          <h3>{{ t('week.summary.next', '下周关注') }}</h3>
+          <ul>
+            <li v-for="item in aiSummary.nextFocus" :key="item">{{ item }}</li>
+          </ul>
+        </section>
+      </template>
     </div>
 
-    <div class="week-insight">
-      <div class="insight-item">
-        <div class="insight-val">{{ avg }}%</div>
-        <div class="insight-label">{{ t('week.insight.avg', 'Avg Completion') }}</div>
-        <div class="insight-delta up">{{ t('week.this_week', 'this week') }}</div>
+    <div v-show="weekView === 'data'" class="week-data-panel">
+      <div class="week-days-row">
+        <div
+          v-for="(day, index) in weekDays"
+          :key="index"
+          class="week-day-card"
+          :class="weekDayClasses(day)"
+        >
+          <div class="wdc-label">{{ day.label }}</div>
+          <div class="wdc-date-num">{{ pad(day.date.getDate()) }}</div>
+          <div class="wdc-pct">{{ day.pct !== null ? `${day.pct}%` : '—' }}</div>
+          <div class="wdc-bar-track">
+            <div class="wdc-bar-fill" :style="{ width: `${day.pct || 0}%` }" />
+          </div>
+          <div class="wdc-tasks">
+            {{ day.pct !== null
+              ? `${day.done}/${day.total}`
+              : day.isFuture
+                ? t('week.upcoming', 'upcoming')
+                : t('week.no_data', 'no plans') }}
+          </div>
+        </div>
       </div>
-      <div class="insight-item">
-        <div class="insight-val">{{ activeDays }}</div>
-        <div class="insight-label">{{ t('week.insight.active', 'Active Days') }}</div>
-        <div class="insight-delta">{{ t('week.tracked', '{count}/7 tracked', { count: activeDays }) }}</div>
-      </div>
-      <div class="insight-item">
-        <div class="insight-val">{{ bestDay || '—' }}</div>
-        <div class="insight-label">{{ t('week.insight.best_day', 'Best Day') }}</div>
-        <div class="insight-delta up">{{ t('week.peak', 'peak: {value}%', { value: maxPct }) }}</div>
-      </div>
-      <div class="insight-item">
-        <div class="insight-val">{{ weakSlot.label }}</div>
-        <div class="insight-label">{{ t('week.insight.weak_slot', 'Weakest Slot') }}</div>
-        <div class="insight-delta">{{ weakSlot.detail }}</div>
-      </div>
-    </div>
 
-    <div class="week-diagnostics">
-      <div class="diagnostic-card">
-        <div class="diagnostic-label">{{ t('week.diagnostic.debt', 'Task debt') }}</div>
-        <div class="diagnostic-value">{{ debtPlan.name }}</div>
-        <div class="diagnostic-copy">{{ debtPlan.detail }}</div>
+      <div class="week-chart-switch">
+        <button
+          v-for="tab in chartTabs"
+          :key="tab.key"
+          class="week-chart-switch-btn"
+          :class="{ active: activeChart === tab.key }"
+          @click="activeChart = tab.key"
+        >
+          {{ tab.label }}
+        </button>
       </div>
-      <div class="diagnostic-card">
-        <div class="diagnostic-label">{{ t('week.diagnostic.recovery', 'Recovery') }}</div>
-        <div class="diagnostic-value">{{ recoveryLabel }}</div>
-        <div class="diagnostic-copy">{{ recoveryCopy }}</div>
-      </div>
-      <div class="diagnostic-card">
-        <div class="diagnostic-label">{{ t('week.diagnostic.structure', 'Structure') }}</div>
-        <div class="diagnostic-value">{{ structureLabel }}</div>
-        <div class="diagnostic-copy">{{ structureCopy }}</div>
-      </div>
-    </div>
 
-    <DurationHoursPanel
-      scope="week"
-      :scope-key="durationScopeKey"
-      :from="durationFrom"
-      :to="durationTo"
-    />
-    <HabitCheckCountsPanel :from="durationFrom" :to="durationTo" />
+      <div class="charts-row">
+        <div class="chart-card" :class="{ active: activeChart === 'radar' }">
+          <div class="chart-card-label">{{ t('week.chart.radar', 'Habit balance') }}</div>
+          <div ref="radarEl" class="chart chart-radar" />
+        </div>
+        <div class="chart-card" :class="{ active: activeChart === 'bar' }">
+          <div class="chart-card-label">{{ t('week.chart.bar', 'Daily completion') }}</div>
+          <div ref="barEl" class="chart chart-bar" />
+        </div>
+        <div class="chart-card" :class="{ active: activeChart === 'line' }">
+          <div class="chart-card-label">{{ t('week.chart.line', '28-day momentum') }}</div>
+          <div ref="lineEl" class="chart chart-line" />
+        </div>
+      </div>
+
+      <div class="week-insight">
+        <div class="insight-item">
+          <div class="insight-val">{{ avg }}%</div>
+          <div class="insight-label">{{ t('week.insight.avg', 'Avg Completion') }}</div>
+          <div class="insight-delta up">{{ t('week.this_week', 'this week') }}</div>
+        </div>
+        <div class="insight-item">
+          <div class="insight-val">{{ activeDays }}</div>
+          <div class="insight-label">{{ t('week.insight.active', 'Active Days') }}</div>
+          <div class="insight-delta">{{ t('week.tracked', '{count}/7 tracked', { count: activeDays }) }}</div>
+        </div>
+        <div class="insight-item">
+          <div class="insight-val">{{ bestDay || '—' }}</div>
+          <div class="insight-label">{{ t('week.insight.best_day', 'Best Day') }}</div>
+          <div class="insight-delta up">{{ t('week.peak', 'peak: {value}%', { value: maxPct }) }}</div>
+        </div>
+        <div class="insight-item">
+          <div class="insight-val">{{ weakSlot.label }}</div>
+          <div class="insight-label">{{ t('week.insight.weak_slot', 'Weakest Slot') }}</div>
+          <div class="insight-delta">{{ weakSlot.detail }}</div>
+        </div>
+      </div>
+
+      <div class="week-diagnostics">
+        <div class="diagnostic-card">
+          <div class="diagnostic-label">{{ t('week.diagnostic.debt', 'Task debt') }}</div>
+          <div class="diagnostic-value">{{ debtPlan.name }}</div>
+          <div class="diagnostic-copy">{{ debtPlan.detail }}</div>
+        </div>
+        <div class="diagnostic-card">
+          <div class="diagnostic-label">{{ t('week.diagnostic.recovery', 'Recovery') }}</div>
+          <div class="diagnostic-value">{{ recoveryLabel }}</div>
+          <div class="diagnostic-copy">{{ recoveryCopy }}</div>
+        </div>
+        <div class="diagnostic-card">
+          <div class="diagnostic-label">{{ t('week.diagnostic.structure', 'Structure') }}</div>
+          <div class="diagnostic-value">{{ structureLabel }}</div>
+          <div class="diagnostic-copy">{{ structureCopy }}</div>
+        </div>
+      </div>
+
+      <DurationHoursPanel
+        scope="week"
+        :scope-key="durationScopeKey"
+        :from="durationFrom"
+        :to="durationTo"
+      />
+      <HabitCheckCountsPanel :from="durationFrom" :to="durationTo" />
+    </div>
   </section>
 </template>
 
@@ -111,16 +169,23 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import * as echarts from 'echarts'
 import DurationHoursPanel from '@/components/stats/DurationHoursPanel.vue'
 import HabitCheckCountsPanel from '@/components/stats/HabitCheckCountsPanel.vue'
+import { completionPctForDate } from '@plainlist/shared'
 import { isoWeekScopeKey, weekDateRange } from '@/features/duration-stats/scopeKeys'
 import { usePlansStore } from '@/features/plans/model/usePlansStore'
 import { useChecksStore } from '@/features/checks/model/useChecksStore'
+import { useReviewsStore } from '@/features/reviews/model/useReviewsStore'
 import { useMarketplaceStore } from '@/features/plugins/model/useMarketplaceStore'
 import { useI18nStore } from '@/shared/i18n/useI18nStore'
 
 const plansStore = usePlansStore()
 const checksStore = useChecksStore()
+const reviewsStore = useReviewsStore()
 const pluginsStore = useMarketplaceStore()
 const i18n = useI18nStore()
+const weekView = ref('ai')
+const aiStatus = ref('loading')
+const aiError = ref('')
+const aiSummary = ref(null)
 function t(key, fallback, params) { return i18n.t(key, fallback, params) }
 
 const radarEl = ref(null)
@@ -171,7 +236,6 @@ const rangeLabel = computed(() => {
   return `${monthNamesShort.value[monday.value.getMonth()]} ${monday.value.getDate()} - ${monthNamesShort.value[sunday.getMonth()]} ${sunday.getDate()}`
 })
 
-const totalPlans = computed(() => plansStore.plans.length)
 const chartTabs = computed(() => [
   { key: 'bar', label: t('week.chart.bar_short', 'Day') },
   { key: 'line', label: t('week.chart.line_short', 'Momentum') },
@@ -183,26 +247,27 @@ function dateKey(date) {
 }
 
 function pctForDate(date) {
-  const all = plansStore.plans
-  if (!all.length) return null
   if (date > today) return null
-  const key = dateKey(date)
-  const done = all.filter((plan) => checksStore.isChecked(plan.id, key)).length
-  return Math.round((done / all.length) * 100)
+  return completionPctForDate(plansStore.plans, checksStore.checks, dateKey(date))?.pct ?? null
 }
 
 const weekDays = computed(() => Array.from({ length: 7 }, (_, index) => {
   const date = new Date(monday.value)
   date.setDate(monday.value.getDate() + index)
-  const pct = pctForDate(date)
+  const info = date > today
+    ? null
+    : completionPctForDate(plansStore.plans, checksStore.checks, dateKey(date))
+  const pct = info?.pct ?? null
   return {
     date,
     label: dayNamesShort.value[date.getDay()],
     isToday: date.toDateString() === today.toDateString(),
-    isFuture: pct === null && date > today,
+    isFuture: date > today,
     isComplete: pct === 100,
     isMissed: pct === 0,
     pct,
+    done: info?.done ?? 0,
+    total: info?.total ?? 0,
   }
 }))
 
@@ -515,18 +580,52 @@ watch(activeChart, () => {
   })
 })
 
+watch(weekView, (value) => {
+  if (value !== 'data') return
+  nextTick(() => {
+    initCharts()
+    resizeCharts()
+    chartRadar?.setOption(buildRadarOption(), true)
+    chartBar?.setOption(buildBarOption(), true)
+    chartLine?.setOption(buildLineOption(), true)
+  })
+}, { flush: 'post' })
+
 function onThemeChanged() {
   chartRadar?.setOption(buildRadarOption(), true)
   chartBar?.setOption(buildBarOption(), true)
   chartLine?.setOption(buildLineOption(), true)
 }
 
+async function loadAiSummary() {
+  aiStatus.value = 'loading'
+  aiError.value = ''
+  try {
+    let result = await reviewsStore.fetchWeeklySummary(durationFrom.value)
+    if (result.status === 'missing') {
+      result = await reviewsStore.generateWeeklySummary(durationFrom.value)
+    }
+    if (result.status === 'ready' && result.content) {
+      aiSummary.value = result.content
+      aiStatus.value = 'ready'
+      return
+    }
+    aiError.value = result.reason || t('week.summary.unavailable', 'AI 周总结暂时不可用。')
+    aiStatus.value = 'unavailable'
+    weekView.value = 'data'
+  } catch {
+    aiError.value = t('week.summary.unavailable', 'AI 周总结暂时不可用。')
+    aiStatus.value = 'unavailable'
+    weekView.value = 'data'
+  }
+}
+
 onMounted(() => {
   const start = rangeDates(35)[0]
   checksStore.fetchRange(dateKey(start), dateKey(today))
-  initCharts()
   document.addEventListener('theme:changed', onThemeChanged)
   window.addEventListener('resize', resizeCharts)
+  loadAiSummary()
 })
 
 onBeforeUnmount(() => {
@@ -547,9 +646,82 @@ onBeforeUnmount(() => {
   justify-content: flex-start;
 }
 
-.week-header { display: flex; align-items: baseline; gap: 1rem; margin-bottom: 1.5rem; }
+.week-header { display: flex; align-items: baseline; gap: 1rem; margin-bottom: 1rem; }
 .week-title  { font-size: 1.4rem; font-weight: 700; }
 .week-range  { font-size: .85rem; color: var(--muted); }
+
+.week-view-switch {
+  display: flex;
+  gap: .55rem;
+  margin-bottom: 1rem;
+}
+.week-view-switch-btn {
+  border: 1px solid var(--faint);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 84%, var(--bg));
+  color: var(--mid);
+  padding: .45rem .9rem;
+  font-family: var(--mono);
+  font-size: .68rem;
+  letter-spacing: .08em;
+  cursor: pointer;
+  transition: border-color .15s ease, color .15s ease, background .15s ease;
+}
+.week-view-switch-btn.active {
+  border-color: var(--dark);
+  background: var(--dark);
+  color: var(--bg);
+}
+
+.week-ai-banner {
+  margin: 0 0 1rem;
+  padding: .7rem .9rem;
+  border: 1px solid var(--faint);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 88%, var(--bg));
+  color: var(--mid);
+  font-size: .78rem;
+}
+
+.week-ai-panel {
+  max-width: 46rem;
+  margin-bottom: 1.5rem;
+}
+.week-ai-kicker {
+  margin-bottom: 1rem;
+  font-family: var(--mono);
+  font-size: .62rem;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.week-ai-loading {
+  color: var(--muted);
+  font-size: .85rem;
+}
+.week-ai-block {
+  margin-bottom: 1.1rem;
+}
+.week-ai-block h3 {
+  margin: 0 0 .35rem;
+  font-family: var(--mono);
+  font-size: .62rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+}
+.week-ai-block p,
+.week-ai-block li {
+  margin: 0;
+  color: var(--dark);
+  font-size: .92rem;
+  line-height: 1.65;
+}
+.week-ai-block ul {
+  margin: 0;
+  padding-left: 1.1rem;
+}
 
 .week-days-row {
   display: grid;

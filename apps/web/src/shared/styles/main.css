@@ -1096,7 +1096,10 @@
       opacity: 0;
       transition: opacity .3s;
     }
-    .review-save-hint.saved { opacity: 1; }
+    .review-save-hint.saved,
+    .review-save-hint.saving,
+    .review-save-hint.error { opacity: 1; }
+    .review-save-hint.error { cursor: pointer; }
     .review-save-row {
       display: flex;
       align-items: center;

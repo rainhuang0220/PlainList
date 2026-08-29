@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { ZodError } from 'zod';
 import { authMiddleware, type AuthRequest } from '../../middleware/auth';
 import { listReviews, upsertReview } from './service';
+import { generateWeeklySummary, getWeeklySummary } from './weeklySummary';
 
 function respondError(error: unknown, res: any): void {
   if (error instanceof ZodError) {
@@ -20,6 +21,22 @@ reviewsRouter.use(authMiddleware);
 reviewsRouter.get('/', async (req, res) => {
   try {
     res.json(await listReviews((req as AuthRequest).user, req.query));
+  } catch (error) {
+    respondError(error, res);
+  }
+});
+
+reviewsRouter.get('/weekly-summary', async (req, res) => {
+  try {
+    res.json(await getWeeklySummary((req as AuthRequest).user, req.query));
+  } catch (error) {
+    respondError(error, res);
+  }
+});
+
+reviewsRouter.post('/weekly-summary', async (req, res) => {
+  try {
+    res.json(await generateWeeklySummary((req as AuthRequest).user, req.body ?? {}));
   } catch (error) {
     respondError(error, res);
   }

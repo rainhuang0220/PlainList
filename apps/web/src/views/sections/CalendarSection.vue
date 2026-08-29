@@ -179,6 +179,13 @@
               </div>
               <div class="day-popover-actions">
                 <button
+                  class="day-popover-add"
+                  type="button"
+                  @click="openAddTaskForm"
+                >
+                  ＋ {{ t('calendar.add_task', '添加任务') }}
+                </button>
+                <button
                   class="day-popover-expand"
                   type="button"
                   :title="t('calendar.expand_day', 'Expand day review')"
@@ -188,6 +195,52 @@
                 </button>
                 <button class="day-popover-close" type="button" @click="closeDayPopover">x</button>
               </div>
+            </div>
+
+            <div v-if="addTaskOpen" class="day-popover-add-form">
+              <div class="day-popover-add-hint">{{ t('calendar.makeup.hint', '补记当天已完成的事项') }}</div>
+              <p v-if="addTaskMessage" class="day-popover-add-message">{{ addTaskMessage }}</p>
+              <template v-if="addTaskConfirm">
+                <p class="day-popover-add-message">{{ t('calendar.makeup.confirm_complete', '当天已有同名任务尚未完成。确认将其标记为完成？不会新建第二条。') }}</p>
+                <div class="day-popover-add-row">
+                  <button type="button" class="day-popover-add-btn ghost" @click="cancelAddTask">{{ t('common.back', '返回') }}</button>
+                  <button type="button" class="day-popover-add-btn" @click="confirmCompleteExisting">{{ t('calendar.makeup.confirm', '确认标记完成') }}</button>
+                </div>
+              </template>
+              <template v-else>
+                <input
+                  v-model="addTaskName"
+                  class="day-popover-add-input"
+                  type="text"
+                  :placeholder="t('calendar.makeup.name_ph', '做了什么')"
+                  maxlength="200"
+                />
+                <textarea
+                  v-model="addTaskDesc"
+                  class="day-popover-add-input"
+                  rows="2"
+                  :placeholder="t('calendar.makeup.desc_ph', '补充说明（可选）')"
+                />
+                <div class="day-popover-add-row">
+                  <input
+                    v-model="addTaskTime"
+                    class="day-popover-add-input time"
+                    type="text"
+                    maxlength="5"
+                    :placeholder="t('calendar.makeup.time_ph', '时间')"
+                  />
+                  <label class="day-popover-add-check">
+                    <input v-model="addTaskDone" type="checkbox" />
+                    {{ t('calendar.makeup.completed', '已完成') }}
+                  </label>
+                </div>
+                <div class="day-popover-add-row">
+                  <button type="button" class="day-popover-add-btn ghost" @click="cancelAddTask">{{ t('plan.add_cancel', 'Cancel') }}</button>
+                  <button type="button" class="day-popover-add-btn" :disabled="addTaskSaving" @click="submitAddTask">
+                    {{ addTaskSaving ? t('plan.add_saving', 'Saving…') : t('calendar.makeup.save', '保存') }}
+                  </button>
+                </div>
+              </template>
             </div>
 
             <div v-if="dayPopover.tasks.length" class="day-popover-list">
@@ -249,7 +302,7 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { isPlanVisibleOnDate } from '@plainlist/shared'
+import { decideMakeupTodo, findTodoByNameOnDate, isPlanVisibleOnDate, resolveMakeupAfterCreate, toDateKey } from '@plainlist/shared'
 import DurationHoursPanel from '@/components/stats/DurationHoursPanel.vue'
 import HabitCheckCountsPanel from '@/components/stats/HabitCheckCountsPanel.vue'
 import { yearDateRange, yearScopeKey } from '@/features/duration-stats/scopeKeys'
@@ -279,8 +332,8 @@ const durationRange = computed(() => yearDateRange(year.value))
 const durationFrom = computed(() => durationRange.value.from)
 const durationTo = computed(() => {
   const end = durationRange.value.to
-  const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
-  return end > todayKey && year.value === today.getFullYear() ? todayKey : end
+  const todayKey = toDateKey(new Date())
+  return end > todayKey && year.value === new Date().getFullYear() ? todayKey : end
 })
 const durationScopeKey = computed(() => yearScopeKey(year.value))
 
@@ -326,6 +379,16 @@ const actionMenu = ref({
   y: 0,
   task: null,
 })
+
+const addTaskOpen = ref(false)
+const addTaskConfirm = ref(false)
+const addTaskSaving = ref(false)
+const addTaskDone = ref(true)
+const addTaskName = ref('')
+const addTaskDesc = ref('')
+const addTaskTime = ref('09:00')
+const addTaskMessage = ref('')
+const pendingCompletePlan = ref(null)
 
 const selectedJournalKey = ref('')
 const journalQuery = ref('')
@@ -593,6 +656,119 @@ function closeActionMenu() {
   }
 }
 
+function resetAddTaskForm() {
+  addTaskOpen.value = false
+  addTaskConfirm.value = false
+  addTaskSaving.value = false
+  addTaskDone.value = true
+  addTaskName.value = ''
+  addTaskDesc.value = ''
+  addTaskTime.value = '09:00'
+  addTaskMessage.value = ''
+  pendingCompletePlan.value = null
+}
+
+function openAddTaskForm() {
+  if (addTaskOpen.value) {
+    resetAddTaskForm()
+    return
+  }
+  addTaskOpen.value = true
+  addTaskConfirm.value = false
+  addTaskMessage.value = ''
+  addTaskDone.value = true
+  if (!addTaskTime.value) addTaskTime.value = '09:00'
+}
+
+function cancelAddTask() {
+  resetAddTaskForm()
+}
+
+async function confirmCompleteExisting() {
+  const plan = pendingCompletePlan.value
+  const key = dayPopover.value?.dateKey
+  if (!plan || !key) return
+  addTaskSaving.value = true
+  try {
+    await checksStore.setCheck(Number(plan.id), key, { done: true })
+    refreshDayPopoverTasks()
+    resetAddTaskForm()
+  } finally {
+    addTaskSaving.value = false
+  }
+}
+
+async function submitAddTask() {
+  const name = addTaskName.value.trim()
+  const key = dayPopover.value?.dateKey
+  const time = addTaskTime.value.trim() || '09:00'
+  if (!name || !key) return
+  if (!/^\d{2}:\d{2}$/.test(time)) return
+  if (addTaskSaving.value) return
+
+  const existing = findTodoByNameOnDate(plansStore.plans, name, key)
+  const alreadyDone = existing ? checksStore.isChecked(existing.id, key) : false
+  const decision = decideMakeupTodo({
+    plans: plansStore.plans,
+    name,
+    dateKey: key,
+    wantComplete: addTaskDone.value,
+    alreadyDone,
+  })
+
+  if (decision.action === 'already-complete') {
+    addTaskMessage.value = t('calendar.makeup.already_complete', '当天已有同名任务，且已标记完成。')
+    return
+  }
+  if (decision.action === 'exists-incomplete') {
+    addTaskMessage.value = t('calendar.makeup.exists_incomplete', '当天已有同名任务（未完成）。未修改原任务。')
+    return
+  }
+  if (decision.action === 'confirm-complete') {
+    pendingCompletePlan.value = decision.plan
+    addTaskConfirm.value = true
+    addTaskMessage.value = ''
+    return
+  }
+
+  addTaskSaving.value = true
+  try {
+    const beforeIds = new Set(plansStore.plans.map((plan) => plan.id))
+    const created = await plansStore.add(
+      name,
+      'todo',
+      time,
+      key,
+      addTaskDesc.value.trim() || undefined,
+    )
+    const after = resolveMakeupAfterCreate({
+      existed: beforeIds.has(created.id),
+      alreadyDone: checksStore.isChecked(created.id, key),
+      wantComplete: addTaskDone.value,
+    })
+    if (after.action === 'mark-complete') {
+      await checksStore.setCheck(created.id, key, { done: true })
+    } else if (after.action === 'abort-needs-confirm') {
+      pendingCompletePlan.value = created
+      addTaskConfirm.value = true
+      addTaskSaving.value = false
+      return
+    } else if (after.action === 'noop-already-complete') {
+      addTaskMessage.value = t('calendar.makeup.already_complete', '当天已有同名任务，且已标记完成。')
+      addTaskSaving.value = false
+      return
+    } else if (after.action === 'noop-exists') {
+      addTaskMessage.value = t('calendar.makeup.exists_incomplete', '当天已有同名任务（未完成）。未修改原任务。')
+      addTaskSaving.value = false
+      return
+    }
+    refreshDayPopoverTasks()
+    resetAddTaskForm()
+  } finally {
+    addTaskSaving.value = false
+  }
+}
+
 function onTaskPointerDown(task, event) {
   // Fine pointer: right-click only. Coarse/touch: long-press.
   if (event.pointerType === 'mouse') return
@@ -653,6 +829,7 @@ async function onActionEditMinutes(minutes) {
 
 function openDayPopover(month, day, event) {
   closeActionMenu()
+  resetAddTaskForm()
   const key = dateKey(month, day)
   const visible = visiblePlansForDay(month, day)
   const tasks = completedTasksForDay(month, day)
@@ -675,6 +852,7 @@ function openDayPopover(month, day, event) {
 function closeDayPopover() {
   closeActionMenu()
   clearLongPress()
+  resetAddTaskForm()
   dayPopoverOpen.value = false
 }
 
@@ -1038,8 +1216,102 @@ function onGlobalEscape(event) {
 
 .day-popover-actions {
   display: inline-flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
+  justify-content: flex-end;
+}
+
+.day-popover-add {
+  padding: 6px 10px;
+  border: 1px solid var(--faint);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--dark);
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.day-popover-add:hover {
+  border-color: var(--dark);
+}
+
+.day-popover-add-form {
+  margin-bottom: 12px;
+  padding: 10px;
+  border: 1px solid var(--faint);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface) 92%, var(--bg));
+}
+
+.day-popover-add-hint {
+  margin-bottom: 8px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.day-popover-add-message {
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--dark);
+}
+
+.day-popover-add-input {
+  display: block;
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--faint);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 96%, var(--bg));
+  color: var(--dark);
+  font-family: var(--mono);
+  font-size: 13px;
+  outline: none;
+}
+
+.day-popover-add-input.time {
+  width: 88px;
+  margin-bottom: 0;
+}
+
+.day-popover-add-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.day-popover-add-check {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--mid);
+}
+
+.day-popover-add-btn {
+  flex: 1;
+  padding: 8px 10px;
+  border: 1px solid var(--dark);
+  border-radius: 8px;
+  background: var(--dark);
+  color: var(--bg);
+  font-family: var(--mono);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.day-popover-add-btn.ghost {
+  border-color: var(--faint);
+  background: transparent;
+  color: var(--mid);
 }
 
 .day-popover-date {
