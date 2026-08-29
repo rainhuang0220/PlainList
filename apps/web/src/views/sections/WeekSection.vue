@@ -32,32 +32,32 @@
         {{ t('week.summary.loading', '正在整理本周观察…') }}
       </div>
       <template v-else-if="aiSummary">
-        <section class="week-ai-block">
+        <div class="week-ai-block">
           <h3>{{ t('week.summary.overall', '总体状态') }}</h3>
           <p>{{ aiSummary.overall }}</p>
-        </section>
-        <section class="week-ai-block">
+        </div>
+        <div class="week-ai-block">
           <h3>{{ t('week.summary.what', '本周发生了什么') }}</h3>
           <p>{{ aiSummary.summary }}</p>
-        </section>
-        <section class="week-ai-block">
+        </div>
+        <div class="week-ai-block">
           <h3>{{ t('week.summary.comparison', '与过去相比') }}</h3>
           <p>{{ aiSummary.comparison }}</p>
-        </section>
-        <section class="week-ai-block">
+        </div>
+        <div class="week-ai-block">
           <h3>{{ t('week.summary.positive', '值得肯定') }}</h3>
           <p>{{ aiSummary.positive }}</p>
-        </section>
-        <section class="week-ai-block">
+        </div>
+        <div class="week-ai-block">
           <h3>{{ t('week.summary.concerns', '值得注意') }}</h3>
           <p>{{ aiSummary.concerns }}</p>
-        </section>
-        <section class="week-ai-block">
+        </div>
+        <div class="week-ai-block">
           <h3>{{ t('week.summary.next', '下周关注') }}</h3>
           <ul>
             <li v-for="item in aiSummary.nextFocus" :key="item">{{ item }}</li>
           </ul>
-        </section>
+        </div>
       </template>
     </div>
 
