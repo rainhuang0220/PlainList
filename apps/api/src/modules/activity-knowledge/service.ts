@@ -46,8 +46,11 @@ export async function appendActivityDigest(user: AuthenticatedUser, payload: unk
   if (existing?.content_hash === contentHash) return { sourceId: existing.id, factCount: 0, created: false };
 
   let sourceId: number;
+  let oldDates: string[] = [];
   if (existing) {
     sourceId = existing.id;
+    const [oldDateRows] = await pool.query('SELECT date_key FROM activity_facts WHERE source_id = ? AND user_id = ?', [sourceId, user.id]);
+    oldDates = Array.isArray(oldDateRows) ? (oldDateRows as Array<{ date_key: string }>).map((row) => row.date_key) : [];
     await pool.query(
       `UPDATE activity_sources SET external_id = ?, date_start = ?, date_end = ?, occurred_at = ?, schema_version = 'v1', compact_payload = ?, content_hash = ?, status = 'active', deleted_at = NULL WHERE id = ? AND user_id = ?`,
       [input.sourceExternalId, input.dateKey, input.dateKey, input.occurredAt ?? null, JSON.stringify(input), contentHash, sourceId, user.id],
@@ -71,7 +74,7 @@ export async function appendActivityDigest(user: AuthenticatedUser, payload: unk
       [user.id, sourceId, input.dateKey, fact.key, fact.category, fact.title, fact.summary, fact.output, fact.exploration, JSON.stringify(input.candidateGoalRelations.map((item) => item.goalId)), JSON.stringify([{ source: 'chatgpt-explicit-digest', key: fact.key }]), contentHash, factHash],
     );
   }
-  await invalidateRange(user.id, input.dateKey, input.dateKey);
+  await invalidateDates(user.id, [...oldDates, input.dateKey]);
   return { sourceId, factCount: facts.length, created: !existing };
 }
 

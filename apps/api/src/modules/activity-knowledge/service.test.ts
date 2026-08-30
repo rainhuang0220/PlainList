@@ -25,6 +25,19 @@ describe('activity digest ingestion', () => {
     expect(query.mock.calls[0]?.[1]).toContain(7);
   });
 
+  it('invalidates the union of old and new source fact dates on update', async () => {
+    query.mockResolvedValueOnce([[{ id: 44, content_hash: 'old-hash' }]])
+      .mockResolvedValueOnce([[{ date_key: '2026-08-29' }, { date_key: '2026-08-30' }]])
+      .mockResolvedValueOnce([{ affectedRows: 1 }]).mockResolvedValueOnce([{ affectedRows: 2 }])
+      .mockResolvedValue([{ affectedRows: 1 }]);
+    const changed = { ...digest, summary: '更新后的摘要', dateKey: '2026-08-31' };
+    await appendActivityDigest(user, changed);
+    const daily = query.mock.calls.find(([sql]) => /UPDATE daily_activity_digests/i.test(String(sql)));
+    expect(daily?.[1]).toEqual([7, '2026-08-29', '2026-08-30', '2026-08-31']);
+    const weekly = query.mock.calls.find(([sql]) => /UPDATE weekly_activity_intelligence/i.test(String(sql)));
+    expect(weekly?.[1]).toEqual([7, '2026-08-24', '2026-08-31']);
+  });
+
   it('tombstones a source and dirties only its fact dates and weeks', async () => {
     query.mockResolvedValueOnce([[{ date_key: '2026-08-30' }, { date_key: '2026-08-31' }]])
       .mockResolvedValueOnce([{ affectedRows: 1 }]).mockResolvedValueOnce([{ affectedRows: 2 }])
