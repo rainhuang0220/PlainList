@@ -27,6 +27,26 @@
     <p v-if="aiError" class="week-ai-banner">{{ aiError }}</p>
 
     <div v-show="weekView === 'ai'" class="week-ai-panel">
+      <div v-if="weeklyInsight" class="week-ai-block weekly-intelligence">
+        <h3>{{ t('week.intelligence.title', '本周洞察') }}</h3>
+        <template v-if="weeklyInsight.outputs?.length">
+          <h4>{{ t('week.intelligence.outputs', '本周产出') }}</h4>
+          <ul><li v-for="item in weeklyInsight.outputs" :key="item">{{ item }}</li></ul>
+        </template>
+        <p v-if="weeklyInsight.summary">{{ weeklyInsight.summary }}</p>
+        <template v-if="weeklyInsight.openLoops?.length">
+          <h4>{{ t('week.intelligence.open_loops', '待完成事项') }}</h4>
+          <ul><li v-for="item in weeklyInsight.openLoops" :key="item">{{ item }}</li></ul>
+        </template>
+        <template v-if="weeklyInsight.opportunityCost === 'evidenced'">
+          <h4>{{ t('week.intelligence.attention', '注意力与机会成本') }}</h4>
+          <p>{{ t('week.intelligence.attention_copy', '当前记录显示高优先级目标可能需要更多连续投入。') }}</p>
+        </template>
+        <template v-if="weeklyInsight.suggestedNextFocus?.length">
+          <h4>{{ t('week.intelligence.next', '下周焦点') }}</h4>
+          <ul><li v-for="item in weeklyInsight.suggestedNextFocus.slice(0, 3)" :key="item">{{ item }}</li></ul>
+        </template>
+      </div>
       <div class="week-ai-kicker">{{ t('week.summary.title', '本周总结') }}</div>
       <div v-if="aiStatus === 'loading'" class="week-ai-loading">
         {{ t('week.summary.loading', '正在整理本周观察…') }}
@@ -176,6 +196,7 @@ import { useChecksStore } from '@/features/checks/model/useChecksStore'
 import { useReviewsStore } from '@/features/reviews/model/useReviewsStore'
 import { useMarketplaceStore } from '@/features/plugins/model/useMarketplaceStore'
 import { useI18nStore } from '@/shared/i18n/useI18nStore'
+import { useApi } from '@/shared/api/useApi'
 
 const plansStore = usePlansStore()
 const checksStore = useChecksStore()
@@ -186,6 +207,8 @@ const weekView = ref('ai')
 const aiStatus = ref('loading')
 const aiError = ref('')
 const aiSummary = ref(null)
+const weeklyInsight = ref(null)
+const api = useApi()
 function t(key, fallback, params) { return i18n.t(key, fallback, params) }
 
 const radarEl = ref(null)
@@ -620,12 +643,22 @@ async function loadAiSummary() {
   }
 }
 
+async function loadWeeklyInsight() {
+  try {
+    const result = await api.post('/activity/weekly/generate', { weekStart: durationFrom.value })
+    if (result?.content) weeklyInsight.value = result.content
+  } catch {
+    // Insight is a derived enhancement: the descriptive weekly summary remains usable.
+  }
+}
+
 onMounted(() => {
   const start = rangeDates(35)[0]
   checksStore.fetchRange(dateKey(start), dateKey(today))
   document.addEventListener('theme:changed', onThemeChanged)
   window.addEventListener('resize', resizeCharts)
   loadAiSummary()
+  loadWeeklyInsight()
 })
 
 onBeforeUnmount(() => {

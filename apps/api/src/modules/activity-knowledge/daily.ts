@@ -1,4 +1,4 @@
-import { canonicalHash, type AuthenticatedUser } from '@plainlist/shared';
+import { canonicalHash, normalizeWeekStart, type AuthenticatedUser } from '@plainlist/shared';
 import { pool } from '../../db/pool';
 import { resolveAiConfigForUser } from '../ai-intake/settings';
 import { chatComplete, extractJsonObject } from '../ai-shared/llm';
@@ -23,6 +23,8 @@ export async function generateDailyDigest(user: AuthenticatedUser, dateKey: stri
    const parsed = JSON.parse(extractJsonObject(result.text) ?? result.text);
    const content = { ...fallback, ...parsed, evidenceFactIds: fallback.evidenceFactIds };
    await pool.query(`INSERT INTO daily_activity_digests (user_id, date_key, status, input_hash, prompt_version, schema_version, content, evidence_fact_ids, provider, model, generated_at) VALUES (?, ?, 'ready', ?, ?, 'v1', ?, ?, ?, ?, CURRENT_TIMESTAMP) ON DUPLICATE KEY UPDATE status='ready', input_hash=VALUES(input_hash), prompt_version=VALUES(prompt_version), content=VALUES(content), evidence_fact_ids=VALUES(evidence_fact_ids), provider=VALUES(provider), model=VALUES(model), generated_at=CURRENT_TIMESTAMP, error_code=NULL`, [user.id, dateKey, inputHash, PROMPT_VERSION, JSON.stringify(content), JSON.stringify(fallback.evidenceFactIds), result.provider, result.model]);
+   const weekStart = normalizeWeekStart(dateKey);
+   await pool.query(`UPDATE weekly_activity_intelligence SET status = 'dirty', content = NULL, error_code = NULL WHERE user_id = ? AND week_start = ?`, [user.id, weekStart]);
    return { status: 'ready', cached: false, content };
  } catch {
    await pool.query(`INSERT INTO daily_activity_digests (user_id, date_key, status, input_hash, prompt_version, error_code) VALUES (?, ?, 'failed', ?, ?, 'provider_failed') ON DUPLICATE KEY UPDATE status='failed', input_hash=VALUES(input_hash), prompt_version=VALUES(prompt_version), error_code='provider_failed'`, [user.id, dateKey, inputHash, PROMPT_VERSION]);
