@@ -10,6 +10,7 @@ import { aiIntakeRouter } from './modules/ai-intake/router';
 import { userProfileRouter } from './modules/user-profile/router';
 import { durationPrefsRouter } from './modules/duration-prefs/router';
 import { activityGoalsRouter } from './modules/activity-goals/router';
+import { activityKnowledgeRouter } from './modules/activity-knowledge/router';
 
 export function createApp() {
   const app = express();
@@ -44,6 +45,7 @@ export function createApp() {
   app.use('/api/user-profile', userProfileRouter);
   app.use('/api/duration-chart-prefs', durationPrefsRouter);
   app.use('/api/activity/goals', activityGoalsRouter);
+  app.use('/api/activity', activityKnowledgeRouter);
 
   return app;
 }
