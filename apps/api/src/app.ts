@@ -9,6 +9,7 @@ import { marketplaceRouter } from './modules/plugins/marketplace.router';
 import { aiIntakeRouter } from './modules/ai-intake/router';
 import { userProfileRouter } from './modules/user-profile/router';
 import { durationPrefsRouter } from './modules/duration-prefs/router';
+import { activityGoalsRouter } from './modules/activity-goals/router';
 
 export function createApp() {
   const app = express();
@@ -42,6 +43,7 @@ export function createApp() {
   app.use('/api/ai-intake', aiIntakeRouter);
   app.use('/api/user-profile', userProfileRouter);
   app.use('/api/duration-chart-prefs', durationPrefsRouter);
+  app.use('/api/activity/goals', activityGoalsRouter);
 
   return app;
 }

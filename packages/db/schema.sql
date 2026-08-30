@@ -122,3 +122,49 @@ CREATE TABLE IF NOT EXISTS duration_chart_prefs (
   UNIQUE KEY uq_user_scope (user_id, scope, scope_key),
   CONSTRAINT fk_dcp_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- See migrations/009_activity_knowledge_core.sql for the additive Activity
+-- Knowledge tables. Kept here so a fresh schema matches the migration chain.
+CREATE TABLE IF NOT EXISTS activity_goals (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, user_id INT UNSIGNED NOT NULL,
+  title VARCHAR(160) NOT NULL, description TEXT NULL, priority_rank SMALLINT UNSIGNED NOT NULL,
+  time_horizon ENUM('near_term','medium_term','long_term') NOT NULL,
+  status ENUM('active','paused','achieved','archived') NOT NULL DEFAULT 'active', domain VARCHAR(80) NULL,
+  success_signals JSON NOT NULL, anti_goals JSON NOT NULL, version INT UNSIGNED NOT NULL DEFAULT 1,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_activity_goals_user_status_rank (user_id, status, priority_rank),
+  CONSTRAINT fk_activity_goals_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS activity_sources (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, user_id INT UNSIGNED NOT NULL, source_type VARCHAR(48) NOT NULL,
+  external_id VARCHAR(255) NULL, idempotency_key VARCHAR(128) NOT NULL, date_start DATE NOT NULL, date_end DATE NOT NULL,
+  occurred_at DATETIME(3) NULL, schema_version VARCHAR(40) NOT NULL, compact_payload JSON NULL, content_hash CHAR(64) NOT NULL,
+  status ENUM('active','deleted') NOT NULL DEFAULT 'active', deleted_at TIMESTAMP NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_activity_sources_user_idempotency (user_id, source_type, idempotency_key), INDEX idx_activity_sources_user_external (user_id, source_type, external_id),
+  CONSTRAINT fk_activity_sources_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS activity_facts (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, user_id INT UNSIGNED NOT NULL, source_id BIGINT UNSIGNED NOT NULL, date_key DATE NOT NULL,
+  fact_key VARCHAR(120) NOT NULL, category VARCHAR(48) NOT NULL, title VARCHAR(240) NOT NULL, summary VARCHAR(600) NOT NULL, outcome VARCHAR(600) NULL,
+  progress_state ENUM('advanced','maintained','blocked','not_observed','unknown') NOT NULL DEFAULT 'unknown', output_state ENUM('produced','partial','not_applicable','unknown') NOT NULL DEFAULT 'unknown', exploration_state ENUM('explored','not_applicable','unknown') NOT NULL DEFAULT 'unknown',
+  related_goal_ids JSON NOT NULL, evidence JSON NOT NULL, confidence ENUM('high','medium','low') NOT NULL DEFAULT 'medium', input_hash CHAR(64) NOT NULL, fact_hash CHAR(64) NOT NULL, extractor_version VARCHAR(40) NOT NULL, provider VARCHAR(120) NULL, model VARCHAR(200) NULL, version INT UNSIGNED NOT NULL DEFAULT 1,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_activity_facts_source_key (source_id, fact_key), INDEX idx_activity_facts_user_date (user_id, date_key),
+  CONSTRAINT fk_activity_facts_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE, CONSTRAINT fk_activity_facts_source FOREIGN KEY (source_id) REFERENCES activity_sources(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS daily_activity_digests (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, user_id INT UNSIGNED NOT NULL, date_key DATE NOT NULL,
+  status ENUM('generating','ready','dirty','failed') NOT NULL DEFAULT 'dirty', input_hash CHAR(64) NULL, prompt_version VARCHAR(40) NULL, schema_version VARCHAR(40) NULL, content JSON NULL, evidence_fact_ids JSON NULL, provider VARCHAR(120) NULL, model VARCHAR(200) NULL, input_tokens INT UNSIGNED NULL, output_tokens INT UNSIGNED NULL, error_code VARCHAR(80) NULL, generated_at TIMESTAMP NULL, updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_daily_activity_digests_user_date (user_id, date_key), CONSTRAINT fk_daily_activity_digests_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS weekly_activity_intelligence (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, user_id INT UNSIGNED NOT NULL, week_start DATE NOT NULL, source_date_from DATE NOT NULL, source_date_to DATE NOT NULL,
+  status ENUM('generating','ready','dirty','failed') NOT NULL DEFAULT 'dirty', input_hash CHAR(64) NULL, goal_profile_hash CHAR(64) NULL, prompt_version VARCHAR(40) NULL, schema_version VARCHAR(40) NULL, content JSON NULL, evidence_daily_dates JSON NULL, evidence_fact_ids JSON NULL, provider VARCHAR(120) NULL, model VARCHAR(200) NULL, input_tokens INT UNSIGNED NULL, output_tokens INT UNSIGNED NULL, error_code VARCHAR(80) NULL, generated_at TIMESTAMP NULL, updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_weekly_activity_intelligence_user_week (user_id, week_start), INDEX idx_weekly_activity_intelligence_user_range (user_id, source_date_from, source_date_to),
+  CONSTRAINT fk_weekly_activity_intelligence_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
