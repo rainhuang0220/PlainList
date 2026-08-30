@@ -25,14 +25,17 @@ describe('activity digest ingestion', () => {
     expect(query.mock.calls[0]?.[1]).toContain(7);
   });
 
-  it('tombstones only the owners source, clears payload, removes facts, and dirties derived data', async () => {
-    query.mockResolvedValueOnce([{ affectedRows: 1 }]).mockResolvedValue([{ affectedRows: 1 }]).mockResolvedValue([{ affectedRows: 1 }]).mockResolvedValue([{ affectedRows: 1 }]);
+  it('tombstones a source and dirties only its fact dates and weeks', async () => {
+    query.mockResolvedValueOnce([[{ date_key: '2026-08-30' }, { date_key: '2026-08-31' }]])
+      .mockResolvedValueOnce([{ affectedRows: 1 }]).mockResolvedValueOnce([{ affectedRows: 2 }])
+      .mockResolvedValueOnce([{ affectedRows: 1 }]).mockResolvedValueOnce([{ affectedRows: 1 }]);
 
     await expect(deleteActivitySource(user, { id: 44 })).resolves.toBeUndefined();
-    expect(String(query.mock.calls[0]?.[0])).toMatch(/WHERE id = \? AND user_id = \?/i);
-    expect(query.mock.calls[0]?.[1]).toEqual([44, 7]);
+    expect(String(query.mock.calls[1]?.[0])).toMatch(/WHERE id = \? AND user_id = \?/i);
+    expect(query.mock.calls[1]?.[1]).toEqual([44, 7]);
     expect(query.mock.calls.some(([sql]) => /DELETE FROM activity_facts/i.test(String(sql)))).toBe(true);
     expect(query.mock.calls.some(([sql]) => /daily_activity_digests/i.test(String(sql)))).toBe(true);
     expect(query.mock.calls.some(([sql]) => /weekly_activity_intelligence/i.test(String(sql)))).toBe(true);
+    expect(query.mock.calls.every(([sql]) => !/WHERE user_id = \?\s*$/i.test(String(sql)) || !/daily_activity_digests|weekly_activity_intelligence/i.test(String(sql)))).toBe(true);
   });
 });

@@ -1,5 +1,5 @@
 import type { AuthenticatedUser, AppendActivityDigestInput } from '@plainlist/shared';
-import { appendActivityDigestSchema, canonicalHash } from '@plainlist/shared';
+import { appendActivityDigestSchema, canonicalHash, normalizeWeekStart } from '@plainlist/shared';
 import { pool } from '../../db/pool';
 
 interface SourceRow { id: number; content_hash: string; }
@@ -24,6 +24,14 @@ function factCandidates(input: AppendActivityDigestInput): Array<{ key: string; 
 async function invalidateRange(userId: number, from: string, to: string): Promise<void> {
   await pool.query(`UPDATE daily_activity_digests SET status = 'dirty', content = NULL, error_code = NULL WHERE user_id = ? AND date_key BETWEEN ? AND ?`, [userId, from, to]);
   await pool.query(`UPDATE weekly_activity_intelligence SET status = 'dirty', content = NULL, error_code = NULL WHERE user_id = ? AND source_date_from <= ? AND source_date_to >= ?`, [userId, to, from]);
+}
+
+async function invalidateDates(userId: number, dates: string[]): Promise<void> {
+  const uniqueDates = [...new Set(dates)].sort();
+  if (!uniqueDates.length) return;
+  const weeks = [...new Set(uniqueDates.map(normalizeWeekStart))];
+  await pool.query(`UPDATE daily_activity_digests SET status = 'dirty', content = NULL, error_code = NULL WHERE user_id = ? AND date_key IN (${uniqueDates.map(() => '?').join(',')})`, [userId, ...uniqueDates]);
+  await pool.query(`UPDATE weekly_activity_intelligence SET status = 'dirty', content = NULL, error_code = NULL WHERE user_id = ? AND week_start IN (${weeks.map(() => '?').join(',')})`, [userId, ...weeks]);
 }
 
 export async function appendActivityDigest(user: AuthenticatedUser, payload: unknown): Promise<DigestIngestResult> {
@@ -70,11 +78,12 @@ export async function appendActivityDigest(user: AuthenticatedUser, payload: unk
 export async function deleteActivitySource(user: AuthenticatedUser, params: unknown): Promise<void> {
   const id = Number((params as { id?: unknown }).id);
   if (!Number.isInteger(id) || id <= 0) throw serviceError(400, 'invalid activity source id');
+  const [dateRows] = await pool.query('SELECT date_key FROM activity_facts WHERE source_id = ? AND user_id = ?', [id, user.id]);
+  const dates = Array.isArray(dateRows) ? (dateRows as Array<{ date_key: string }>).map((row) => row.date_key) : [];
   const [result] = await pool.query(
     `UPDATE activity_sources SET status = 'deleted', compact_payload = NULL, deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ? AND status = 'active'`, [id, user.id],
   );
   if (!Number((result as { affectedRows: number }).affectedRows)) throw serviceError(404, 'activity source not found');
   await pool.query('DELETE FROM activity_facts WHERE source_id = ? AND user_id = ?', [id, user.id]);
-  await pool.query(`UPDATE daily_activity_digests SET status = 'dirty', content = NULL, error_code = NULL WHERE user_id = ?`, [user.id]);
-  await pool.query(`UPDATE weekly_activity_intelligence SET status = 'dirty', content = NULL, error_code = NULL WHERE user_id = ?`, [user.id]);
+  await invalidateDates(user.id, dates);
 }
