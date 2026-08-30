@@ -7,3 +7,6 @@ export * from './ai-intake';
 export * from './ai-settings';
 export * from './user-profile';
 export * from './reviews';
+export * from './activity-goals';
+export * from './activity-sources';
+export * from './activity-insights';
