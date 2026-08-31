@@ -159,23 +159,46 @@ export async function catchUpWeeklyReviewSnapshots(): Promise<boolean> {
   return snapshots.some((snapshot) => snapshot?.status === 'error' && (snapshot.attemptCount ?? 0) < 2);
 }
 
+export async function recoverExpiredWeeklyReviewSnapshots(): Promise<void> {
+  const [rows] = await pool.query(
+    `SELECT u.id, u.username, u.is_admin
+     FROM weekly_review_snapshots s
+     INNER JOIN users u ON u.id = s.user_id
+     WHERE s.status = 'generating'
+       AND s.lease_expires_at <= UTC_TIMESTAMP()
+       AND s.attempt_count < 2`,
+  );
+  if (!Array.isArray(rows)) return;
+  await Promise.all(rows.map((row) => generateCurrentWeeklyReviewSnapshot({
+    id: Number((row as { id: number }).id),
+    username: String((row as { username: string }).username),
+    isAdmin: Boolean((row as { is_admin: number }).is_admin),
+  })));
+}
+
 interface WeeklyReviewSchedulerDeps {
   catchUp: () => Promise<boolean>;
+  recover?: () => Promise<void>;
   millisecondsUntilNextMidnight: () => number;
   retryDelayMilliseconds: number;
+  recoveryIntervalMilliseconds?: number;
   setTimer: (callback: () => void, milliseconds: number) => NodeJS.Timeout;
   clearTimer: (timer: NodeJS.Timeout) => void;
 }
 
 export function createWeeklyReviewSnapshotScheduler(deps: WeeklyReviewSchedulerDeps = {
   catchUp: catchUpWeeklyReviewSnapshots,
+  recover: recoverExpiredWeeklyReviewSnapshots,
   millisecondsUntilNextMidnight: () => clock.millisecondsUntilNextMidnight(),
   retryDelayMilliseconds: 60_000,
+  recoveryIntervalMilliseconds: 60_000,
   setTimer: (callback: () => void, milliseconds: number) => setTimeout(callback, milliseconds),
   clearTimer: (timer: NodeJS.Timeout) => clearTimeout(timer),
 }): () => void {
   let midnightTimer: NodeJS.Timeout | undefined;
   let retryTimer: NodeJS.Timeout | undefined;
+  let recoveryTimer: NodeJS.Timeout | undefined;
+  let recoveryInFlight = false;
   let catchUpFailureRetries = 0;
   let stopped = false;
   const scheduleRetry = () => {
@@ -204,11 +227,29 @@ export function createWeeklyReviewSnapshotScheduler(deps: WeeklyReviewSchedulerD
       schedule();
     }, deps.millisecondsUntilNextMidnight());
   };
+  const runRecovery = () => {
+    if (stopped || recoveryInFlight) return;
+    recoveryInFlight = true;
+    void (deps.recover ?? recoverExpiredWeeklyReviewSnapshots)().catch((error) => {
+      console.error('[weekly-review] recovery failed', error);
+    }).finally(() => {
+      recoveryInFlight = false;
+    });
+  };
+  const scheduleRecovery = () => {
+    recoveryTimer = deps.setTimer(() => {
+      runRecovery();
+      scheduleRecovery();
+    }, deps.recoveryIntervalMilliseconds ?? 60_000);
+  };
   runCatchUp();
+  runRecovery();
   schedule();
+  scheduleRecovery();
   return () => {
     stopped = true;
     if (midnightTimer) deps.clearTimer(midnightTimer);
     if (retryTimer) deps.clearTimer(retryTimer);
+    if (recoveryTimer) deps.clearTimer(recoveryTimer);
   };
 }
