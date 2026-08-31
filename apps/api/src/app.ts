@@ -9,6 +9,10 @@ import { marketplaceRouter } from './modules/plugins/marketplace.router';
 import { aiIntakeRouter } from './modules/ai-intake/router';
 import { userProfileRouter } from './modules/user-profile/router';
 import { durationPrefsRouter } from './modules/duration-prefs/router';
+import { activityGoalsRouter } from './modules/activity-goals/router';
+import { activityKnowledgeRouter } from './modules/activity-knowledge/router';
+import { createActivityOAuthRouter } from './modules/activity-mcp/oauth/router';
+import { createActivityMcpTransportRouter } from './modules/activity-mcp/transport';
 
 export function createApp() {
   const app = express();
@@ -28,6 +32,9 @@ export function createApp() {
     ],
     credentials: true,
   }));
+  // OAuth and MCP are isolated protocol surfaces with their own parsers and body limits.
+  app.use(createActivityOAuthRouter());
+  app.use('/mcp', createActivityMcpTransportRouter());
   app.use(express.json());
 
   app.get('/api/health', (_req, res) => {
@@ -42,6 +49,8 @@ export function createApp() {
   app.use('/api/ai-intake', aiIntakeRouter);
   app.use('/api/user-profile', userProfileRouter);
   app.use('/api/duration-chart-prefs', durationPrefsRouter);
+  app.use('/api/activity/goals', activityGoalsRouter);
+  app.use('/api/activity', activityKnowledgeRouter);
 
   return app;
 }

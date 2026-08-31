@@ -8,6 +8,7 @@ import type {
 import {
   WEEKLY_SUMMARY_PROMPT_VERSION,
   getWeekStart,
+  reviewWindowFor,
   toDateKey,
   visiblePlansOnDate,
   weeklySummaryContentSchema,
@@ -223,6 +224,36 @@ export function assembleWeeklyEvidence(input: {
     days,
     conflicts,
     profile,
+  };
+}
+
+/**
+ * Snapshot evidence is always cut off at yesterday in the app timezone.
+ * The historical comparison horizon remains four calendar weeks, but the
+ * visible review window is never a rolling seven-day range.
+ */
+export function assembleReviewSnapshotEvidence(input: {
+  reviewAsOfDate: string;
+  plans: PlanRecord[];
+  checks: ChecksByPlan;
+  reviews: Record<string, string>;
+  profile: UserProfileTraitRecord[];
+}): WeeklyEvidencePayload {
+  const window = reviewWindowFor(input.reviewAsOfDate);
+  const evidence = assembleWeeklyEvidence({
+    weekStart: window.windowStartDate,
+    todayKey: window.windowEndDate,
+    plans: input.plans,
+    checks: input.checks,
+    reviews: input.reviews,
+    profile: input.profile,
+  });
+
+  return {
+    ...evidence,
+    weekStart: window.windowStartDate,
+    weekEnd: window.windowEndDate,
+    todayKey: input.reviewAsOfDate,
   };
 }
 

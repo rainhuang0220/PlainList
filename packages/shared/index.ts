@@ -2,6 +2,8 @@ export * from './types';
 export * from './constants';
 export * from './schemas';
 export * from './date';
+export * from './activity/canonicalize';
+export * from './activity/dateRange';
 export * from './duration';
 export * from './plans/visibility';
 export * from './plans/sort';

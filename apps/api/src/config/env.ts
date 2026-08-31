@@ -45,6 +45,13 @@ const envSchema = z.object({
     .default('false')
     .transform((value) => value === 'true' || value === '1'),
   CORS_ORIGINS: z.string().optional().default(''),
+  MCP_PUBLIC_BASE_URL: z.string().url().default('http://localhost:3000'),
+  MCP_OAUTH_CLIENT_ID: z.string().min(1).max(512).default('plainlist-local-mcp-client'),
+  MCP_OAUTH_REDIRECT_URIS: z.string().default('http://127.0.0.1:6274/oauth/callback,http://localhost:6274/oauth/callback'),
+  MCP_AUTH_CODE_TTL_SECONDS: z.coerce.number().int().min(60).max(600).default(300),
+  MCP_ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().min(300).max(86400).default(900),
+  MCP_ALLOWED_ORIGINS: z.string().optional().default(''),
+  APP_TIME_ZONE: z.string().default('Asia/Shanghai'),
 });
 
 export const env = envSchema.parse(process.env);
