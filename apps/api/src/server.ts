@@ -1,6 +1,7 @@
 import { createApp } from './app';
 import { env } from './config/env';
 import { startInstalledWidgets, stopWidget } from './modules/plugins/widgetRunner';
+import { createActivityIntelligenceScheduler } from './modules/activity-knowledge/scheduler';
 import { createWeeklyReviewSnapshotScheduler } from './modules/reviews/weeklyReviewSnapshot';
 
 const app = createApp();
@@ -10,6 +11,7 @@ const server = app.listen(env.PORT, () => {
   void startInstalledWidgets();
 });
 const stopWeeklyReviewScheduler = createWeeklyReviewSnapshotScheduler();
+const stopActivityIntelligenceScheduler = createActivityIntelligenceScheduler();
 
 // Graceful shutdown: clean up detached widget processes on Ctrl+C
 function gracefulShutdown(signal: string) {
@@ -17,6 +19,7 @@ function gracefulShutdown(signal: string) {
 
   // Stop all running widgets
   stopWeeklyReviewScheduler();
+  stopActivityIntelligenceScheduler();
   try {
     const { execSync } = require('child_process');
     console.log('[shutdown] Stopping widget processes...');

@@ -17,11 +17,12 @@ interface SnapshotRow {
   evidence_json?: string | null;
   evidence_hash?: string | null;
   prompt_version?: string | null;
+  attempt_count?: number;
 }
 
 const SNAPSHOT_FIELDS = `
   user_id, review_as_of_date, window_start_date, window_end_date, status,
-  content_json, generated_at, model, provider, error_message, evidence_json, evidence_hash, prompt_version
+  content_json, generated_at, model, provider, error_message, evidence_json, evidence_hash, prompt_version, attempt_count
 `;
 
 function toSnapshot(row: SnapshotRow): ReviewSnapshot {
@@ -48,6 +49,7 @@ function toSnapshot(row: SnapshotRow): ReviewSnapshot {
     evidence: row.evidence_json ? JSON.parse(row.evidence_json) : null,
     evidenceHash: row.evidence_hash ?? null,
     promptVersion: row.prompt_version ?? null,
+    attemptCount: Number(row.attempt_count ?? 0),
   };
 }
 
@@ -84,7 +86,10 @@ export function createMysqlReviewSnapshotRepository(query: SqlQuery): ReviewSnap
       const result = await query(
         `UPDATE weekly_review_snapshots
          SET status = 'generating', error_message = NULL, attempt_count = attempt_count + 1
-         WHERE user_id = ? AND review_as_of_date = ? AND status IN ('pending', 'error') AND attempt_count < 2`,
+         WHERE user_id = ? AND review_as_of_date = ?
+           AND (status IN ('pending', 'error')
+                OR (status = 'generating' AND updated_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL 2 MINUTE)))
+           AND attempt_count < 2`,
         [userId, reviewAsOfDate],
       ) as [{ affectedRows?: number }];
       return Number(result[0]?.affectedRows) === 1;

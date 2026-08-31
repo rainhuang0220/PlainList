@@ -148,31 +148,56 @@ export async function generateCurrentWeeklyReviewSnapshot(user: AuthenticatedUse
   return coordinator.generate(user, clock.currentDateKey());
 }
 
-export async function catchUpWeeklyReviewSnapshots(): Promise<void> {
+export async function catchUpWeeklyReviewSnapshots(): Promise<boolean> {
   const [rows] = await pool.query('SELECT id, username, is_admin FROM users');
-  if (!Array.isArray(rows)) return;
-  await Promise.all(rows.map((row) => generateCurrentWeeklyReviewSnapshot({
+  if (!Array.isArray(rows)) return false;
+  const snapshots = await Promise.all(rows.map((row) => generateCurrentWeeklyReviewSnapshot({
     id: Number((row as { id: number }).id),
     username: String((row as { username: string }).username),
     isAdmin: Boolean((row as { is_admin: number }).is_admin),
   })));
+  return snapshots.some((snapshot) => snapshot?.status === 'error' && (snapshot.attemptCount ?? 0) < 2);
 }
 
-export function createWeeklyReviewSnapshotScheduler(deps = {
+interface WeeklyReviewSchedulerDeps {
+  catchUp: () => Promise<boolean>;
+  millisecondsUntilNextMidnight: () => number;
+  retryDelayMilliseconds: number;
+  setTimer: (callback: () => void, milliseconds: number) => NodeJS.Timeout;
+  clearTimer: (timer: NodeJS.Timeout) => void;
+}
+
+export function createWeeklyReviewSnapshotScheduler(deps: WeeklyReviewSchedulerDeps = {
   catchUp: catchUpWeeklyReviewSnapshots,
   millisecondsUntilNextMidnight: () => clock.millisecondsUntilNextMidnight(),
+  retryDelayMilliseconds: 60_000,
   setTimer: (callback: () => void, milliseconds: number) => setTimeout(callback, milliseconds),
   clearTimer: (timer: NodeJS.Timeout) => clearTimeout(timer),
 }): () => void {
-  let timer: NodeJS.Timeout | undefined;
+  let midnightTimer: NodeJS.Timeout | undefined;
+  let retryTimer: NodeJS.Timeout | undefined;
   let stopped = false;
+  const runCatchUp = () => {
+    void deps.catchUp().then((shouldRetry) => {
+      if (!shouldRetry || stopped || retryTimer) return;
+      retryTimer = deps.setTimer(() => {
+        retryTimer = undefined;
+        runCatchUp();
+      }, deps.retryDelayMilliseconds);
+    }).catch((error) => console.error('[weekly-review] generation failed', error));
+  };
   const schedule = () => {
     if (stopped) return;
-    timer = deps.setTimer(() => {
-      void deps.catchUp().catch((error) => console.error('[weekly-review] scheduled generation failed', error)).finally(schedule);
+    midnightTimer = deps.setTimer(() => {
+      runCatchUp();
+      schedule();
     }, deps.millisecondsUntilNextMidnight());
   };
-  void deps.catchUp().catch((error) => console.error('[weekly-review] startup catch-up failed', error));
+  runCatchUp();
   schedule();
-  return () => { stopped = true; if (timer) deps.clearTimer(timer); };
+  return () => {
+    stopped = true;
+    if (midnightTimer) deps.clearTimer(midnightTimer);
+    if (retryTimer) deps.clearTimer(retryTimer);
+  };
 }

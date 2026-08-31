@@ -14,7 +14,10 @@ activityKnowledgeRouter.post('/daily/generate', async (req, res) => { try { res.
 activityKnowledgeRouter.get('/weekly', async (req, res) => {
  try {
   const context = await getWeekContext((req as AuthRequest).user, String(req.query?.weekStart ?? ''));
-  res.json({ status: context.status, content: context.intelligence });
+  res.json({
+   status: context.status,
+   content: context.intelligence && { ...context.intelligence, suggestedNextFocus: context.intelligence.nextFocus },
+  });
  } catch (error) { respond(error, res); }
 });
 activityKnowledgeRouter.post('/weekly/generate', async (req, res) => { try { res.json(await generateWeeklyIntelligence((req as AuthRequest).user, String(req.body?.weekStart ?? ''))); } catch (error) { respond(error, res); } });

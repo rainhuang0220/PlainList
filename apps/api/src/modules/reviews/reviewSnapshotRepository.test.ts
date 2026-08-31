@@ -36,12 +36,13 @@ describe('MySQL review snapshot repository', () => {
     expect(snapshot).toMatchObject({ status: 'ready', reviewAsOfDate: '2026-09-01' });
   });
 
-  it('atomically claims pending/error work but never overwrites a ready snapshot', async () => {
+  it('atomically claims retryable or expired generating work but never overwrites a ready snapshot', async () => {
     const query = vi.fn().mockResolvedValue([{ affectedRows: 1 }]);
     const repository = createMysqlReviewSnapshotRepository(query);
 
     await expect(repository.claim(7, '2026-09-01')).resolves.toBe(true);
     expect(query.mock.calls[0]?.[0]).toContain("status IN ('pending', 'error')");
+    expect(query.mock.calls[0]?.[0]).toContain("status = 'generating' AND updated_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL 2 MINUTE)");
     expect(query.mock.calls[0]?.[0]).toContain("SET status = 'generating'");
     expect(query.mock.calls[0]?.[0]).toContain('attempt_count < 2');
   });

@@ -16,6 +16,7 @@ export interface ReviewSnapshot {
   evidence?: unknown | null;
   evidenceHash?: string | null;
   promptVersion?: string | null;
+  attemptCount?: number;
 }
 
 export type ReviewSnapshotCompletion = Pick<ReviewSnapshot, 'content' | 'model' | 'provider' | 'generatedAt'> & {
