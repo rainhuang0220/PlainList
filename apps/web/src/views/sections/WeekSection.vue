@@ -657,7 +657,7 @@ async function loadAiSummary() {
 
 async function loadWeeklyInsight() {
   try {
-    const result = await api.post('/activity/weekly/generate', { weekStart: durationFrom.value })
+    const result = await api.get(`/activity/weekly?weekStart=${durationFrom.value}`)
     if (result?.content) weeklyInsight.value = result.content
   } catch {
     // Insight is a derived enhancement: the descriptive weekly summary remains usable.
