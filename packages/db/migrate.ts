@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { runPendingMigrations } from './migrationRunner';
 import { createPool, ensureDatabaseExists, loadDatabaseConfig } from './utils';
 
 async function main(): Promise<void> {
@@ -18,19 +19,18 @@ async function main(): Promise<void> {
     `);
 
     const migrationsDir = path.resolve(__dirname, 'migrations');
-    const files = (await fs.readdir(migrationsDir)).filter((file) => file.endsWith('.sql')).sort();
-
-    for (const filename of files) {
-      const [rows] = await pool.query('SELECT id FROM schema_migrations WHERE filename = ?', [filename]);
-      if (Array.isArray(rows) && rows.length > 0) {
-        continue;
-      }
-
-      const sql = await fs.readFile(path.join(migrationsDir, filename), 'utf8');
-      await pool.query(sql);
-      await pool.query('INSERT INTO schema_migrations (filename) VALUES (?)', [filename]);
-      console.log(`Applied migration ${filename}`);
-    }
+    await runPendingMigrations(await fs.readdir(migrationsDir), {
+      isApplied: async (filename) => {
+        const [rows] = await pool.query('SELECT id FROM schema_migrations WHERE filename = ?', [filename]);
+        return Array.isArray(rows) && rows.length > 0;
+      },
+      readMigration: (filename) => fs.readFile(path.join(migrationsDir, filename), 'utf8'),
+      applyMigration: async (filename, sql) => {
+        await pool.query(sql);
+        await pool.query('INSERT INTO schema_migrations (filename) VALUES (?)', [filename]);
+        console.log(`Applied migration ${filename}`);
+      },
+    });
   } finally {
     await pool.end();
   }
