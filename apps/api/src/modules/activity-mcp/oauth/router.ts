@@ -87,13 +87,14 @@ export function createActivityOAuthRouter(dependencies: {
       token_endpoint_auth_methods_supported: ['none'],
       scopes_supported: [...MCP_SCOPES],
       authorization_response_iss_parameter_supported: true,
+      client_id_metadata_document_supported: true,
       resource_indicators_supported: true,
     });
   });
 
-  router.get('/oauth/authorize', (req, res) => {
+  router.get('/oauth/authorize', async (req, res) => {
     try {
-      const request = service.validateAuthorizationRequest(authorizationParameters(req.query));
+      const request = await service.validateAuthorizationRequest(authorizationParameters(req.query));
       const hidden = Object.entries(authorizationParameters(request))
         .map(([name, value]) => `<input type="hidden" name="${escapeHtml(name)}" value="${escapeHtml(String(value))}">`).join('');
       const requested = request.scopes.map((scope) => `<li>${escapeHtml(scopeDescriptions[scope] ?? scope)}</li>`).join('');
@@ -108,12 +109,18 @@ export function createActivityOAuthRouter(dependencies: {
   });
 
   router.post('/oauth/authorize', async (req: Request, res: Response) => {
+    let request: Awaited<ReturnType<OAuthService['validateAuthorizationRequest']>>;
     try {
-      const request = service.validateAuthorizationRequest(authorizationParameters(req.body));
-      if (req.body.decision !== 'allow') {
-        redirectAuthorizationResult(res, request.redirect_uri, { error: 'access_denied', state: request.state, iss: issuer });
-        return;
-      }
+      request = await service.validateAuthorizationRequest(authorizationParameters(req.body));
+    } catch (error) {
+      oauthError(error, res);
+      return;
+    }
+    if (req.body.decision !== 'allow') {
+      redirectAuthorizationResult(res, request.redirect_uri, { error: 'access_denied', state: request.state, iss: issuer });
+      return;
+    }
+    try {
       const requestedUsername = typeof req.body.username === 'string' ? req.body.username.trim() : 'unknown';
       let user;
       try {
@@ -132,7 +139,8 @@ export function createActivityOAuthRouter(dependencies: {
         code: authorization.code, state: authorization.state, iss: authorization.issuer,
       });
     } catch (error) {
-      oauthError(error, res);
+      const errorCode = error instanceof OAuthError ? error.error : 'access_denied';
+      redirectAuthorizationResult(res, request.redirect_uri, { error: errorCode, state: request.state, iss: issuer });
     }
   });
 

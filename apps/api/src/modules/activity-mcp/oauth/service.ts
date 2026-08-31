@@ -1,6 +1,7 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { AuthenticatedUser } from '@plainlist/shared';
 import { z } from 'zod';
+import { createOAuthClientResolver, type OAuthClientResolver } from './client';
 
 export const MCP_ACTIVITY_WRITE_SCOPE = 'plainlist.activity.write';
 export const MCP_CONTEXT_READ_SCOPE = 'plainlist.context.read';
@@ -99,26 +100,30 @@ function invalidRequest(): OAuthError {
 export function createOAuthService(dependencies: {
   repository: OAuthGrantRepository;
   config: OAuthServerConfig;
+  clientResolver?: OAuthClientResolver;
   now?: () => Date;
   randomSecret?: () => string;
 }) {
   const now = dependencies.now ?? (() => new Date());
   const randomSecret = dependencies.randomSecret ?? (() => randomBytes(32).toString('base64url'));
   const { repository, config } = dependencies;
+  const clientResolver = dependencies.clientResolver ?? createOAuthClientResolver({
+    predefinedClient: { clientId: config.clientId, redirectUris: config.redirectUris },
+  });
 
   return {
-    validateAuthorizationRequest(rawRequest: unknown) {
+    async validateAuthorizationRequest(rawRequest: unknown) {
       const parsed = authorizationRequestSchema.safeParse(rawRequest);
       if (!parsed.success) throw invalidRequest();
       const request = parsed.data;
-      if (request.client_id !== config.clientId) throw new OAuthError('invalid_client', 400, 'Unknown OAuth client');
-      if (!config.redirectUris.includes(request.redirect_uri)) throw invalidRequest();
+      const client = await clientResolver.resolve(request.client_id);
+      if (!client.redirectUris.includes(request.redirect_uri)) throw invalidRequest();
       if (request.resource !== config.resource) throw invalidRequest();
       return { ...request, scopes: parseScopes(request.scope) };
     },
 
     async authorize(user: AuthenticatedUser, rawRequest: unknown) {
-      const request = this.validateAuthorizationRequest(rawRequest);
+      const request = await this.validateAuthorizationRequest(rawRequest);
       const scopes = request.scopes;
       const code = randomSecret();
       const issuedAt = now();
@@ -146,8 +151,8 @@ export function createOAuthService(dependencies: {
       const parsed = tokenRequestSchema.safeParse(rawRequest);
       if (!parsed.success) throw new OAuthError('invalid_grant', 400, 'The authorization code exchange is invalid');
       const request = parsed.data;
-      if (request.client_id !== config.clientId) throw new OAuthError('invalid_client', 401, 'Unknown OAuth client');
-      if (request.resource !== config.resource || !config.redirectUris.includes(request.redirect_uri)) {
+      const client = await clientResolver.resolve(request.client_id);
+      if (request.resource !== config.resource || !client.redirectUris.includes(request.redirect_uri)) {
         throw new OAuthError('invalid_grant', 400, 'Authorization code binding mismatch');
       }
       const accessToken = randomSecret();
