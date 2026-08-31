@@ -6,17 +6,24 @@ if [[ $# -ne 1 ]]; then
   exit 64
 fi
 
-output_path="$1"
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-mkdir -p "$(dirname "$output_path")"
+output_dir="$(cd "$(dirname "$1")" && pwd)"
+output_path="${output_dir}/$(basename "$1")"
+mkdir -p "$output_dir"
 
-COPYFILE_DISABLE=1 tar -C "$repo_root" -czf "$output_path" \
-  --exclude='.git' \
-  --exclude='node_modules' \
-  --exclude='._*' \
-  --exclude='.DS_Store' \
-  --exclude='__MACOSX' \
-  .
+tar_excludes=(
+  --exclude='.git'
+  --exclude='node_modules'
+  --exclude='._*'
+  --exclude='.DS_Store'
+  --exclude='__MACOSX'
+)
+
+if [[ "$output_path" == "$repo_root/"* ]]; then
+  tar_excludes+=("--exclude=${output_path#"$repo_root/"}")
+fi
+
+COPYFILE_DISABLE=1 tar -C "$repo_root" -czf "$output_path" "${tar_excludes[@]}" .
 
 if tar -tzf "$output_path" | grep -E '(^|/)(\._[^/]*|\.DS_Store|__MACOSX)(/|$)' >/dev/null; then
   echo "refusing release archive containing macOS metadata: $output_path" >&2
