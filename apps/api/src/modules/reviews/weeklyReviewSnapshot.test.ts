@@ -55,4 +55,29 @@ describe('weekly review snapshot scheduler', () => {
     expect(scheduled.filter((item) => item.milliseconds === 100)).toHaveLength(1);
     stop();
   });
+
+  it('performs one bounded delayed retry when catch-up itself rejects', async () => {
+    const catchUp = vi.fn().mockRejectedValueOnce(new Error('database unavailable')).mockResolvedValueOnce(false);
+    const scheduled: Array<{ callback: () => void; milliseconds: number }> = [];
+    const stop = createWeeklyReviewSnapshotScheduler({
+      catchUp,
+      millisecondsUntilNextMidnight: () => 10_000,
+      retryDelayMilliseconds: 100,
+      setTimer: (callback, milliseconds) => {
+        scheduled.push({ callback, milliseconds });
+        return {} as NodeJS.Timeout;
+      },
+      clearTimer: vi.fn(),
+    });
+
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(scheduled.map((item) => item.milliseconds)).toContain(100);
+
+    scheduled.find((item) => item.milliseconds === 100)?.callback();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(catchUp).toHaveBeenCalledTimes(2);
+    stop();
+  });
 });

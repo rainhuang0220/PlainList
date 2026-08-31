@@ -176,19 +176,30 @@ export function createWeeklyReviewSnapshotScheduler(deps: WeeklyReviewSchedulerD
 }): () => void {
   let midnightTimer: NodeJS.Timeout | undefined;
   let retryTimer: NodeJS.Timeout | undefined;
+  let catchUpFailureRetries = 0;
   let stopped = false;
+  const scheduleRetry = () => {
+    if (stopped || retryTimer) return;
+    retryTimer = deps.setTimer(() => {
+      retryTimer = undefined;
+      runCatchUp();
+    }, deps.retryDelayMilliseconds);
+  };
   const runCatchUp = () => {
     void deps.catchUp().then((shouldRetry) => {
-      if (!shouldRetry || stopped || retryTimer) return;
-      retryTimer = deps.setTimer(() => {
-        retryTimer = undefined;
-        runCatchUp();
-      }, deps.retryDelayMilliseconds);
-    }).catch((error) => console.error('[weekly-review] generation failed', error));
+      catchUpFailureRetries = 0;
+      if (shouldRetry) scheduleRetry();
+    }).catch((error) => {
+      console.error('[weekly-review] generation failed', error);
+      if (catchUpFailureRetries >= 1) return;
+      catchUpFailureRetries += 1;
+      scheduleRetry();
+    });
   };
   const schedule = () => {
     if (stopped) return;
     midnightTimer = deps.setTimer(() => {
+      catchUpFailureRetries = 0;
       runCatchUp();
       schedule();
     }, deps.millisecondsUntilNextMidnight());
