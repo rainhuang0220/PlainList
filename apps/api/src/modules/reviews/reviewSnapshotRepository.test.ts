@@ -87,4 +87,16 @@ describe('MySQL review snapshot repository', () => {
     expect(query.mock.calls[0]?.[0]).toContain("status = 'generating' AND claim_token = ?");
     expect(query.mock.calls[0]?.[1]).toContain('expired-claim-token');
   });
+
+  it('expires an exhausted stale lease instead of leaving it generating forever', async () => {
+    const query = vi.fn().mockResolvedValue([{ affectedRows: 1 }]);
+    const repository = createMysqlReviewSnapshotRepository(query);
+
+    await repository.expireExhaustedLeases();
+
+    expect(query.mock.calls[0]?.[0]).toContain("status = 'generating'");
+    expect(query.mock.calls[0]?.[0]).toContain('lease_expires_at <= UTC_TIMESTAMP()');
+    expect(query.mock.calls[0]?.[0]).toContain('attempt_count >= 2');
+    expect(query.mock.calls[0]?.[0]).toContain("SET status = 'error'");
+  });
 });
