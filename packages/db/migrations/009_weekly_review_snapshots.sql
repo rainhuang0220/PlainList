@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS weekly_review_snapshots (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id INT UNSIGNED NOT NULL,
+  review_as_of_date DATE NOT NULL,
+  window_start_date DATE NOT NULL,
+  window_end_date DATE NOT NULL,
+  status ENUM('pending', 'generating', 'ready', 'error') NOT NULL DEFAULT 'pending',
+  content_json JSON NULL,
+  evidence_json JSON NULL,
+  evidence_hash CHAR(64) NULL,
+  provider VARCHAR(32) NULL,
+  model VARCHAR(160) NULL,
+  prompt_version VARCHAR(80) NULL,
+  error_message VARCHAR(500) NULL,
+  generated_at DATETIME(3) NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_weekly_review_snapshot_user_as_of (user_id, review_as_of_date),
+  INDEX idx_weekly_review_snapshot_user_status_date (user_id, status, review_as_of_date),
+  CONSTRAINT fk_weekly_review_snapshot_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

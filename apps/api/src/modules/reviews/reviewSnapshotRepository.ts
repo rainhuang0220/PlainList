@@ -1,0 +1,134 @@
+import type { WeeklySummaryContent } from '@plainlist/shared';
+import type { ReviewSnapshot, ReviewSnapshotRepository } from './reviewSnapshotCoordinator';
+
+export type SqlQuery = (sql: string, values?: unknown[]) => Promise<unknown>;
+
+interface SnapshotRow {
+  user_id: number;
+  review_as_of_date: string;
+  window_start_date: string;
+  window_end_date: string;
+  status: ReviewSnapshot['status'];
+  content_json: string | null;
+  generated_at: string | Date | null;
+  model: string | null;
+  provider: string | null;
+  error_message: string | null;
+  evidence_json?: string | null;
+  evidence_hash?: string | null;
+  prompt_version?: string | null;
+}
+
+const SNAPSHOT_FIELDS = `
+  user_id, review_as_of_date, window_start_date, window_end_date, status,
+  content_json, generated_at, model, provider, error_message, evidence_json, evidence_hash, prompt_version
+`;
+
+function toSnapshot(row: SnapshotRow): ReviewSnapshot {
+  let content: WeeklySummaryContent | null = null;
+  if (row.content_json) {
+    try {
+      content = JSON.parse(row.content_json) as WeeklySummaryContent;
+    } catch {
+      content = null;
+    }
+  }
+
+  return {
+    userId: Number(row.user_id),
+    reviewAsOfDate: String(row.review_as_of_date).slice(0, 10),
+    windowStartDate: String(row.window_start_date).slice(0, 10),
+    windowEndDate: String(row.window_end_date).slice(0, 10),
+    status: row.status,
+    content,
+    generatedAt: row.generated_at ? new Date(row.generated_at).toISOString() : null,
+    model: row.model,
+    provider: row.provider,
+    errorMessage: row.error_message,
+    evidence: row.evidence_json ? JSON.parse(row.evidence_json) : null,
+    evidenceHash: row.evidence_hash ?? null,
+    promptVersion: row.prompt_version ?? null,
+  };
+}
+
+async function rowsFor(query: SqlQuery, sql: string, values: unknown[]): Promise<SnapshotRow[]> {
+  const result = await query(sql, values) as [unknown];
+  return Array.isArray(result[0]) ? result[0] as SnapshotRow[] : [];
+}
+
+export function createMysqlReviewSnapshotRepository(query: SqlQuery): ReviewSnapshotRepository {
+  async function find(userId: number, reviewAsOfDate: string): Promise<ReviewSnapshot | null> {
+    const rows = await rowsFor(query,
+      `SELECT ${SNAPSHOT_FIELDS} FROM weekly_review_snapshots WHERE user_id = ? AND review_as_of_date = ?`,
+      [userId, reviewAsOfDate]);
+    return rows[0] ? toSnapshot(rows[0]) : null;
+  }
+
+  return {
+    async ensure(input) {
+      await query(
+        `INSERT INTO weekly_review_snapshots
+          (user_id, review_as_of_date, window_start_date, window_end_date, status)
+         VALUES (?, ?, ?, ?, 'pending')
+         ON DUPLICATE KEY UPDATE review_as_of_date = VALUES(review_as_of_date)`,
+        [input.userId, input.reviewAsOfDate, input.windowStartDate, input.windowEndDate],
+      );
+      const snapshot = await find(input.userId, input.reviewAsOfDate);
+      if (!snapshot) {
+        throw new Error('review snapshot was not found after ensure');
+      }
+      return snapshot;
+    },
+    find,
+    async claim(userId, reviewAsOfDate) {
+      const result = await query(
+        `UPDATE weekly_review_snapshots
+         SET status = 'generating', error_message = NULL
+         WHERE user_id = ? AND review_as_of_date = ? AND status IN ('pending', 'error')`,
+        [userId, reviewAsOfDate],
+      ) as [{ affectedRows?: number }];
+      return Number(result[0]?.affectedRows) === 1;
+    },
+    async complete(userId, reviewAsOfDate, result) {
+      await query(
+        `UPDATE weekly_review_snapshots
+         SET status = 'ready', content_json = ?, evidence_json = ?, evidence_hash = ?, prompt_version = ?,
+             generated_at = ?, model = ?, provider = ?, error_message = NULL
+         WHERE user_id = ? AND review_as_of_date = ? AND status = 'generating'`,
+        [
+          JSON.stringify(result.content),
+          JSON.stringify(result.evidence ?? null),
+          result.evidenceHash ?? null,
+          result.promptVersion ?? null,
+          result.generatedAt,
+          result.model,
+          result.provider,
+          userId,
+          reviewAsOfDate,
+        ],
+      );
+      const snapshot = await find(userId, reviewAsOfDate);
+      if (!snapshot) throw new Error('review snapshot was not found after completion');
+      return snapshot;
+    },
+    async fail(userId, reviewAsOfDate, errorMessage) {
+      await query(
+        `UPDATE weekly_review_snapshots
+         SET status = 'error', error_message = ?
+         WHERE user_id = ? AND review_as_of_date = ? AND status = 'generating'`,
+        [errorMessage.slice(0, 500), userId, reviewAsOfDate],
+      );
+      const snapshot = await find(userId, reviewAsOfDate);
+      if (!snapshot) throw new Error('review snapshot was not found after failure');
+      return snapshot;
+    },
+    async latestReady(userId) {
+      const rows = await rowsFor(query,
+        `SELECT ${SNAPSHOT_FIELDS} FROM weekly_review_snapshots
+         WHERE user_id = ? AND status = 'ready'
+         ORDER BY review_as_of_date DESC LIMIT 1`,
+        [userId]);
+      return rows[0] ? toSnapshot(rows[0]) : null;
+    },
+  };
+}

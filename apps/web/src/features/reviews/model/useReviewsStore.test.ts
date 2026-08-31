@@ -21,7 +21,7 @@ describe('useReviewsStore weekly summary', () => {
     setActivePinia(createPinia());
   });
 
-  it('loads a cached weekly summary without generating', async () => {
+  it('loads today\'s saved snapshot through a read-only endpoint', async () => {
     api.get.mockResolvedValueOnce({
       status: 'ready',
       weekStart: '2026-08-24',
@@ -39,25 +39,16 @@ describe('useReviewsStore weekly summary', () => {
     });
 
     const store = useReviewsStore();
-    const result = await store.fetchWeeklySummary('2026-08-24');
-    expect(api.get).toHaveBeenCalledWith('/reviews/weekly-summary?weekStart=2026-08-24');
+    const result = await store.fetchWeeklySummary();
+    expect(api.get).toHaveBeenCalledWith('/reviews/weekly-summary');
     expect(result.status).toBe('ready');
     expect(api.post).not.toHaveBeenCalled();
   });
 
-  it('posts generate when asked and does not throw on unavailable', async () => {
-    api.post.mockResolvedValueOnce({
-      status: 'unavailable',
-      weekStart: '2026-08-24',
-      weekEnd: '2026-08-30',
-      promptVersion: 'weekly-summary-v1',
-      reason: 'AI 周总结暂时不可用。',
-    });
-
+  it('does not expose a page-triggered generation command', async () => {
     const store = useReviewsStore();
-    const result = await store.generateWeeklySummary('2026-08-24');
-    expect(api.post).toHaveBeenCalledWith('/reviews/weekly-summary', { weekStart: '2026-08-24' });
-    expect(result.status).toBe('unavailable');
+    expect((store as unknown as Record<string, unknown>).generateWeeklySummary).toBeUndefined();
+    expect(api.post).not.toHaveBeenCalled();
   });
 });
 
@@ -82,4 +73,3 @@ describe('useReviewsStore persist', () => {
     expect(store.getReview('2026-08-28')).toBe('未落盘');
   });
 });
-

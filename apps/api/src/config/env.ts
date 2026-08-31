@@ -51,6 +51,7 @@ const envSchema = z.object({
   MCP_AUTH_CODE_TTL_SECONDS: z.coerce.number().int().min(60).max(600).default(300),
   MCP_ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().min(300).max(86400).default(900),
   MCP_ALLOWED_ORIGINS: z.string().optional().default(''),
+  APP_TIME_ZONE: z.string().default('Asia/Shanghai'),
 });
 
 export const env = envSchema.parse(process.env);

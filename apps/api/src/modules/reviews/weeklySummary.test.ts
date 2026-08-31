@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ChecksByPlan, PlanRecord, UserProfileTraitRecord } from '@plainlist/shared';
 import {
   WEEKLY_SUMMARY_PROMPT_VERSION,
+  assembleReviewSnapshotEvidence,
   assembleWeeklyEvidence,
   buildWeeklySummarySystemPrompt,
   isWeeklySummaryCacheFresh,
@@ -219,6 +220,26 @@ describe('assembleWeeklyEvidence', () => {
     });
     const monday = evidence.days.find((day) => day.date === '2026-08-24');
     expect(monday?.items.some((item) => item.name === '论文实验')).toBe(false);
+  });
+});
+
+describe('assembleReviewSnapshotEvidence', () => {
+  it('keeps the current local date out of a Tuesday snapshot while preserving calendar-week context', () => {
+    const evidence = assembleReviewSnapshotEvidence({
+      reviewAsOfDate: '2026-09-01',
+      plans: [],
+      checks: {},
+      reviews: {
+        '2026-08-31': '昨天完成了实验。',
+        '2026-09-01': '今天新建的任务不得进入这份快照。',
+      },
+      profile: [],
+    });
+
+    expect(evidence.weekStart).toBe('2026-08-31');
+    expect(evidence.weekEnd).toBe('2026-08-31');
+    expect(evidence.days.at(-1)?.date).toBe('2026-08-31');
+    expect(evidence.days.some((day) => day.date === '2026-09-01')).toBe(false);
   });
 });
 

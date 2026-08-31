@@ -12,7 +12,7 @@ STAGE_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 STAGE_DIR="${STAGE_DIR}/.electron-stage"
 RELEASE_DIR="${STAGE_DIR}/release"
 APP_NAME="PlainList"
-VERSION="2.1.1"
+VERSION="${PLAINLIST_VERSION:-2.2.0}"
 DMG_NAME="${APP_NAME}-${VERSION}-${ARCH}.dmg"
 
 case "$ARCH" in

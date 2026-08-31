@@ -1,6 +1,7 @@
 import { createApp } from './app';
 import { env } from './config/env';
 import { startInstalledWidgets, stopWidget } from './modules/plugins/widgetRunner';
+import { createWeeklyReviewSnapshotScheduler } from './modules/reviews/weeklyReviewSnapshot';
 
 const app = createApp();
 
@@ -8,12 +9,14 @@ const server = app.listen(env.PORT, () => {
   console.log(`PlainList API listening on http://localhost:${env.PORT}`);
   void startInstalledWidgets();
 });
+const stopWeeklyReviewScheduler = createWeeklyReviewSnapshotScheduler();
 
 // Graceful shutdown: clean up detached widget processes on Ctrl+C
 function gracefulShutdown(signal: string) {
   console.log(`\n[${signal}] Shutting down gracefully...`);
 
   // Stop all running widgets
+  stopWeeklyReviewScheduler();
   try {
     const { execSync } = require('child_process');
     console.log('[shutdown] Stopping widget processes...');

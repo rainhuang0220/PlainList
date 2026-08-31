@@ -5,7 +5,7 @@ import { toDateKey } from '@plainlist/shared';
 import { useApi } from '@/shared/api/useApi';
 
 export const useReviewsStore = defineStore('reviews', () => {
-  const { get, put, post } = useApi();
+  const { get, put } = useApi();
   const reviews = ref<Record<string, string>>({});
 
   async function fetchRange(from: string, to: string) {
@@ -33,12 +33,8 @@ export const useReviewsStore = defineStore('reviews', () => {
     return reviews.value[dateKey] ?? '';
   }
 
-  async function fetchWeeklySummary(weekStart: string) {
-    return get<WeeklySummaryResponse>(`/reviews/weekly-summary?weekStart=${weekStart}`);
-  }
-
-  async function generateWeeklySummary(weekStart: string) {
-    return post<WeeklySummaryResponse>('/reviews/weekly-summary', { weekStart });
+  async function fetchWeeklySummary() {
+    return get<WeeklySummaryResponse>('/reviews/weekly-summary');
   }
 
   function clear() {
@@ -52,7 +48,6 @@ export const useReviewsStore = defineStore('reviews', () => {
     persist,
     getReview,
     fetchWeeklySummary,
-    generateWeeklySummary,
     clear,
   };
 });

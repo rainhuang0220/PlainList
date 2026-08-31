@@ -248,7 +248,7 @@ export interface WeeklySummaryContent {
   nextFocus: string[];
 }
 
-export type WeeklySummaryStatus = 'ready' | 'missing' | 'unavailable';
+export type WeeklySummaryStatus = 'ready' | 'missing' | 'unavailable' | 'pending' | 'generating' | 'error';
 
 export interface WeeklySummaryResponse {
   status: WeeklySummaryStatus;
@@ -261,6 +261,8 @@ export interface WeeklySummaryResponse {
   cached?: boolean;
   reason?: string;
   content?: WeeklySummaryContent;
+  reviewAsOfDate?: string;
+  fallback?: boolean;
 }
 
 export interface InstalledPlugin {

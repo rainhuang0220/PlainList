@@ -48,6 +48,7 @@
         </template>
       </div>
       <div class="week-ai-kicker">{{ t('week.summary.title', '本周总结') }}</div>
+      <div v-if="reviewWindowLabel" class="week-ai-range">{{ reviewWindowLabel }}</div>
       <div v-if="aiStatus === 'loading'" class="week-ai-loading">
         {{ t('week.summary.loading', '正在整理本周观察…') }}
       </div>
@@ -79,6 +80,7 @@
           </ul>
         </div>
       </template>
+      <p v-else class="week-ai-empty">{{ aiError || t('week.summary.updating', '最新回顾更新中。') }}</p>
     </div>
 
     <div v-show="weekView === 'data'" class="week-data-panel">
@@ -209,6 +211,7 @@ const aiError = ref('')
 const aiSummary = ref(null)
 const weeklyInsight = ref(null)
 const api = useApi()
+const reviewWindow = ref(null)
 function t(key, fallback, params) { return i18n.t(key, fallback, params) }
 
 const radarEl = ref(null)
@@ -257,6 +260,18 @@ const rangeLabel = computed(() => {
   }
 
   return `${monthNamesShort.value[monday.value.getMonth()]} ${monday.value.getDate()} - ${monthNamesShort.value[sunday.getMonth()]} ${sunday.getDate()}`
+})
+
+const reviewWindowLabel = computed(() => {
+  if (!reviewWindow.value) return ''
+  const [startYear, startMonth, startDay] = reviewWindow.value.start.split('-').map(Number)
+  const [endYear, endMonth, endDay] = reviewWindow.value.end.split('-').map(Number)
+  if (i18n.locale === 'zh-CN') {
+    const start = `${startMonth}月${startDay}日`
+    const end = startYear === endYear ? `${endMonth}月${endDay}日` : `${endYear}年${endMonth}月${endDay}日`
+    return `${start}－${end}`
+  }
+  return `${monthNamesShort.value[startMonth - 1]} ${startDay} - ${monthNamesShort.value[endMonth - 1]} ${endDay}`
 })
 
 const chartTabs = computed(() => [
@@ -624,22 +639,19 @@ async function loadAiSummary() {
   aiStatus.value = 'loading'
   aiError.value = ''
   try {
-    let result = await reviewsStore.fetchWeeklySummary(durationFrom.value)
-    if (result.status === 'missing') {
-      result = await reviewsStore.generateWeeklySummary(durationFrom.value)
-    }
+    const result = await reviewsStore.fetchWeeklySummary()
+    reviewWindow.value = result.weekStart && result.weekEnd ? { start: result.weekStart, end: result.weekEnd } : null
     if (result.status === 'ready' && result.content) {
       aiSummary.value = result.content
       aiStatus.value = 'ready'
+      if (result.fallback) aiError.value = result.reason || t('week.summary.updating', '最新回顾更新中。')
       return
     }
     aiError.value = result.reason || t('week.summary.unavailable', 'AI 周总结暂时不可用。')
     aiStatus.value = 'unavailable'
-    weekView.value = 'data'
   } catch {
     aiError.value = t('week.summary.unavailable', 'AI 周总结暂时不可用。')
     aiStatus.value = 'unavailable'
-    weekView.value = 'data'
   }
 }
 
@@ -728,6 +740,8 @@ onBeforeUnmount(() => {
   text-transform: uppercase;
   color: var(--muted);
 }
+.week-ai-range { color: var(--muted); font-size: .78rem; margin: -.35rem 0 .75rem; }
+.week-ai-empty { color: var(--mid); margin: 1rem 0; }
 .week-ai-loading {
   color: var(--muted);
   font-size: .85rem;
