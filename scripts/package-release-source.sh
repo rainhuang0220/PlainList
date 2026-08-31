@@ -7,9 +7,9 @@ if [[ $# -ne 1 ]]; then
 fi
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+mkdir -p "$(dirname "$1")"
 output_dir="$(cd "$(dirname "$1")" && pwd)"
 output_path="${output_dir}/$(basename "$1")"
-mkdir -p "$output_dir"
 
 tar_excludes=(
   --exclude='.git'
