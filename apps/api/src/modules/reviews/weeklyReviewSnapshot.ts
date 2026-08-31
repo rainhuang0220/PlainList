@@ -160,6 +160,7 @@ export async function catchUpWeeklyReviewSnapshots(): Promise<boolean> {
 }
 
 export async function recoverExpiredWeeklyReviewSnapshots(): Promise<void> {
+  await repository.expireExhaustedLeases();
   const [rows] = await pool.query(
     `SELECT u.id, u.username, u.is_admin
      FROM weekly_review_snapshots s

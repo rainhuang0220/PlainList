@@ -32,6 +32,7 @@ export interface ReviewSnapshotRepository {
   complete(userId: number, reviewAsOfDate: string, claimToken: string, result: ReviewSnapshotCompletion): Promise<ReviewSnapshot>;
   fail(userId: number, reviewAsOfDate: string, claimToken: string, errorMessage: string): Promise<ReviewSnapshot>;
   latestReady(userId: number): Promise<ReviewSnapshot | null>;
+  expireExhaustedLeases(): Promise<void>;
 }
 
 export function createReviewSnapshotCoordinator(input: {

@@ -139,5 +139,15 @@ export function createMysqlReviewSnapshotRepository(query: SqlQuery): ReviewSnap
         [userId]);
       return rows[0] ? toSnapshot(rows[0]) : null;
     },
+    async expireExhaustedLeases() {
+      await query(
+        `UPDATE weekly_review_snapshots
+         SET status = 'error', error_message = 'review generation lease expired after maximum attempts',
+             claim_token = NULL, lease_expires_at = NULL
+         WHERE status = 'generating'
+           AND lease_expires_at <= UTC_TIMESTAMP()
+           AND attempt_count >= 2`,
+      );
+    },
   };
 }
