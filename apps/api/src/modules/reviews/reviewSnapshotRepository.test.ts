@@ -40,10 +40,12 @@ describe('MySQL review snapshot repository', () => {
     const query = vi.fn().mockResolvedValue([{ affectedRows: 1 }]);
     const repository = createMysqlReviewSnapshotRepository(query);
 
-    await expect(repository.claim(7, '2026-09-01')).resolves.toBe(true);
+    await expect(repository.claim(7, '2026-09-01')).resolves.toEqual(expect.any(String));
     expect(query.mock.calls[0]?.[0]).toContain("status IN ('pending', 'error')");
-    expect(query.mock.calls[0]?.[0]).toContain("status = 'generating' AND updated_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL 2 MINUTE)");
+    expect(query.mock.calls[0]?.[0]).toContain("status = 'generating' AND lease_expires_at < UTC_TIMESTAMP()");
     expect(query.mock.calls[0]?.[0]).toContain("SET status = 'generating'");
+    expect(query.mock.calls[0]?.[0]).toContain('claim_token = ?');
+    expect(query.mock.calls[0]?.[0]).toContain('lease_expires_at = DATE_ADD(UTC_TIMESTAMP(), INTERVAL 6 MINUTE)');
     expect(query.mock.calls[0]?.[0]).toContain('attempt_count < 2');
   });
 
@@ -53,7 +55,7 @@ describe('MySQL review snapshot repository', () => {
       .mockResolvedValueOnce([[row]]);
     const repository = createMysqlReviewSnapshotRepository(query);
 
-    await repository.complete(7, '2026-09-01', {
+    await repository.complete(7, '2026-09-01', 'claim-token', {
       content: JSON.parse(row.content_json),
       generatedAt: '2026-09-01T00:00:00.000Z',
       model: 'demo',
@@ -65,10 +67,24 @@ describe('MySQL review snapshot repository', () => {
 
     expect(query.mock.calls[0]?.[0]).toContain('evidence_json = ?');
     expect(query.mock.calls[0]?.[0]).toContain('prompt_version = ?');
+    expect(query.mock.calls[0]?.[0]).toContain('claim_token = NULL, lease_expires_at = NULL');
+    expect(query.mock.calls[0]?.[0]).toContain('AND claim_token = ?');
     expect(query.mock.calls[0]?.[1]).toEqual(expect.arrayContaining([
       JSON.stringify({ days: [{ date: '2026-08-31' }] }),
       'a'.repeat(64),
       'weekly-summary-v1',
     ]));
+  });
+
+  it('does not let an expired claim token mark a newer generation as failed', async () => {
+    const query = vi.fn()
+      .mockResolvedValueOnce([{ affectedRows: 0 }])
+      .mockResolvedValueOnce([[row]]);
+    const repository = createMysqlReviewSnapshotRepository(query);
+
+    await repository.fail(7, '2026-09-01', 'expired-claim-token', 'old worker failed');
+
+    expect(query.mock.calls[0]?.[0]).toContain("status = 'generating' AND claim_token = ?");
+    expect(query.mock.calls[0]?.[1]).toContain('expired-claim-token');
   });
 });

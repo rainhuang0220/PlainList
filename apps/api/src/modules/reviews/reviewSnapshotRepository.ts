@@ -1,4 +1,5 @@
 import type { WeeklySummaryContent } from '@plainlist/shared';
+import { randomUUID } from 'node:crypto';
 import type { ReviewSnapshot, ReviewSnapshotRepository } from './reviewSnapshotCoordinator';
 
 export type SqlQuery = (sql: string, values?: unknown[]) => Promise<unknown>;
@@ -83,23 +84,25 @@ export function createMysqlReviewSnapshotRepository(query: SqlQuery): ReviewSnap
     },
     find,
     async claim(userId, reviewAsOfDate) {
+      const claimToken = randomUUID();
       const result = await query(
         `UPDATE weekly_review_snapshots
-         SET status = 'generating', error_message = NULL, attempt_count = attempt_count + 1
+         SET status = 'generating', error_message = NULL, attempt_count = attempt_count + 1,
+             claim_token = ?, lease_expires_at = DATE_ADD(UTC_TIMESTAMP(), INTERVAL 6 MINUTE)
          WHERE user_id = ? AND review_as_of_date = ?
            AND (status IN ('pending', 'error')
-                OR (status = 'generating' AND updated_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL 2 MINUTE)))
+                OR (status = 'generating' AND lease_expires_at < UTC_TIMESTAMP()))
            AND attempt_count < 2`,
-        [userId, reviewAsOfDate],
+        [claimToken, userId, reviewAsOfDate],
       ) as [{ affectedRows?: number }];
-      return Number(result[0]?.affectedRows) === 1;
+      return Number(result[0]?.affectedRows) === 1 ? claimToken : null;
     },
-    async complete(userId, reviewAsOfDate, result) {
+    async complete(userId, reviewAsOfDate, claimToken, result) {
       await query(
         `UPDATE weekly_review_snapshots
          SET status = 'ready', content_json = ?, evidence_json = ?, evidence_hash = ?, prompt_version = ?,
-             generated_at = ?, model = ?, provider = ?, error_message = NULL
-         WHERE user_id = ? AND review_as_of_date = ? AND status = 'generating'`,
+             generated_at = ?, model = ?, provider = ?, error_message = NULL, claim_token = NULL, lease_expires_at = NULL
+         WHERE user_id = ? AND review_as_of_date = ? AND status = 'generating' AND claim_token = ?`,
         [
           JSON.stringify(result.content),
           JSON.stringify(result.evidence ?? null),
@@ -110,18 +113,19 @@ export function createMysqlReviewSnapshotRepository(query: SqlQuery): ReviewSnap
           result.provider,
           userId,
           reviewAsOfDate,
+          claimToken,
         ],
       );
       const snapshot = await find(userId, reviewAsOfDate);
       if (!snapshot) throw new Error('review snapshot was not found after completion');
       return snapshot;
     },
-    async fail(userId, reviewAsOfDate, errorMessage) {
+    async fail(userId, reviewAsOfDate, claimToken, errorMessage) {
       await query(
         `UPDATE weekly_review_snapshots
-         SET status = 'error', error_message = ?
-         WHERE user_id = ? AND review_as_of_date = ? AND status = 'generating'`,
-        [errorMessage.slice(0, 500), userId, reviewAsOfDate],
+         SET status = 'error', error_message = ?, claim_token = NULL, lease_expires_at = NULL
+         WHERE user_id = ? AND review_as_of_date = ? AND status = 'generating' AND claim_token = ?`,
+        [errorMessage.slice(0, 500), userId, reviewAsOfDate, claimToken],
       );
       const snapshot = await find(userId, reviewAsOfDate);
       if (!snapshot) throw new Error('review snapshot was not found after failure');

@@ -28,9 +28,9 @@ export type ReviewSnapshotCompletion = Pick<ReviewSnapshot, 'content' | 'model' 
 export interface ReviewSnapshotRepository {
   ensure(input: Pick<ReviewSnapshot, 'userId' | 'reviewAsOfDate' | 'windowStartDate' | 'windowEndDate'>): Promise<ReviewSnapshot>;
   find(userId: number, reviewAsOfDate: string): Promise<ReviewSnapshot | null>;
-  claim(userId: number, reviewAsOfDate: string): Promise<boolean>;
-  complete(userId: number, reviewAsOfDate: string, result: ReviewSnapshotCompletion): Promise<ReviewSnapshot>;
-  fail(userId: number, reviewAsOfDate: string, errorMessage: string): Promise<ReviewSnapshot>;
+  claim(userId: number, reviewAsOfDate: string): Promise<string | null>;
+  complete(userId: number, reviewAsOfDate: string, claimToken: string, result: ReviewSnapshotCompletion): Promise<ReviewSnapshot>;
+  fail(userId: number, reviewAsOfDate: string, claimToken: string, errorMessage: string): Promise<ReviewSnapshot>;
   latestReady(userId: number): Promise<ReviewSnapshot | null>;
 }
 
@@ -51,13 +51,14 @@ export function createReviewSnapshotCoordinator(input: {
       return snapshot;
     }
 
-    if (!await input.repository.claim(user.id, reviewAsOfDate)) {
+    const claimToken = await input.repository.claim(user.id, reviewAsOfDate);
+    if (!claimToken) {
       return input.repository.find(user.id, reviewAsOfDate);
     }
 
     try {
       const result = await input.generate(user, snapshot);
-      return input.repository.complete(user.id, reviewAsOfDate, {
+      return input.repository.complete(user.id, reviewAsOfDate, claimToken, {
         ...result,
         generatedAt: input.now().toISOString(),
       });
@@ -65,6 +66,7 @@ export function createReviewSnapshotCoordinator(input: {
       return input.repository.fail(
         user.id,
         reviewAsOfDate,
+        claimToken,
         error instanceof Error ? error.message : 'review generation failed',
       );
     }

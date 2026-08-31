@@ -32,16 +32,16 @@ function createRepository(): ReviewSnapshotRepository {
     },
     async claim(userId, reviewAsOfDate) {
       const snapshot = records.get(key(userId, reviewAsOfDate));
-      if (!snapshot || !['pending', 'error'].includes(snapshot.status)) return false;
+      if (!snapshot || !['pending', 'error'].includes(snapshot.status)) return null;
       snapshot.status = 'generating';
-      return true;
+      return 'test-claim-token';
     },
-    async complete(userId, reviewAsOfDate, result) {
+    async complete(userId, reviewAsOfDate, _claimToken, result) {
       const snapshot = records.get(key(userId, reviewAsOfDate))!;
       Object.assign(snapshot, { status: 'ready', ...result, errorMessage: null });
       return snapshot;
     },
-    async fail(userId, reviewAsOfDate, errorMessage) {
+    async fail(userId, reviewAsOfDate, _claimToken, errorMessage) {
       const snapshot = records.get(key(userId, reviewAsOfDate))!;
       snapshot.status = 'error';
       snapshot.errorMessage = errorMessage;
