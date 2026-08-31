@@ -8,6 +8,7 @@ import {
   type AuthorizationCodeRecord,
   type OAuthGrantRepository,
 } from './service';
+import { createOAuthClientResolver } from './client';
 
 class MemoryGrantRepository implements OAuthGrantRepository {
   readonly codes = new Map<string, AuthorizationCodeRecord>();
@@ -94,6 +95,37 @@ async function authorizeAndExchange(now = baseNow) {
 }
 
 describe('MCP OAuth 2.1 authorization code + PKCE', () => {
+  it('completes authorization-code PKCE flow for a trusted ChatGPT CIMD client', async () => {
+    const cimdClientId = 'https://chatgpt.com/oauth/client.json';
+    const cimdRedirectUri = 'https://chatgpt.com/connector_platform_oauth_redirect';
+    const resolver = createOAuthClientResolver({
+      predefinedClient: { clientId: 'chatgpt-test-client', redirectUris: [authRequest.redirect_uri] },
+      fetchClientMetadata: async () => new Response(JSON.stringify({
+        client_id: cimdClientId,
+        client_name: 'ChatGPT',
+        redirect_uris: [cimdRedirectUri],
+        grant_types: ['authorization_code'],
+        response_types: ['code'],
+        token_endpoint_auth_method: 'none',
+      }), { headers: { 'content-type': 'application/json' } }),
+    });
+    const repository = new MemoryGrantRepository();
+    const service = createOAuthService({
+      repository, now: () => baseNow, randomSecret: () => `cimd-secret-${'x'.repeat(48)}`,
+      config: { issuer: 'https://plainlist.example', resource: authRequest.resource, clientId: 'chatgpt-test-client',
+        redirectUris: [authRequest.redirect_uri], authorizationCodeTtlSeconds: 300, accessTokenTtlSeconds: 900 },
+      clientResolver: resolver,
+    });
+    const request = { ...authRequest, client_id: cimdClientId, redirect_uri: cimdRedirectUri };
+
+    const authorization = await service.authorize({ id: 7, username: 'reader', isAdmin: false }, request);
+    await expect(service.exchangeAuthorizationCode({
+      grant_type: 'authorization_code', client_id: cimdClientId, redirect_uri: cimdRedirectUri,
+      resource: authRequest.resource, code: authorization.code, code_verifier: verifier,
+    })).resolves.toMatchObject({ token_type: 'Bearer' });
+    expect([...repository.codes.values()][0]).toMatchObject({ clientId: cimdClientId, redirectUri: cimdRedirectUri });
+  });
+
   it('accepts a valid authorization request and stores only a code hash', async () => {
     const { repository, service } = setup();
     const result = await service.authorize({ id: 7, username: 'reader', isAdmin: false }, authRequest);
