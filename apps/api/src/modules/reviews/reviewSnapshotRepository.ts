@@ -83,8 +83,8 @@ export function createMysqlReviewSnapshotRepository(query: SqlQuery): ReviewSnap
     async claim(userId, reviewAsOfDate) {
       const result = await query(
         `UPDATE weekly_review_snapshots
-         SET status = 'generating', error_message = NULL
-         WHERE user_id = ? AND review_as_of_date = ? AND status IN ('pending', 'error')`,
+         SET status = 'generating', error_message = NULL, attempt_count = attempt_count + 1
+         WHERE user_id = ? AND review_as_of_date = ? AND status IN ('pending', 'error') AND attempt_count < 2`,
         [userId, reviewAsOfDate],
       ) as [{ affectedRows?: number }];
       return Number(result[0]?.affectedRows) === 1;

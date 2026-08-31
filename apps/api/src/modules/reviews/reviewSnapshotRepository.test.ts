@@ -43,6 +43,7 @@ describe('MySQL review snapshot repository', () => {
     await expect(repository.claim(7, '2026-09-01')).resolves.toBe(true);
     expect(query.mock.calls[0]?.[0]).toContain("status IN ('pending', 'error')");
     expect(query.mock.calls[0]?.[0]).toContain("SET status = 'generating'");
+    expect(query.mock.calls[0]?.[0]).toContain('attempt_count < 2');
   });
 
   it('persists the generated intelligence together with its evidence and prompt metadata', async () => {

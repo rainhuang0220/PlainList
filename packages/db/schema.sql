@@ -176,6 +176,7 @@ CREATE TABLE IF NOT EXISTS weekly_review_snapshots (
   window_start_date DATE NOT NULL,
   window_end_date DATE NOT NULL,
   status ENUM('pending', 'generating', 'ready', 'error') NOT NULL DEFAULT 'pending',
+  attempt_count TINYINT UNSIGNED NOT NULL DEFAULT 0,
   content_json JSON NULL,
   evidence_json JSON NULL,
   evidence_hash CHAR(64) NULL,
