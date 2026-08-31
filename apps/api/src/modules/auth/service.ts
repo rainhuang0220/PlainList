@@ -50,7 +50,7 @@ export async function registerUser(payload: unknown): Promise<AuthSuccessRespons
   };
 }
 
-export async function loginUser(payload: unknown): Promise<AuthSuccessResponse> {
+export async function authenticateUserCredentials(payload: unknown): Promise<AuthenticatedUser> {
   const input = loginSchema.parse(payload);
   const [rows] = await pool.query('SELECT id, username, password, is_admin FROM users WHERE username = ?', [input.username]);
 
@@ -64,7 +64,11 @@ export async function loginUser(payload: unknown): Promise<AuthSuccessResponse> 
     throw serviceError(401, 'incorrect passphrase');
   }
 
-  const authenticatedUser = toAuthenticatedUser(user);
+  return toAuthenticatedUser(user);
+}
+
+export async function loginUser(payload: unknown): Promise<AuthSuccessResponse> {
+  const authenticatedUser = await authenticateUserCredentials(payload);
   return {
     token: signToken(authenticatedUser),
     username: authenticatedUser.username,

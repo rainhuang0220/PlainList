@@ -1,0 +1,22 @@
+CREATE TABLE IF NOT EXISTS activity_mcp_oauth_grants (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id INT UNSIGNED NOT NULL,
+  client_id VARCHAR(512) NOT NULL,
+  redirect_uri VARCHAR(1024) NOT NULL,
+  scopes VARCHAR(255) NOT NULL,
+  resource VARCHAR(1024) NOT NULL,
+  authorization_code_hash CHAR(64) NOT NULL,
+  code_challenge VARCHAR(128) NOT NULL,
+  code_challenge_method ENUM('S256') NOT NULL,
+  code_expires_at DATETIME(3) NOT NULL,
+  code_used_at DATETIME(3) NULL,
+  access_token_hash CHAR(64) NULL,
+  access_token_expires_at DATETIME(3) NULL,
+  revoked_at DATETIME(3) NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_activity_mcp_oauth_code_hash (authorization_code_hash),
+  UNIQUE KEY uk_activity_mcp_oauth_access_hash (access_token_hash),
+  INDEX idx_activity_mcp_oauth_user_client (user_id, client_id),
+  CONSTRAINT fk_activity_mcp_oauth_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
