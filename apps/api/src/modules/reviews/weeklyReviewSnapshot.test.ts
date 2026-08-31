@@ -8,6 +8,7 @@ describe('weekly review snapshot scheduler', () => {
     const scheduled: Array<() => void> = [];
     const stop = createWeeklyReviewSnapshotScheduler({
       catchUp,
+      recover: vi.fn().mockResolvedValue(undefined),
       millisecondsUntilNextMidnight,
       retryDelayMilliseconds: 60_000,
       setTimer: (callback) => {
@@ -35,6 +36,7 @@ describe('weekly review snapshot scheduler', () => {
     const scheduled: Array<{ callback: () => void; milliseconds: number }> = [];
     const stop = createWeeklyReviewSnapshotScheduler({
       catchUp,
+      recover: vi.fn().mockResolvedValue(undefined),
       millisecondsUntilNextMidnight: () => 10_000,
       retryDelayMilliseconds: 100,
       setTimer: (callback, milliseconds) => {
@@ -61,6 +63,7 @@ describe('weekly review snapshot scheduler', () => {
     const scheduled: Array<{ callback: () => void; milliseconds: number }> = [];
     const stop = createWeeklyReviewSnapshotScheduler({
       catchUp,
+      recover: vi.fn().mockResolvedValue(undefined),
       millisecondsUntilNextMidnight: () => 10_000,
       retryDelayMilliseconds: 100,
       setTimer: (callback, milliseconds) => {
@@ -78,6 +81,52 @@ describe('weekly review snapshot scheduler', () => {
     await Promise.resolve();
     await Promise.resolve();
     expect(catchUp).toHaveBeenCalledTimes(2);
+    stop();
+  });
+
+  it('runs recovery immediately and once per recovery interval', async () => {
+    const catchUp = vi.fn().mockResolvedValue(false);
+    let resolveFirstRecovery!: () => void;
+    const firstRecovery = new Promise<void>((resolve) => {
+      resolveFirstRecovery = resolve;
+    });
+    let activeRecoveries = 0;
+    let maxActiveRecoveries = 0;
+    const recover = vi.fn()
+      .mockImplementationOnce(() => {
+        activeRecoveries += 1;
+        maxActiveRecoveries = Math.max(maxActiveRecoveries, activeRecoveries);
+        return firstRecovery.finally(() => { activeRecoveries -= 1; });
+      })
+      .mockResolvedValue(undefined);
+    const scheduled: Array<{ callback: () => void; milliseconds: number }> = [];
+    const stop = createWeeklyReviewSnapshotScheduler({
+      catchUp,
+      recover,
+      millisecondsUntilNextMidnight: () => 10_000,
+      retryDelayMilliseconds: 100,
+      recoveryIntervalMilliseconds: 60_000,
+      setTimer: (callback, milliseconds) => {
+        scheduled.push({ callback, milliseconds });
+        return {} as NodeJS.Timeout;
+      },
+      clearTimer: vi.fn(),
+    });
+
+    await Promise.resolve();
+    expect(recover).toHaveBeenCalledTimes(1);
+
+    scheduled.find((item) => item.milliseconds === 60_000)?.callback();
+    expect(recover).toHaveBeenCalledTimes(1);
+    expect(maxActiveRecoveries).toBe(1);
+
+    resolveFirstRecovery();
+    await firstRecovery;
+    await new Promise<void>((resolve) => setImmediate(resolve));
+
+    scheduled.filter((item) => item.milliseconds === 60_000).at(-1)?.callback();
+    await vi.waitFor(() => expect(recover).toHaveBeenCalledTimes(2));
+
     stop();
   });
 });
