@@ -64,13 +64,21 @@ ssh "${SSH_OPTS[@]}" "$SERVER" \
   "sudo -n mv /tmp/SHA256SUMS.txt '${REMOTE_ROOT}/downloads/SHA256SUMS.txt' && \
    sudo -n chown www:www '${REMOTE_ROOT}/downloads/SHA256SUMS.txt'"
 
-# 5. Upload download page
+# 5. Upload download page and installer
 echo "[deploy] uploading index.html..."
 scp "${SSH_OPTS[@]}" "${PAGE_DIR}/index.html" \
   "$SERVER:/tmp/plainlist-index.html"
 ssh "${SSH_OPTS[@]}" "$SERVER" \
   "sudo -n mv /tmp/plainlist-index.html '${REMOTE_ROOT}/index.html' && \
    sudo -n chown www:www '${REMOTE_ROOT}/index.html'"
+
+echo "[deploy] uploading install.sh..."
+scp "${SSH_OPTS[@]}" "${PAGE_DIR}/install.sh" \
+  "$SERVER:/tmp/plainlist-install.sh"
+ssh "${SSH_OPTS[@]}" "$SERVER" \
+  "sudo -n mv /tmp/plainlist-install.sh '${REMOTE_ROOT}/downloads/install.sh' && \
+   sudo -n chmod 755 '${REMOTE_ROOT}/downloads/install.sh' && \
+   sudo -n chown www:www '${REMOTE_ROOT}/downloads/install.sh'"
 
 # 6. Copy favicon from existing plainlist dir if not present
 echo "[deploy] ensuring favicon..."
