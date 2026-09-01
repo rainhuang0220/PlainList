@@ -124,7 +124,7 @@ describe('weekly summary service', () => {
 
     const result = await generateWeeklySummary(user, { weekStart });
     expect(result.status).toBe('unavailable');
-    expect(result.reason).toBe('AI 周总结暂时不可用。');
+    expect(result.reason).toBe('本期回顾暂不可用');
     expect(chatComplete).not.toHaveBeenCalled();
   });
 

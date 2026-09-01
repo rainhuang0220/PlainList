@@ -89,7 +89,7 @@ const coordinator = createReviewSnapshotCoordinator({
       profile: profile.traits,
     });
     const config = await resolveAiConfigForUser(user.id);
-    if (!config || !aiProviderConfigured(config)) throw new Error('AI 周总结暂时不可用。');
+    if (!config || !aiProviderConfigured(config)) throw new Error('本期回顾暂不可用');
     const result = await chatComplete(config, {
       system: buildWeeklySummarySystemPrompt(),
       user: buildWeeklySummaryUserPrompt(evidence),
@@ -100,7 +100,7 @@ const coordinator = createReviewSnapshotCoordinator({
       timeoutMs: Math.max(config.timeoutMs, 60_000),
     });
     const content = parseWeeklySummaryContent(result.text);
-    if (!content) throw new Error('AI 周总结暂时不可用。');
+    if (!content) throw new Error('本期回顾暂不可用');
     return {
       content,
       model: result.model,
@@ -112,7 +112,10 @@ const coordinator = createReviewSnapshotCoordinator({
   },
 });
 
-function response(snapshot: ReviewSnapshot, fallback = false): WeeklySummaryResponse {
+function response(
+  snapshot: ReviewSnapshot,
+  options: { fallback?: boolean; notice?: WeeklySummaryResponse['notice'] } = {},
+): WeeklySummaryResponse {
   return {
     status: snapshot.status === 'ready' ? 'ready' : snapshot.status,
     weekStart: snapshot.windowStartDate,
@@ -122,8 +125,8 @@ function response(snapshot: ReviewSnapshot, fallback = false): WeeklySummaryResp
     model: snapshot.model,
     generatedAt: snapshot.generatedAt ?? undefined,
     content: snapshot.content ?? undefined,
-    fallback,
-    reason: fallback ? '最新回顾更新中，当前显示上一份回顾。' : snapshot.errorMessage ?? undefined,
+    fallback: options.fallback ?? false,
+    notice: options.notice,
   };
 }
 
@@ -132,7 +135,12 @@ export async function getCurrentWeeklyReviewSnapshot(user: AuthenticatedUser): P
   const current = await coordinator.read(user.id, reviewAsOfDate);
   if (current?.status === 'ready') return response(current);
   const fallback = await repository.latestReady(user.id);
-  if (fallback) return response(fallback, true);
+  if (fallback) {
+    return response(fallback, {
+      fallback: true,
+      notice: current?.status === 'error' ? 'not_updated' : 'updating',
+    });
+  }
   const window = clock.reviewWindow();
   return {
     status: current?.status ?? 'missing',
@@ -140,7 +148,8 @@ export async function getCurrentWeeklyReviewSnapshot(user: AuthenticatedUser): P
     weekEnd: window.windowEndDate,
     reviewAsOfDate,
     promptVersion: WEEKLY_SUMMARY_PROMPT_VERSION,
-    reason: current?.errorMessage ?? '最新回顾更新中。',
+    notice: 'unavailable',
+    reason: '本期回顾暂不可用',
   };
 }
 

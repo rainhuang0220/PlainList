@@ -1,5 +1,10 @@
-import { describe, expect, it } from 'vitest';
-import { extractJsonObject, repairTruncatedJson, stripModelArtifacts } from './llm';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { chatComplete, extractJsonObject, repairTruncatedJson, stripModelArtifacts } from './llm';
+
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+});
 
 describe('stripModelArtifacts', () => {
   it('removes MiniMax thinking blocks before JSON parse', () => {
@@ -26,5 +31,34 @@ describe('repairTruncatedJson', () => {
     expect(repaired).toBeTruthy();
     const parsed = JSON.parse(repaired!) as { items: unknown[] };
     expect(parsed.items.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('chatComplete timeout boundary', () => {
+  it('aborts an unfinished provider request at the requested hard timeout', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('fetch', vi.fn((_url: string, init?: RequestInit) => new Promise((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => {
+        reject(Object.assign(new Error('aborted'), { name: 'AbortError' }));
+      });
+    })));
+
+    const request = chatComplete({
+      provider: 'openai',
+      baseUrl: 'https://provider.example/v1',
+      model: 'safe-model',
+      apiKey: 'test-key',
+      timeoutMs: 30_000,
+      anthropicVersion: '2023-06-01',
+      source: 'user',
+    }, {
+      system: 'test',
+      user: 'test',
+      timeoutMs: 60_000,
+    });
+
+    const assertion = expect(request).rejects.toMatchObject({ status: 504 });
+    await vi.advanceTimersByTimeAsync(60_000);
+    await assertion;
   });
 });

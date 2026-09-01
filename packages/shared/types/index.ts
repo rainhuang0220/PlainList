@@ -263,6 +263,7 @@ export interface WeeklySummaryResponse {
   content?: WeeklySummaryContent;
   reviewAsOfDate?: string;
   fallback?: boolean;
+  notice?: 'updating' | 'not_updated' | 'unavailable';
 }
 
 export interface InstalledPlugin {

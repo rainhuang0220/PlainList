@@ -9,14 +9,9 @@
 set -euo pipefail
 
 SERVER="${PLAINLIST_SERVER:-ubuntu@175.24.134.228}"
-PASSWORD="${SSHPASS:-Hzy20060220}"
 REMOTE_VHOST="/www/server/panel/vhost/nginx/175.24.134.228.conf"
 
-if [[ -z "${SSHPASS:-}" ]]; then
-  export SSHPASS="$PASSWORD"
-fi
-
-SSHPASS_OPTS=(-o StrictHostKeyChecking=accept-new -o ConnectTimeout=20)
+SSH_OPTS=(-o BatchMode=yes -o PreferredAuthentications=publickey -o PasswordAuthentication=no -o StrictHostKeyChecking=accept-new -o ConnectTimeout=20)
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
@@ -24,15 +19,15 @@ LOCAL_VHOST="${WORK}/vhost.conf"
 LOCAL_PATCHED="${WORK}/vhost.patched.conf"
 
 echo "[patch] fetching ${REMOTE_VHOST} (via sudo)..."
-sshpass -e ssh "${SSHPASS_OPTS[@]}" "$SERVER" \
-  "echo '${SSHPASS}' | sudo -S cat '${REMOTE_VHOST}'" > "${LOCAL_VHOST}"
+ssh "${SSH_OPTS[@]}" "$SERVER" \
+  "sudo -n cat '${REMOTE_VHOST}'" > "${LOCAL_VHOST}"
 ls -la "${LOCAL_VHOST}"
 head -5 "${LOCAL_VHOST}"
 
 # backup on the server
 echo "[patch] backing up remote vhost..."
-sshpass -e ssh "${SSHPASS_OPTS[@]}" "$SERVER" \
-  "echo '${SSHPASS}' | sudo -S cp '${REMOTE_VHOST}' '${REMOTE_VHOST}.bak-$(date +%Y%m%d-%H%M%S)'"
+ssh "${SSH_OPTS[@]}" "$SERVER" \
+  "sudo -n cp '${REMOTE_VHOST}' '${REMOTE_VHOST}.bak-$(date +%Y%m%d-%H%M%S)'"
 
 # build the patch block
 cat > "${WORK}/patch.conf" <<'PATCH_EOF'
@@ -83,13 +78,13 @@ PY_EOF
 
 # upload
 echo "[patch] uploading patched vhost..."
-sshpass -e scp "${SSHPASS_OPTS[@]}" "${LOCAL_PATCHED}" "$SERVER:/tmp/vhost.patched.conf"
+scp "${SSH_OPTS[@]}" "${LOCAL_PATCHED}" "$SERVER:/tmp/vhost.patched.conf"
 
-sshpass -e ssh "${SSHPASS_OPTS[@]}" "$SERVER" \
-  "echo '${SSHPASS}' | sudo -S mv /tmp/vhost.patched.conf '${REMOTE_VHOST}' && \
-   echo '${SSHPASS}' | sudo -S chown root:root '${REMOTE_VHOST}' && \
-   echo '${SSHPASS}' | sudo -S /www/server/nginx/sbin/nginx -t 2>&1 && \
-   echo '${SSHPASS}' | sudo -S /www/server/nginx/sbin/nginx -s reload 2>&1 && \
+ssh "${SSH_OPTS[@]}" "$SERVER" \
+  "sudo -n mv /tmp/vhost.patched.conf '${REMOTE_VHOST}' && \
+   sudo -n chown root:root '${REMOTE_VHOST}' && \
+   sudo -n /www/server/nginx/sbin/nginx -t 2>&1 && \
+   sudo -n /www/server/nginx/sbin/nginx -s reload 2>&1 && \
    echo reload_ok"
 
 echo "[patch] done."
