@@ -290,8 +290,8 @@ async function handlePassphrase(value: string) {
     await completeAuth(response, pendingUser.value, [
       `  welcome back, ${pendingUser.value}.`,
     ]);
-  } catch {
-    print('  incorrect passphrase.', 'err');
+  } catch (caught) {
+    print(`  ${caught instanceof Error ? caught.message : 'incorrect passphrase.'}`, 'err');
     print('  try again or type cd <name>.', 'out');
     resetState();
   }
@@ -325,8 +325,8 @@ async function loginDemoAccount() {
     await completeAuth(response, DEMO_ACCOUNT.username, [
       '  demo account ready. explore the dashboard.',
     ]);
-  } catch {
-    print('  demo login failed. run the demo seed and try again.', 'err');
+  } catch (caught) {
+    print(`  ${caught instanceof Error ? caught.message : 'demo login failed. run the demo seed and try again.'}`, 'err');
     print(`  expected demo account: ${DEMO_ACCOUNT.username} / ${DEMO_ACCOUNT.password}`, 'out');
     resetState();
   }

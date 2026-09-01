@@ -3,35 +3,20 @@
  *
  * 职责：
  *  - 加载 Vite 构建产物的 dist/index.html
- *  - 创建 BrowserWindow，注入 API_BASE_URL（打包时构建产物已写入 __API_BASE_URL__）
+ *  - 创建 BrowserWindow，加载包含生产 API 配置的渲染产物
  *  - 提供应用生命周期管理（macOS dock 行为、窗口关闭等）
  *
  * 注意：
  *  - 文件用 .cjs 避免 ESM/CJS 互操作问题（package.json 顶层是 type: module）
  *  - 打包后路径用 app.getAppPath() 解析，确保开发态 / 打包态都能用
  */
-const { app, BrowserWindow, shell, Menu, dialog, ipcMain } = require('electron');
+const { app, BrowserWindow, shell, Menu, dialog, ipcMain, net } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const fsp = require('node:fs/promises');
 const { startFishTimeLocal, DEFAULT_PORT: FISHTIME_PORT } = require('./fishtime-local.cjs');
 const { buildLocalDigest, detectChangedArchives, scanArchiveDirectory } = require('./chatgpt-local-sync.cjs');
-
-// Widget sidecars (Focus Bay 等) 走 http:// 公网反代访问。Chromium 把非
-// https 的 origin 视为 insecure context，navigator.mediaDevices 会直接
-// 不存在，摄像头 (getUserMedia) 无法使用。把 API 域标记为 secure。
-// 必须在 app ready 之前调用。端口也要写全——Chromium 按完整 origin 匹配。
-app.commandLine.appendSwitch(
-  'unsafely-treat-insecure-origin-as-secure',
-  [
-    'http://175.24.134.228',
-    'http://175.24.134.228:80',
-    'http://175.24.134.228:3001',
-    'http://175.24.134.228:8086',
-    'http://127.0.0.1:8800',
-    `http://127.0.0.1:${FISHTIME_PORT}`,
-  ].join(','),
-);
+const { createDesktopApiRequest } = require('./desktop-api.cjs');
 
 const isDev = !app.isPackaged;
 const APP_NAME = 'PlainList';
@@ -41,6 +26,17 @@ let mainWindow = null;
 let fishTimeLocal = null;
 let chatgptSyncWatcher = null;
 let chatgptSyncTimer = null;
+
+const requestProductionApi = createDesktopApiRequest(net.fetch);
+
+ipcMain.handle('desktop-api:request', async (event, payload) => {
+  const isMainRenderer = mainWindow && event.sender.id === mainWindow.webContents.id;
+  const isLocalRenderer = event.senderFrame?.url.startsWith('file://');
+  if (!isMainRenderer || !isLocalRenderer) {
+    throw new Error('Unauthorized desktop API request');
+  }
+  return requestProductionApi(payload);
+});
 
 function chatgptSyncStatePath() { return path.join(app.getPath('userData'), 'chatgpt-local-sync-state.json'); }
 async function readChatgptSyncState() {
@@ -279,16 +275,6 @@ function buildMenu() {
 }
 
 app.whenReady().then(async () => {
-  // 梯子 / Clash TUN / 系统代理会劫持所有出站流量；代理到国内云主机 IP
-  // 经常超时或空连接，表现成「连不上公网 API」。PlainList 只访问自有
-  // 服务器与本机 widget，强制直连，不走系统代理。
-  try {
-    const { session } = require('electron');
-    await session.defaultSession.setProxy({ mode: 'direct' });
-  } catch (e) {
-    console.error('[proxy] failed to set direct mode:', e);
-  }
-
   // Local FishTime: track frontmost apps on this Mac and serve UI + API.
   try {
     const staticDir = path.join(__dirname, 'fishtime-web');
@@ -345,7 +331,7 @@ app.on('web-contents-created', (_event, contents) => {
     if (url.startsWith('file://')) return;
     if (/^https?:\/\/127\.0\.0\.1(?::\d+)?\//i.test(url)) return;
     if (/^https?:\/\/localhost(?::\d+)?\//i.test(url)) return;
-    if (/^https?:\/\/175\.24\.134\.228(?::\d+)?\//i.test(url)) return;
+    if (/^https:\/\/plainlist\.space(?::\d+)?\//i.test(url)) return;
     event.preventDefault();
     shell.openExternal(url);
   });

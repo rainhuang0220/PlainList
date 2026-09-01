@@ -18,6 +18,9 @@ contextBridge.exposeInMainWorld('plainlistDesktop', {
   },
   /** When set, marketplace routes the FishTime iframe here instead of cloud WakaTime. */
   fishtimeLocalUrl: FISHTIME_LOCAL_URL,
+  api: {
+    request: (payload) => ipcRenderer.invoke('desktop-api:request', payload),
+  },
   chatgptLocalSync: {
     chooseDirectory: (userScope) => ipcRenderer.invoke('chatgpt-local-sync:choose-directory', userScope),
     status: () => ipcRenderer.invoke('chatgpt-local-sync:status'),

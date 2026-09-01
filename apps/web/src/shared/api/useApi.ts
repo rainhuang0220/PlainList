@@ -1,24 +1,49 @@
 import { Capacitor } from '@capacitor/core';
 import { useAuthStore } from '@/features/auth/model/useAuthStore';
+import {
+  apiRequestUrl,
+  connectionErrorMessage,
+  httpErrorMessage,
+  resolveApiOrigin,
+} from './apiRouting';
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+
+interface DesktopApiResponse {
+  status: number;
+  statusText: string;
+  body: string;
+}
+
+interface DesktopApiBridge {
+  api?: {
+    request: (payload: {
+      method: HttpMethod;
+      path: string;
+      body?: unknown;
+      authorization?: string;
+    }) => Promise<DesktopApiResponse>;
+  };
+}
 
 declare const __API_BASE_URL__: string;
 
 function getApiBaseUrl(): string {
-  if (typeof __API_BASE_URL__ === 'string' && __API_BASE_URL__) {
-    return __API_BASE_URL__;
-  }
-  if (Capacitor.isNativePlatform()) {
-    console.warn('[PlainList] Running on native platform without VITE_API_BASE_URL. Set it before building.');
-    return '';
-  }
-  return '';
+  return resolveApiOrigin({
+    configuredOrigin: typeof __API_BASE_URL__ === 'string' ? __API_BASE_URL__ : '',
+    isNative: Capacitor.isNativePlatform(),
+    protocol: typeof window === 'undefined' ? '' : window.location.protocol,
+  });
 }
 
 const API_BASE = getApiBaseUrl();
 const DEFAULT_TIMEOUT_MS = 20_000;
 const LONG_TIMEOUT_MS = 180_000;
+
+function desktopApiBridge(): DesktopApiBridge['api'] | undefined {
+  if (typeof window === 'undefined' || window.location.protocol !== 'file:') return undefined;
+  return (window as Window & { plainlistDesktop?: DesktopApiBridge }).plainlistDesktop?.api;
+}
 
 function timeoutForPath(path: string): number {
   if (
@@ -31,7 +56,7 @@ function timeoutForPath(path: string): number {
   return DEFAULT_TIMEOUT_MS;
 }
 
-function formatApiError(status: number, message: string): string {
+function formatApiError(status: number, message: string, path: string): string {
   if (status === 503 && message.includes('未配置可用的大模型')) {
     return message;
   }
@@ -59,28 +84,7 @@ function formatApiError(status: number, message: string): string {
     return '服务器暂时无响应（500）。请稍后重试；若持续失败，请检查服务是否在线。';
   }
 
-  if (status === 401) {
-    return '登录已过期，请重新登录。';
-  }
-
-  return message || `请求失败（HTTP ${status}）`;
-}
-
-function connectionErrorMessage(timedOut = false): string {
-  const hint = timedOut
-    ? '请求超时。若开着梯子/VPN（尤其是 TUN 全局模式），请把 175.24.134.228 加入直连/绕过，或先关闭后再试。'
-    : '无法连接服务器。若开着梯子/VPN，请把 175.24.134.228 加入直连/绕过，或先关闭后再试。';
-
-  if (Capacitor.isNativePlatform()) {
-    return `${hint}（${API_BASE || '未配置 API 地址'}）`;
-  }
-  if (API_BASE) {
-    return `${hint}（${API_BASE}）`;
-  }
-  if (typeof window !== 'undefined' && !/localhost|127\.0\.0\.1/.test(window.location.hostname)) {
-    return hint;
-  }
-  return '无法连接后端 API。本地开发请确认 npm run dev 已启动。';
+  return httpErrorMessage(status, message, path);
 }
 
 function mergeTimeoutSignal(external: AbortSignal | undefined, ms: number): {
@@ -128,12 +132,27 @@ export function useApi() {
     const timeout = mergeTimeoutSignal(signal, timeoutForPath(path));
     let response: Response;
     try {
-      response = await fetch(`${API_BASE}/api${path}`, {
-        method,
-        headers,
-        body: body === undefined ? undefined : JSON.stringify(body),
-        signal: timeout.signal,
-      });
+      const desktop = desktopApiBridge();
+      if (desktop) {
+        const result = await desktop.request({
+          method,
+          path,
+          body,
+          authorization: headers.Authorization,
+        });
+        response = new Response(result.body, {
+          status: result.status,
+          statusText: result.statusText,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      } else {
+        response = await fetch(apiRequestUrl(API_BASE, path), {
+          method,
+          headers,
+          body: body === undefined ? undefined : JSON.stringify(body),
+          signal: timeout.signal,
+        });
+      }
     } catch (error) {
       const timedOut = timeout.didTimeout();
       timeout.cleanup();
@@ -150,7 +169,7 @@ export function useApi() {
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: response.statusText }));
       const message = typeof error.error === 'string' ? error.error : response.statusText;
-      throw new Error(formatApiError(response.status, message));
+      throw new Error(formatApiError(response.status, message, path));
     }
 
     if (response.status === 204) {

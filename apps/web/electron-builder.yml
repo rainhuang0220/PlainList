@@ -36,7 +36,7 @@ mac:
     CFBundleDocumentTypes: []
     NSCameraUsageDescription: PlainList 需要使用摄像头以运行 Focus Bay 专注检测。
     NSMicrophoneUsageDescription: PlainList 可能需要麦克风权限以支持插件功能。
-    NSPrivacyPolicyURL: http://175.24.134.228/
+    NSPrivacyPolicyURL: https://plainlist.space/
   # Strip unused Chromium locales — saves ~40MB.
   # PlainList's UI is in zh-CN (bundled in dist/), Electron's chrome
   # only needs en-US for native dialogs / menus.

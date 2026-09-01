@@ -11,8 +11,8 @@ case "$ARCH" in
   *) echo "不支持的架构: $ARCH"; exit 1 ;;
 esac
 
-BASE_URL="${PLAINLIST_BASE_URL:-http://175.24.134.228}"
-DMG_URL="${BASE_URL}/downloads/PlainList-2.3.0-${DMG_ARCH}.dmg"
+BASE_URL="${PLAINLIST_BASE_URL:-https://plainlist.space}"
+DMG_URL="${BASE_URL}/downloads/PlainList-2.3.1-${DMG_ARCH}.dmg"
 TMP_DMG="$(mktemp -t plainlist).dmg"
 DEST="/Applications/PlainList.app"
 
