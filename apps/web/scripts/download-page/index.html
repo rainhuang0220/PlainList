@@ -436,7 +436,7 @@
         手机端更推荐——语音输入随时可用，人也更常带着。
       </p>
       <div class="hero-actions">
-        <a class="btn" href="/downloads/PlainList-2.1.1.apk">下载 Android APK</a>
+        <a class="btn" href="/downloads/PlainList-2.2.1.apk">下载 Android APK</a>
         <a class="btn ghost" href="/guide.html">使用指南</a>
         <a class="btn ghost" href="http://175.24.134.228:8086/">打开 Web 版</a>
         <a class="btn ghost" href="https://github.com/rainhuang0220/PlainList/releases/tag/v2.1.1">GitHub Release</a>
@@ -518,8 +518,8 @@
         <div class="dl-card primary">
           <div class="arch">Recommended · Android</div>
           <h3>通用 APK</h3>
-          <p class="meta">版本 <strong>2.1.1</strong> · 大小 <strong id="size-apk">—</strong> · arm64 / x86_64</p>
-          <a class="btn" href="/downloads/PlainList-2.1.1.apk">下载 PlainList-2.1.1.apk</a>
+          <p class="meta">版本 <strong>2.2.1</strong> · 大小 <strong id="size-apk">—</strong> · arm64 / x86_64</p>
+          <a class="btn" href="/downloads/PlainList-2.2.1.apk">下载 PlainList-2.2.1.apk</a>
           <p class="hint">侧载安装：设置里允许「未知来源 / 安装未知应用」后打开 APK。演示账号 rainhuang / rainhuang。</p>
         </div>
 
@@ -529,14 +529,14 @@
               <strong>Apple Silicon</strong>
               <span>macOS · 2.1.1 · <span id="size-arm64">—</span></span>
             </div>
-            <a class="btn" href="/downloads/PlainList-2.1.1-arm64.dmg">DMG</a>
+            <a class="btn" href="/downloads/PlainList-2.2.1-arm64.dmg">DMG</a>
           </div>
           <div class="dl-mini">
             <div>
               <strong>Intel Mac</strong>
               <span>macOS · 2.1.1 · <span id="size-x64">—</span></span>
             </div>
-            <a class="btn" href="/downloads/PlainList-2.1.1-x64.dmg">DMG</a>
+            <a class="btn" href="/downloads/PlainList-2.2.1-x64.dmg">DMG</a>
           </div>
           <div class="install-box">
             <strong>macOS 一键安装</strong>
@@ -569,14 +569,14 @@
     return (bytes / 1024 / 1024 / 1024).toFixed(2) + ' GB';
   }
   ['arm64', 'x64'].forEach((arch) => {
-    fetch(`/downloads/PlainList-2.1.1-${arch}.dmg`, { method: 'HEAD' })
+    fetch(`/downloads/PlainList-2.2.1-${arch}.dmg`, { method: 'HEAD' })
       .then((r) => {
         const len = r.headers.get('content-length');
         if (len) document.getElementById('size-' + arch).textContent = fmtSize(parseInt(len, 10));
       })
       .catch(() => {});
   });
-  fetch('/downloads/PlainList-2.1.1.apk', { method: 'HEAD' })
+  fetch('/downloads/PlainList-2.2.1.apk', { method: 'HEAD' })
     .then((r) => {
       const len = r.headers.get('content-length');
       if (len) document.getElementById('size-apk').textContent = fmtSize(parseInt(len, 10));

@@ -8,6 +8,7 @@ const deploymentScripts = [
   fileURLToPath(new URL('../../scripts/deploy-dmg.sh', import.meta.url)),
   fileURLToPath(new URL('../../scripts/deploy-android.sh', import.meta.url)),
 ];
+const downloadPage = fileURLToPath(new URL('../../scripts/download-page/index.html', import.meta.url));
 
 describe('production deployment credentials', () => {
   it.each(deploymentScripts)('%s uses key-only SSH without embedded passwords', (scriptPath) => {
@@ -22,5 +23,14 @@ describe('production deployment credentials', () => {
     const syntaxCheck = spawnSync('bash', ['-n', scriptPath], { encoding: 'utf8' });
     expect(syntaxCheck.stderr).toBe('');
     expect(syntaxCheck.status).toBe(0);
+  });
+
+  it('publishes links for the current release', () => {
+    const page = readFileSync(downloadPage, 'utf8');
+
+    expect(page).toContain('/downloads/PlainList-2.2.1.apk');
+    expect(page).toContain('/downloads/PlainList-2.2.1-arm64.dmg');
+    expect(page).toContain('/downloads/PlainList-2.2.1-x64.dmg');
+    expect(page).not.toContain('PlainList-2.1.1');
   });
 });
