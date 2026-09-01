@@ -28,9 +28,9 @@ describe('production deployment credentials', () => {
   it('publishes links for the current release', () => {
     const page = readFileSync(downloadPage, 'utf8');
 
-    expect(page).toContain('/downloads/PlainList-2.2.1.apk');
-    expect(page).toContain('/downloads/PlainList-2.2.1-arm64.dmg');
-    expect(page).toContain('/downloads/PlainList-2.2.1-x64.dmg');
-    expect(page).not.toContain('PlainList-2.1.1');
+    expect(page).toContain('/downloads/PlainList-2.3.0.apk');
+    expect(page).toContain('/downloads/PlainList-2.3.0-arm64.dmg');
+    expect(page).toContain('/downloads/PlainList-2.3.0-x64.dmg');
+    expect(page).not.toContain('PlainList-2.2.1');
   });
 });

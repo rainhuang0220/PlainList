@@ -4,7 +4,7 @@ import { dateKeySchema } from './plans';
 const compactText = z.string().trim().min(1).max(1200);
 const compactList = z.array(compactText).max(20).default([]);
 
-export const activitySourceTypeSchema = z.enum(['plainlist-records', 'chatgpt-explicit-digest', 'manual']);
+export const activitySourceTypeSchema = z.enum(['plainlist-records', 'chatgpt-explicit-digest', 'chatgpt-local-sync', 'manual']);
 export const activitySourceEnvelopeSchema = z.object({
   sourceType: activitySourceTypeSchema,
   externalId: z.string().trim().min(1).max(255).optional(),
@@ -20,6 +20,7 @@ export const activitySourceEnvelopeSchema = z.object({
 });
 
 export const appendActivityDigestSchema = z.object({
+  sourceType: z.enum(['chatgpt-explicit-digest', 'chatgpt-local-sync']).optional(),
   sourceExternalId: z.string().trim().min(1).max(255),
   idempotencyKey: z.string().trim().min(8).max(128),
   dateKey: dateKeySchema,
@@ -33,6 +34,12 @@ export const appendActivityDigestSchema = z.object({
   learnings: compactList,
   decisions: compactList,
   unresolved: compactList,
+  localFacts: z.array(z.object({
+    dateKey: dateKeySchema,
+    category: z.enum(['engineering', 'research', 'learning', 'planning']),
+    title: z.string().trim().min(1).max(240),
+    completed: z.boolean(),
+  }).strict()).max(20).optional(),
   candidateGoalRelations: z.array(z.object({ goalId: z.number().int().positive(), relation: z.enum(['primary', 'supporting', 'exploration', 'neutral']) })).max(8).default([]),
 }).strict();
 

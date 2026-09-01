@@ -1,0 +1,47 @@
+{
+  "schema_version": "2.4",
+  "exporter_version": "2.9.4",
+  "conversation_id": "conv-plainlist-scheduler",
+  "title": "PlainList scheduler stale lease debugging",
+  "create_time": "2026-08-30T09:00:00.000Z",
+  "update_time": "2026-08-31T11:15:00.000Z",
+  "classification": { "kind": "未归类", "name": "", "source": "none" },
+  "messages": [
+    {
+      "message_id": "message-user-1",
+      "role": "user",
+      "occurred_at": "2026-08-30T09:00:00.000Z",
+      "content": "帮我排查 PlainList scheduler stale lease 问题，看看为什么任务没有重试。",
+      "files": [],
+      "model": null
+    },
+    {
+      "message_id": "message-assistant-1",
+      "role": "assistant",
+      "occurred_at": "2026-08-30T09:02:00.000Z",
+      "content": "建议检查 lease 到期和 retry 状态。",
+      "files": [],
+      "model": "gpt-5"
+    },
+    {
+      "message_id": "message-user-2",
+      "role": "user",
+      "occurred_at": "2026-08-31T11:15:00.000Z",
+      "content": "已修复 stale lease 的过期检查并补了回归测试。",
+      "files": [],
+      "model": null
+    }
+  ],
+  "raw": {
+    "mapping": {
+      "root": { "id": "root", "parent": null, "children": ["active-user", "discarded-user"] },
+      "active-user": { "id": "active-user", "parent": "root", "children": ["active-assistant"], "message": { "id": "message-user-1", "author": { "role": "user" }, "create_time": 1788080400 } },
+      "active-assistant": { "id": "active-assistant", "parent": "active-user", "children": ["active-complete"], "message": { "id": "message-assistant-1", "author": { "role": "assistant" }, "create_time": 1788080520 } },
+      "active-complete": { "id": "active-complete", "parent": "active-assistant", "children": [], "message": { "id": "message-user-2", "author": { "role": "user" }, "create_time": 1788184500 } },
+      "discarded-user": { "id": "discarded-user", "parent": "root", "children": [], "message": { "id": "discarded-message", "author": { "role": "user" }, "create_time": 1788080460 } }
+    },
+    "current_node": "active-complete"
+  },
+  "normalization_mode": "active-branch",
+  "conversion_warnings": []
+}

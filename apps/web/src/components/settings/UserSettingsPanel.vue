@@ -34,6 +34,7 @@
           <AiSettingsForm v-if="activeSection === 'ai'" :key="formKey" />
           <UserProfileSettings v-else-if="activeSection === 'profile'" :key="formKey" />
           <ThemeSettingsPanel v-else-if="activeSection === 'theme'" :key="formKey" />
+          <ChatgptLocalSyncPanel v-else-if="activeSection === 'chatgpt-local-sync'" />
           <div v-else class="us-account">
             <div class="us-account-card">
               <div class="us-account-row">
@@ -63,8 +64,9 @@ import { useI18nStore } from '@/shared/i18n/useI18nStore';
 import AiSettingsForm from '@/components/settings/AiSettingsForm.vue';
 import ThemeSettingsPanel from '@/components/settings/ThemeSettingsPanel.vue';
 import UserProfileSettings from '@/components/settings/UserProfileSettings.vue';
+import ChatgptLocalSyncPanel from '@/components/settings/ChatgptLocalSyncPanel.vue';
 
-type SettingsSection = 'account' | 'ai' | 'profile' | 'theme';
+type SettingsSection = 'account' | 'ai' | 'profile' | 'theme' | 'chatgpt-local-sync';
 
 const props = defineProps<{
   username: string;
@@ -88,6 +90,7 @@ const navItems = computed(() => [
   { id: 'theme' as const, label: t('settings.nav_theme', '主题') },
   { id: 'ai' as const, label: t('settings.nav_ai', 'AI 速记') },
   { id: 'profile' as const, label: t('settings.nav_profile', 'AI 画像') },
+  ...(typeof window !== 'undefined' && (window as any).plainlistDesktop ? [{ id: 'chatgpt-local-sync' as const, label: 'ChatGPT 本地活动同步' }] : []),
 ]);
 
 const activeTitle = computed(() => {
@@ -100,6 +103,7 @@ const activeTitle = computed(() => {
   if (activeSection.value === 'profile') {
     return t('profile.title', '可解释的排程画像');
   }
+  if (activeSection.value === 'chatgpt-local-sync') return 'ChatGPT 本地活动同步';
   return t('intake.settings_title', '大模型设置');
 });
 
