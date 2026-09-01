@@ -25,19 +25,39 @@ if [[ ! -d "${WEB_DIR}/android" ]]; then
 fi
 
 # Capacitor Android / AGP expect JDK 21+ for compileReleaseJavaWithJavac.
-if [[ -z "${JAVA_HOME:-}" ]]; then
+# Do not retain an inherited JDK 17 JAVA_HOME merely because it is set.
+java_major_version() {
+  local java_home="$1"
+  [[ -n "$java_home" && -x "${java_home}/bin/java" ]] || return 1
+  local version_line
+  version_line="$("${java_home}/bin/java" -version 2>&1 | head -1)"
+  [[ "$version_line" =~ \"([0-9]+) ]] || return 1
+  echo "${BASH_REMATCH[1]}"
+}
+
+has_jdk_21_or_newer() {
+  local major
+  major="$(java_major_version "$1")" || return 1
+  (( major >= 21 ))
+}
+
+if ! has_jdk_21_or_newer "${JAVA_HOME:-}"; then
   for candidate in \
     /opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home \
-    /usr/libexec/java_home; do
-    if [[ -x "${candidate}/bin/java" ]]; then
+    "$(/usr/libexec/java_home -v 21 2>/dev/null || true)"; do
+    if has_jdk_21_or_newer "$candidate"; then
       export JAVA_HOME="$candidate"
       break
     fi
   done
 fi
-if command -v java >/dev/null 2>&1; then
-  echo "[android-release] java: $(java -version 2>&1 | head -1)"
+
+if ! has_jdk_21_or_newer "${JAVA_HOME:-}"; then
+  echo "error: a JDK 21+ installation is required for Android release builds" >&2
+  exit 1
 fi
+
+echo "[android-release] java: $("${JAVA_HOME}/bin/java" -version 2>&1 | head -1)"
 
 if [[ -z "${ANDROID_HOME:-}" && -z "${ANDROID_SDK_ROOT:-}" ]]; then
   if [[ -d /opt/homebrew/share/android-commandlinetools ]]; then
