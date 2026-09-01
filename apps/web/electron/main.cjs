@@ -10,12 +10,13 @@
  *  - 文件用 .cjs 避免 ESM/CJS 互操作问题（package.json 顶层是 type: module）
  *  - 打包后路径用 app.getAppPath() 解析，确保开发态 / 打包态都能用
  */
-const { app, BrowserWindow, shell, Menu, dialog, ipcMain } = require('electron');
+const { app, BrowserWindow, shell, Menu, dialog, ipcMain, net } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const fsp = require('node:fs/promises');
 const { startFishTimeLocal, DEFAULT_PORT: FISHTIME_PORT } = require('./fishtime-local.cjs');
 const { buildLocalDigest, detectChangedArchives, scanArchiveDirectory } = require('./chatgpt-local-sync.cjs');
+const { createDesktopApiRequest } = require('./desktop-api.cjs');
 
 const isDev = !app.isPackaged;
 const APP_NAME = 'PlainList';
@@ -25,6 +26,17 @@ let mainWindow = null;
 let fishTimeLocal = null;
 let chatgptSyncWatcher = null;
 let chatgptSyncTimer = null;
+
+const requestProductionApi = createDesktopApiRequest(net.fetch);
+
+ipcMain.handle('desktop-api:request', async (event, payload) => {
+  const isMainRenderer = mainWindow && event.sender.id === mainWindow.webContents.id;
+  const isLocalRenderer = event.senderFrame?.url.startsWith('file://');
+  if (!isMainRenderer || !isLocalRenderer) {
+    throw new Error('Unauthorized desktop API request');
+  }
+  return requestProductionApi(payload);
+});
 
 function chatgptSyncStatePath() { return path.join(app.getPath('userData'), 'chatgpt-local-sync-state.json'); }
 async function readChatgptSyncState() {

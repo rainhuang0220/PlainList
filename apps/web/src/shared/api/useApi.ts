@@ -9,6 +9,23 @@ import {
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
+interface DesktopApiResponse {
+  status: number;
+  statusText: string;
+  body: string;
+}
+
+interface DesktopApiBridge {
+  api?: {
+    request: (payload: {
+      method: HttpMethod;
+      path: string;
+      body?: unknown;
+      authorization?: string;
+    }) => Promise<DesktopApiResponse>;
+  };
+}
+
 declare const __API_BASE_URL__: string;
 
 function getApiBaseUrl(): string {
@@ -22,6 +39,11 @@ function getApiBaseUrl(): string {
 const API_BASE = getApiBaseUrl();
 const DEFAULT_TIMEOUT_MS = 20_000;
 const LONG_TIMEOUT_MS = 180_000;
+
+function desktopApiBridge(): DesktopApiBridge['api'] | undefined {
+  if (typeof window === 'undefined' || window.location.protocol !== 'file:') return undefined;
+  return (window as Window & { plainlistDesktop?: DesktopApiBridge }).plainlistDesktop?.api;
+}
 
 function timeoutForPath(path: string): number {
   if (
@@ -110,12 +132,27 @@ export function useApi() {
     const timeout = mergeTimeoutSignal(signal, timeoutForPath(path));
     let response: Response;
     try {
-      response = await fetch(apiRequestUrl(API_BASE, path), {
-        method,
-        headers,
-        body: body === undefined ? undefined : JSON.stringify(body),
-        signal: timeout.signal,
-      });
+      const desktop = desktopApiBridge();
+      if (desktop) {
+        const result = await desktop.request({
+          method,
+          path,
+          body,
+          authorization: headers.Authorization,
+        });
+        response = new Response(result.body, {
+          status: result.status,
+          statusText: result.statusText,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      } else {
+        response = await fetch(apiRequestUrl(API_BASE, path), {
+          method,
+          headers,
+          body: body === undefined ? undefined : JSON.stringify(body),
+          signal: timeout.signal,
+        });
+      }
     } catch (error) {
       const timedOut = timeout.didTimeout();
       timeout.cleanup();
