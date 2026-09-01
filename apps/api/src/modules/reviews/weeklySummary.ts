@@ -124,7 +124,7 @@ async function writeWeeklyCache(userId: number, cache: CachedWeeklySummary): Pro
 function unavailable(
   weekStart: string,
   weekEnd: string,
-  reason = 'AI 周总结暂时不可用。',
+  reason = '本期回顾暂不可用',
 ): WeeklySummaryResponse {
   return {
     status: 'unavailable',

@@ -12,7 +12,7 @@
         type="button"
         @click="weekView = 'ai'"
       >
-        {{ t('week.view.ai', 'AI 总结') }}
+        {{ t('week.view.ai', '周进展回顾') }}
       </button>
       <button
         class="week-view-switch-btn"
@@ -24,7 +24,7 @@
       </button>
     </div>
 
-    <p v-if="aiError" class="week-ai-banner">{{ aiError }}</p>
+    <p v-if="aiError && aiSummary" class="week-ai-banner">{{ aiError }}</p>
 
     <div v-show="weekView === 'ai'" class="week-ai-panel">
       <div v-if="weeklyInsight" class="week-ai-block weekly-intelligence">
@@ -47,7 +47,7 @@
           <ul><li v-for="item in weeklyInsight.suggestedNextFocus.slice(0, 3)" :key="item">{{ item }}</li></ul>
         </template>
       </div>
-      <div class="week-ai-kicker">{{ t('week.summary.title', '本周总结') }}</div>
+      <div class="week-ai-kicker">{{ t('week.summary.title', '周进展回顾') }}</div>
       <div v-if="reviewWindowLabel" class="week-ai-range">{{ reviewWindowLabel }}</div>
       <div v-if="aiStatus === 'loading'" class="week-ai-loading">
         {{ t('week.summary.loading', '正在整理本周观察…') }}
@@ -80,7 +80,7 @@
           </ul>
         </div>
       </template>
-      <p v-else class="week-ai-empty">{{ aiError || t('week.summary.updating', '最新回顾更新中。') }}</p>
+      <p v-else class="week-ai-empty">{{ aiError || t('week.summary.unavailable', '本期回顾暂不可用') }}</p>
     </div>
 
     <div v-show="weekView === 'data'" class="week-data-panel">
@@ -196,6 +196,7 @@ import { isoWeekScopeKey, weekDateRange } from '@/features/duration-stats/scopeK
 import { usePlansStore } from '@/features/plans/model/usePlansStore'
 import { useChecksStore } from '@/features/checks/model/useChecksStore'
 import { useReviewsStore } from '@/features/reviews/model/useReviewsStore'
+import { presentWeeklyReview } from '@/features/reviews/model/weeklyReviewPresentation'
 import { useMarketplaceStore } from '@/features/plugins/model/useMarketplaceStore'
 import { useI18nStore } from '@/shared/i18n/useI18nStore'
 import { useApi } from '@/shared/api/useApi'
@@ -641,16 +642,12 @@ async function loadAiSummary() {
   try {
     const result = await reviewsStore.fetchWeeklySummary()
     reviewWindow.value = result.weekStart && result.weekEnd ? { start: result.weekStart, end: result.weekEnd } : null
-    if (result.status === 'ready' && result.content) {
-      aiSummary.value = result.content
-      aiStatus.value = 'ready'
-      if (result.fallback) aiError.value = result.reason || t('week.summary.updating', '最新回顾更新中。')
-      return
-    }
-    aiError.value = result.reason || t('week.summary.unavailable', 'AI 周总结暂时不可用。')
-    aiStatus.value = 'unavailable'
+    const presentation = presentWeeklyReview(result, t)
+    aiSummary.value = presentation.summary
+    aiStatus.value = presentation.status
+    aiError.value = presentation.message
   } catch {
-    aiError.value = t('week.summary.unavailable', 'AI 周总结暂时不可用。')
+    aiError.value = t('week.summary.unavailable', '本期回顾暂不可用')
     aiStatus.value = 'unavailable'
   }
 }

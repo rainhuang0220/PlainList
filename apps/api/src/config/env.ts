@@ -52,6 +52,10 @@ const envSchema = z.object({
   MCP_ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().min(300).max(86400).default(900),
   MCP_ALLOWED_ORIGINS: z.string().optional().default(''),
   APP_TIME_ZONE: z.string().default('Asia/Shanghai'),
+  BACKGROUND_JOBS_ENABLED: z
+    .union([z.literal('true'), z.literal('false'), z.literal('1'), z.literal('0')])
+    .default('true')
+    .transform((value) => value === 'true' || value === '1'),
 });
 
 export const env = envSchema.parse(process.env);

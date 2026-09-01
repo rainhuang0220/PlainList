@@ -1,6 +1,7 @@
+import { execSync } from 'node:child_process';
 import { createApp } from './app';
 import { env } from './config/env';
-import { startInstalledWidgets, stopWidget } from './modules/plugins/widgetRunner';
+import { startInstalledWidgets } from './modules/plugins/widgetRunner';
 import { createActivityIntelligenceScheduler } from './modules/activity-knowledge/scheduler';
 import { createWeeklyReviewSnapshotScheduler } from './modules/reviews/weeklyReviewSnapshot';
 
@@ -10,8 +11,12 @@ const server = app.listen(env.PORT, () => {
   console.log(`PlainList API listening on http://localhost:${env.PORT}`);
   void startInstalledWidgets();
 });
-const stopWeeklyReviewScheduler = createWeeklyReviewSnapshotScheduler();
-const stopActivityIntelligenceScheduler = createActivityIntelligenceScheduler();
+const stopWeeklyReviewScheduler = env.BACKGROUND_JOBS_ENABLED
+  ? createWeeklyReviewSnapshotScheduler()
+  : () => {};
+const stopActivityIntelligenceScheduler = env.BACKGROUND_JOBS_ENABLED
+  ? createActivityIntelligenceScheduler()
+  : () => {};
 
 // Graceful shutdown: clean up detached widget processes on Ctrl+C
 function gracefulShutdown(signal: string) {
@@ -21,12 +26,11 @@ function gracefulShutdown(signal: string) {
   stopWeeklyReviewScheduler();
   stopActivityIntelligenceScheduler();
   try {
-    const { execSync } = require('child_process');
     console.log('[shutdown] Stopping widget processes...');
     execSync('pkill -f "data/widgets" 2>/dev/null || true');
     execSync('pkill -f "uvicorn.*8000" 2>/dev/null || true');
     execSync('pkill -f "vite.*5174" 2>/dev/null || true');
-  } catch (e) {
+  } catch {
     // ignore
   }
 
