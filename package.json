@@ -26,9 +26,9 @@
     "mobile:android:release": "npm run mobile:android:release -w @plainlist/web",
     "mobile:ios": "npm run build:shared && npm run mobile:ios -w @plainlist/web",
     "desktop:build": "npm run build:shared && npm run desktop:build -w @plainlist/web",
-    "desktop:dist:mac": "npm run desktop:build -w @plainlist/web -- --mac",
-    "desktop:dist:mac:arm64": "npm run desktop:build -w @plainlist/web -- --mac --arm64",
-    "desktop:dist:mac:x64": "npm run desktop:build -w @plainlist/web -- --mac --x64",
+    "desktop:dist:mac": "npm run desktop:dist:mac -w @plainlist/web",
+    "desktop:dist:mac:arm64": "npm run desktop:dist:mac:arm64 -w @plainlist/web",
+    "desktop:dist:mac:x64": "npm run desktop:dist:mac:x64 -w @plainlist/web",
     "dev:reset": "./scripts/dev-reset.sh"
   },
   "devDependencies": {

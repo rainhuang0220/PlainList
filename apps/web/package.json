@@ -21,9 +21,9 @@
     "mobile:android:release": "bash scripts/build-android-release.sh",
     "mobile:ios": "npm run mobile:build && npx cap open ios",
     "desktop:build": "vue-tsc -p tsconfig.json --noEmit && vite build",
-    "desktop:dist:mac": "npm run desktop:build && electron-builder --mac --config electron-builder.yml",
-    "desktop:dist:mac:arm64": "npm run desktop:build && electron-builder --mac --arm64 --config electron-builder.yml",
-    "desktop:dist:mac:x64": "npm run desktop:build && electron-builder --mac --x64 --config electron-builder.yml",
+    "desktop:dist:mac": "npm run desktop:build && node scripts/prepare-electron.cjs && (cd .electron-stage && ../../../node_modules/.bin/electron-builder --mac)",
+    "desktop:dist:mac:arm64": "npm run desktop:build && node scripts/prepare-electron.cjs && (cd .electron-stage && ../../../node_modules/.bin/electron-builder --mac --arm64)",
+    "desktop:dist:mac:x64": "npm run desktop:build && node scripts/prepare-electron.cjs && (cd .electron-stage && ../../../node_modules/.bin/electron-builder --mac --x64)",
     "deploy:android": "bash scripts/deploy-android.sh"
   },
   "dependencies": {
