@@ -38,6 +38,24 @@ describe('activity digest ingestion', () => {
     expect(weekly?.[1]).toEqual([7, '2026-08-24', '2026-08-31']);
   });
 
+  it('replaces one stable local conversation source while preserving fact dates across days', async () => {
+    query.mockResolvedValueOnce([]).mockResolvedValueOnce([{ insertId: 88 }]).mockResolvedValue({ affectedRows: 1 });
+    await appendActivityDigest(user, {
+      ...digest,
+      sourceType: 'chatgpt-local-sync',
+      sourceExternalId: 'conversation-stable-id',
+      idempotencyKey: 'local-conversation-stable-id',
+      localFacts: [
+        { dateKey: '2026-08-30', category: 'engineering', title: '开展软件工程工作', completed: false },
+        { dateKey: '2026-08-31', category: 'engineering', title: '排查并修复软件工程问题', completed: true },
+      ],
+    });
+    const sourceInsert = query.mock.calls.find(([sql]) => /INSERT INTO activity_sources/i.test(String(sql)));
+    expect(sourceInsert?.[1]).toContain('chatgpt-local-sync');
+    const factDates = query.mock.calls.filter(([sql]) => /INSERT INTO activity_facts/i.test(String(sql))).map(([, values]) => values?.[2]);
+    expect(factDates).toEqual(['2026-08-30', '2026-08-31']);
+  });
+
   it('tombstones a source and dirties only its fact dates and weeks', async () => {
     query.mockResolvedValueOnce([[{ date_key: '2026-08-30' }, { date_key: '2026-08-31' }]])
       .mockResolvedValueOnce([{ affectedRows: 1 }]).mockResolvedValueOnce([{ affectedRows: 2 }])
