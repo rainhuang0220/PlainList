@@ -241,8 +241,8 @@ async function doLogin() {
       password: password.value,
     });
     await finish(response, name);
-  } catch {
-    error.value = t('graphic.err_login', 'Wrong username or passphrase.');
+  } catch (caught) {
+    error.value = caught instanceof Error ? caught.message : t('graphic.err_login', 'Wrong username or passphrase.');
   }
 }
 
@@ -297,8 +297,8 @@ async function loginDemo() {
       password: DEMO_ACCOUNT.password,
     });
     await finish(response, DEMO_ACCOUNT.username);
-  } catch {
-    error.value = t('graphic.err_demo', 'Demo login failed. Run the demo seed and retry.');
+  } catch (caught) {
+    error.value = caught instanceof Error ? caught.message : t('graphic.err_demo', 'Demo login failed. Run the demo seed and retry.');
   } finally {
     busy.value = false;
   }

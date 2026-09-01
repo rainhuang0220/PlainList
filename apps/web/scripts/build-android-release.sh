@@ -4,15 +4,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 WEB_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 ROOT_DIR="$(cd "${WEB_DIR}/../.." && pwd)"
-VERSION="${PLAINLIST_VERSION:-2.3.0}"
-API_BASE="${VITE_API_BASE_URL:-}"
+VERSION="${PLAINLIST_VERSION:-2.3.1}"
+API_BASE="$(node "${SCRIPT_DIR}/production-api-contract.cjs" "${VITE_API_BASE_URL:-}")"
 OUT_DIR="${WEB_DIR}/.android-release"
 KEYPROPS="${WEB_DIR}/android-signing/keystore.properties"
-
-if [[ -z "$API_BASE" ]]; then
-  echo "error: VITE_API_BASE_URL is required for release APK (refusing empty API base)" >&2
-  exit 1
-fi
 
 if [[ ! -f "$KEYPROPS" ]]; then
   echo "error: missing $KEYPROPS — see apps/web/android-signing/README.md" >&2

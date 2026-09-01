@@ -422,7 +422,7 @@
         <a href="#about">About</a>
         <a href="#toolkit">Toolkit</a>
         <a href="#download">Download</a>
-        <a href="http://175.24.134.228:8086/">Web</a>
+        <a href="https://plainlist.space/">Web</a>
         <a href="https://github.com/rainhuang0220/PlainList">GitHub</a>
       </nav>
     </header>
@@ -436,10 +436,10 @@
         手机端更推荐——语音输入随时可用，人也更常带着。
       </p>
       <div class="hero-actions">
-        <a class="btn" href="/downloads/PlainList-2.3.0.apk">下载 Android APK</a>
+        <a class="btn" href="/downloads/PlainList-2.3.1.apk">下载 Android APK</a>
         <a class="btn ghost" href="/guide.html">使用指南</a>
-        <a class="btn ghost" href="http://175.24.134.228:8086/">打开 Web 版</a>
-        <a class="btn ghost" href="https://github.com/rainhuang0220/PlainList/releases/tag/v2.3.0">GitHub Release</a>
+        <a class="btn ghost" href="https://plainlist.space/">打开 Web 版</a>
+        <a class="btn ghost" href="https://github.com/rainhuang0220/PlainList/releases/tag/v2.3.1">GitHub Release</a>
       </div>
     </div>
 
@@ -518,8 +518,8 @@
         <div class="dl-card primary">
           <div class="arch">Recommended · Android</div>
           <h3>通用 APK</h3>
-          <p class="meta">版本 <strong>2.3.0</strong> · 大小 <strong id="size-apk">—</strong> · arm64 / x86_64</p>
-          <a class="btn" href="/downloads/PlainList-2.3.0.apk">下载 PlainList-2.3.0.apk</a>
+          <p class="meta">版本 <strong>2.3.1</strong> · 大小 <strong id="size-apk">—</strong> · arm64 / x86_64</p>
+          <a class="btn" href="/downloads/PlainList-2.3.1.apk">下载 PlainList-2.3.1.apk</a>
           <p class="hint">侧载安装：设置里允许「未知来源 / 安装未知应用」后打开 APK。演示账号 rainhuang / rainhuang。</p>
         </div>
 
@@ -527,21 +527,21 @@
           <div class="dl-mini">
             <div>
               <strong>Apple Silicon</strong>
-              <span>macOS · 2.3.0 · <span id="size-arm64">—</span></span>
+              <span>macOS · 2.3.1 · <span id="size-arm64">—</span></span>
             </div>
-            <a class="btn" href="/downloads/PlainList-2.3.0-arm64.dmg">DMG</a>
+            <a class="btn" href="/downloads/PlainList-2.3.1-arm64.dmg">DMG</a>
           </div>
           <div class="dl-mini">
             <div>
               <strong>Intel Mac</strong>
-              <span>macOS · 2.3.0 · <span id="size-x64">—</span></span>
+              <span>macOS · 2.3.1 · <span id="size-x64">—</span></span>
             </div>
-            <a class="btn" href="/downloads/PlainList-2.3.0-x64.dmg">DMG</a>
+            <a class="btn" href="/downloads/PlainList-2.3.1-x64.dmg">DMG</a>
           </div>
           <div class="install-box">
             <strong>macOS 一键安装</strong>
             <div class="install-row">
-              <code id="install-cmd">curl -fsSL http://175.24.134.228/downloads/install.sh | bash</code>
+              <code id="install-cmd">curl -fsSL https://plainlist.space/downloads/install.sh | bash</code>
               <button type="button" class="copy-btn" id="copy-install">复制</button>
             </div>
           </div>
@@ -549,7 +549,7 @@
       </div>
 
       <div class="note">
-        <strong>说明：</strong>客户端连同一台公网后端 <code>175.24.134.228</code>。macOS 为 ad-hoc 签名，首次可能需在「隐私与安全性」点「仍要打开」。
+        <strong>说明：</strong>客户端通过 <code>https://plainlist.space</code> 连接服务。macOS 为 ad-hoc 签名，首次可能需在「隐私与安全性」点「仍要打开」。
         校验：<a href="/downloads/SHA256SUMS.txt">SHA256SUMS</a> ·
         <a href="https://github.com/rainhuang0220/PlainList/releases">全部 Releases</a>
       </div>
@@ -569,14 +569,14 @@
     return (bytes / 1024 / 1024 / 1024).toFixed(2) + ' GB';
   }
   ['arm64', 'x64'].forEach((arch) => {
-    fetch(`/downloads/PlainList-2.3.0-${arch}.dmg`, { method: 'HEAD' })
+    fetch(`/downloads/PlainList-2.3.1-${arch}.dmg`, { method: 'HEAD' })
       .then((r) => {
         const len = r.headers.get('content-length');
         if (len) document.getElementById('size-' + arch).textContent = fmtSize(parseInt(len, 10));
       })
       .catch(() => {});
   });
-  fetch('/downloads/PlainList-2.3.0.apk', { method: 'HEAD' })
+  fetch('/downloads/PlainList-2.3.1.apk', { method: 'HEAD' })
     .then((r) => {
       const len = r.headers.get('content-length');
       if (len) document.getElementById('size-apk').textContent = fmtSize(parseInt(len, 10));

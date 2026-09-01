@@ -1,6 +1,6 @@
 {
   "name": "@plainlist/web",
-  "version": "2.3.0",
+  "version": "2.3.1",
   "private": true,
   "type": "module",
   "main": "electron/main.cjs",
@@ -11,7 +11,7 @@
     "build": "vue-tsc -p tsconfig.json --noEmit && vite build",
     "preview": "vite preview",
     "lint": "eslint src --ext .ts,.vue",
-    "test": "vitest run src && node --test electron/chatgpt-local-sync.test.cjs",
+    "test": "vitest run src && node --test electron/chatgpt-local-sync.test.cjs && node --test scripts/production-api-contract.test.cjs && node --test scripts/verify-production-api-bundle.test.cjs && node --test scripts/verify-packaged-api-bundle.test.cjs",
     "typecheck": "vue-tsc -p tsconfig.json --noEmit",
     "cap:sync": "npx cap sync",
     "cap:android": "npx cap open android",
@@ -21,9 +21,9 @@
     "mobile:android:release": "bash scripts/build-android-release.sh",
     "mobile:ios": "npm run mobile:build && npx cap open ios",
     "desktop:build": "vue-tsc -p tsconfig.json --noEmit && vite build",
-    "desktop:dist:mac": "npm run desktop:build && node scripts/prepare-electron.cjs && (cd .electron-stage && ../../../node_modules/.bin/electron-builder --mac)",
-    "desktop:dist:mac:arm64": "npm run desktop:build && node scripts/prepare-electron.cjs && (cd .electron-stage && ../../../node_modules/.bin/electron-builder --mac --arm64)",
-    "desktop:dist:mac:x64": "npm run desktop:build && node scripts/prepare-electron.cjs && (cd .electron-stage && ../../../node_modules/.bin/electron-builder --mac --x64)",
+    "desktop:dist:mac": "bash scripts/build-desktop-release.sh --mac",
+    "desktop:dist:mac:arm64": "bash scripts/build-desktop-release.sh --mac --arm64",
+    "desktop:dist:mac:x64": "bash scripts/build-desktop-release.sh --mac --x64",
     "deploy:android": "bash scripts/deploy-android.sh"
   },
   "dependencies": {

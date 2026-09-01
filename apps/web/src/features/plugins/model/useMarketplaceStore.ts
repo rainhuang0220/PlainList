@@ -12,8 +12,8 @@ import { DEFAULT_THEME_VARS } from '@plainlist/shared';
 import { defineStore } from 'pinia';
 import { computed, reactive, ref } from 'vue';
 import { useApi } from '@/shared/api/useApi';
+import { resolveApiOrigin } from '@/shared/api/apiRouting';
 
-// vite define 注入（与 src/shared/api/useApi.ts 一致）
 declare const __API_BASE_URL__: string;
 
 export const useMarketplaceStore = defineStore('marketplace', () => {
@@ -74,10 +74,11 @@ export const useMarketplaceStore = defineStore('marketplace', () => {
       return desktop.fishtimeLocalUrl;
     }
 
-    const apiBase =
-      typeof __API_BASE_URL__ === 'string' && __API_BASE_URL__
-        ? __API_BASE_URL__
-        : window.location.origin;
+    const apiBase = resolveApiOrigin({
+      configuredOrigin: typeof __API_BASE_URL__ === 'string' ? __API_BASE_URL__ : '',
+      isNative: false,
+      protocol: window.location.protocol,
+    }) || window.location.origin;
     if (/^https?:\/\//i.test(manifestUrl)) {
       return manifestUrl;
     }
