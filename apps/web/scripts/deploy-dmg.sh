@@ -23,6 +23,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 STAGE_DIR="${SCRIPT_DIR}/../.electron-stage"
 PAGE_DIR="${SCRIPT_DIR}/download-page"
 DMG_DIR="${STAGE_DIR}/release"
+ANDROID_RELEASE_DIR="${SCRIPT_DIR}/../.android-release"
 VERSION="${PLAINLIST_VERSION:-2.3.0}"
 
 SSH_OPTS=(-o BatchMode=yes -o PreferredAuthentications=publickey -o PasswordAuthentication=no -o StrictHostKeyChecking=accept-new -o ConnectTimeout=20)
@@ -37,6 +38,9 @@ ssh "${SSH_OPTS[@]}" "$SERVER" \
 echo "[deploy] generating SHA256SUMS..."
 SUMS_FILE="${STAGE_DIR}/SHA256SUMS.txt"
 (cd "${DMG_DIR}" && shasum -a 256 "PlainList-${VERSION}-"*.dmg) > "${SUMS_FILE}"
+if [[ -f "${ANDROID_RELEASE_DIR}/PlainList-${VERSION}.apk" ]]; then
+  (cd "${ANDROID_RELEASE_DIR}" && shasum -a 256 "PlainList-${VERSION}.apk") >> "${SUMS_FILE}"
+fi
 cat "${SUMS_FILE}"
 
 # 3. Upload DMG files via scp directly to the target dir
