@@ -83,7 +83,11 @@ ipcMain.handle('chatgpt-local-sync:scan', async (_event, userScope, bootstrapWin
   const scope = safeScope(userScope); const previous = state.users?.[scope] || {}; state.bootstrapScopes ??= {};
   const detected = detectChangedArchives(scan.archives, previous);
   const days = bootstrapWindow === 'all' ? null : Math.max(0, Number(bootstrapWindow) || 7);
-  const cutoff = days === null ? null : Date.now() - days * 86_400_000;
+  // “Today” is the local calendar day, rather than the instant the user clicked sync.
+  // The other windows intentionally remain rolling lookback windows.
+  const cutoff = days === null ? null : days === 0
+    ? new Date(new Date().setHours(0, 0, 0, 0)).getTime()
+    : Date.now() - days * 86_400_000;
   const isBootstrap = !state.bootstrapScopes[scope];
   const eligible = isBootstrap && cutoff !== null ? detected.changed.filter((archive) => Date.parse(archive.updatedAt) >= cutoff) : detected.changed;
   const bootstrapSkipped = isBootstrap ? detected.changed.filter((archive) => !eligible.includes(archive)) : [];
@@ -296,6 +300,13 @@ app.whenReady().then(async () => {
   } catch (e) {
     console.error('[fishtime-local] failed to start:', e);
     fishTimeLocal = null;
+  }
+
+  // The selected directory is local app configuration. Reattach the watcher on
+  // launch so a previously enabled sync keeps reacting to local archive exports.
+  const chatgptSyncState = await readChatgptSyncState();
+  if (chatgptSyncState.rootPath && !chatgptSyncState.paused) {
+    await startChatgptSyncWatcher(chatgptSyncState.rootPath);
   }
 
   buildMenu();

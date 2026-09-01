@@ -43,12 +43,16 @@ function copyDir(from, to) {
   }
 }
 
-for (const dir of ['dist', 'electron', 'build']) {
+for (const dir of ['dist', 'electron', 'build', 'scripts']) {
   const from = path.join(src, dir);
   if (fs.existsSync(from)) {
     copyDir(from, path.join(stage, dir));
   }
 }
+
+// Keep the package configuration beside the staged package. Its relative
+// buildResources and entitlement paths must resolve inside the staging dir.
+fs.copyFileSync(path.join(src, 'electron-builder.yml'), path.join(stage, 'electron-builder.yml'));
 
 // trimmed package.json: just the fields electron-builder needs at the asar root
 const pkg = JSON.parse(fs.readFileSync(path.join(src, 'package.json'), 'utf8'));
