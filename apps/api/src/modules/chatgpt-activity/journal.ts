@@ -11,7 +11,7 @@ export type { ChatgptJournalFact } from './dailyNormalize';
 export { chineseCharCount, isTriviaActivityTitle, scrubFactText };
 export { isReadableDailyParagraph };
 
-export const DAILY_JOURNAL_SOURCE_VERSION = 'journal-v4';
+export const DAILY_JOURNAL_SOURCE_VERSION = 'journal-v5';
 
 export function chineseMonthDay(dateKey: string): string {
   const [, month, day] = dateKey.split('-').map(Number);

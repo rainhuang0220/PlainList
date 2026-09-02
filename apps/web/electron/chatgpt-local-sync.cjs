@@ -1,6 +1,7 @@
 const { createHash } = require('node:crypto');
 const { lstat, readdir, readFile } = require('node:fs/promises');
 const path = require('node:path');
+const { extractDailySemanticFacts } = require('./daily-semantic-fact.cjs');
 
 const SOURCE_TYPE = 'chatgpt-local-sync';
 const MAX_ARCHIVE_BYTES = 8 * 1024 * 1024;
@@ -162,6 +163,7 @@ function buildLocalDigest(archive) {
     decisions: [],
     unresolved: [],
     localFacts: facts,
+    dailySemanticFacts: extractDailySemanticFacts(archive),
   };
 }
 

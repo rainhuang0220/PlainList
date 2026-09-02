@@ -90,4 +90,28 @@ describe('activity digest ingestion', () => {
     expect(factInsert?.[1]?.[0]).toBe(2);
     expect(JSON.stringify(query.mock.calls)).not.toMatch(/"user_id":99|"userId":99/);
   });
+
+  it('stores daily semantic facts in compact payload without using them as Activity titles', async () => {
+    query.mockResolvedValueOnce([]).mockResolvedValueOnce([{ insertId: 90 }]).mockResolvedValue({ affectedRows: 1 });
+    await appendActivityDigest(user, {
+      ...digest,
+      sourceType: 'chatgpt-local-sync',
+      sourceExternalId: 'conversation-semantic',
+      idempotencyKey: 'local-conversation-semantic',
+      localFacts: [{ dateKey: '2026-08-31', category: 'engineering', title: '完成PlainList scheduler', completed: true }],
+      dailySemanticFacts: [{
+        topic: 'PlainList',
+        status: 'completed',
+        summary: '完成了 PlainList scheduler 的 stale lease 修复，并补了回归测试。',
+        dateKey: '2026-08-31',
+        sourceConversationId: 'conversation-semantic',
+      }],
+    });
+    const sourceInsert = query.mock.calls.find(([sql]) => /INSERT INTO activity_sources/i.test(String(sql)));
+    expect(JSON.stringify(sourceInsert?.[1])).toMatch(/stale lease 修复/);
+    const factInserts = query.mock.calls.filter(([sql]) => /INSERT INTO activity_facts/i.test(String(sql)));
+    expect(factInserts).toHaveLength(1);
+    expect(factInserts[0]?.[1]).toContain('完成PlainList scheduler');
+    expect(JSON.stringify(factInserts[0]?.[1])).not.toMatch(/stale lease 修复/);
+  });
 });

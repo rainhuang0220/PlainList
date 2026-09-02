@@ -40,6 +40,14 @@ export const appendActivityDigestSchema = z.object({
     title: z.string().trim().min(1).max(240),
     completed: z.boolean(),
   }).strict()).max(20).optional(),
+  dailySemanticFacts: z.array(z.object({
+    topic: z.string().trim().min(1).max(80),
+    status: z.enum(['completed', 'progress', 'planned', 'discussed']),
+    summary: z.string().trim().min(8).max(240),
+    dateKey: dateKeySchema,
+    occurredAt: z.string().datetime({ offset: true }).optional(),
+    sourceConversationId: z.string().trim().min(1).max(255).optional(),
+  }).strict()).max(8).optional(),
   candidateGoalRelations: z.array(z.object({ goalId: z.number().int().positive(), relation: z.enum(['primary', 'supporting', 'exploration', 'neutral']) })).max(8).default([]),
 }).strict();
 
