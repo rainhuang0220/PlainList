@@ -10,6 +10,7 @@ export const chatgptActivityReconcileSchema = z.object({
   processed: z.number().int().nonnegative().optional(),
   historicalBootstrap: z.boolean().optional(),
   bootstrapComplete: z.boolean().optional(),
+  presentationOnly: z.boolean().optional(),
   dateFrom: dateKeySchema.optional().nullable(),
   dateTo: dateKeySchema.optional().nullable(),
 }).strict();

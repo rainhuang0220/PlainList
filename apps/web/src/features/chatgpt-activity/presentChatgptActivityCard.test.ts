@@ -12,21 +12,22 @@ describe('presentChatgptActivityCard', () => {
     });
     expect(card.variant).toBe('desktop-disconnected');
     expect(card.connected).toBe(false);
-    expect(card.body).toContain('完整对话保留在本机');
+    expect(card.body).toContain('本机');
   });
 
-  it('shows a living connected state on desktop instead of unused status rows', () => {
+  it('shows a compact connected state with conversation counts', () => {
     const card = presentChatgptActivityCard({
       isDesktop: true,
       localStatus: 'enabled',
       rootName: 'chatgpt-local-sync',
-      connection: { viaDesktop: true, lastSyncedAt: '2026-09-02T15:41:00.000Z' },
-      lastResult: { changed: 6, activities: 4 },
+      connection: { viaDesktop: true, lastSyncedAt: '2026-09-02T15:41:00.000Z', checked: 105, processed: 76 },
+      lastResult: { changed: 0, activities: 0, checked: 105, processed: 76 },
     });
     expect(card.variant).toBe('desktop-connected');
     expect(card.headline).toBe('自动记录中');
-    expect(card.todayLine).toContain('6 个对话');
-    expect(card.todayLine).toContain('4 条活动记录');
+    expect(card.countLine).toContain('105 个对话');
+    expect(card.countLine).toContain('已处理 76');
+    expect(card.todayLine).toBeNull();
   });
 
   it('explains that web cannot pick a local archive when disconnected', () => {
@@ -67,10 +68,11 @@ describe('presentChatgptActivityCard', () => {
       isDesktop: false,
       localStatus: 'disabled',
       rootName: null,
-      connection: { viaDesktop: true, lastSyncedAt: '2026-09-02T15:41:00.000Z' },
-      lastResult: { changed: 3, activities: 2 },
+      connection: { viaDesktop: true, lastSyncedAt: '2026-09-02T15:41:00.000Z', checked: 105, processed: 76 },
+      lastResult: { changed: 3, activities: 2, checked: 105, processed: 76 },
     });
     expect(card.variant).toBe('web-connected');
-    expect(card.headline).toContain('Desktop');
+    expect(card.headline).toBe('自动记录中');
+    expect(card.countLine).toContain('105 个对话');
   });
 });

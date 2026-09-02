@@ -15,4 +15,10 @@ describe('AiJournalHistoryPanel reader', () => {
     expect(source).not.toContain('bootstrap_skipped');
     expect(source).toContain('presentAiJournalEmpty');
   });
+
+  it('uses a compact history list beside a full-width reader', () => {
+    expect(source).toContain('grid-template-columns: 168px minmax(0, 1fr)');
+    expect(source).toContain('previewText');
+    expect(source).not.toContain('journal-intro');
+  });
 });

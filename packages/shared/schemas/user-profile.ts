@@ -14,8 +14,8 @@ export const userProfilePatchSchema = z.object({
 export const userProfileAnalyzeSchema = z.object({
   fromDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   toDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  days: z.number().int().min(1).max(180).optional(),
-});
+  days: z.number().int().min(1).max(3650).optional(),
+}).strict();
 
 export type UserProfilePatchInput = z.infer<typeof userProfilePatchSchema>;
 export type UserProfileAnalyzeInput = z.infer<typeof userProfileAnalyzeSchema>;

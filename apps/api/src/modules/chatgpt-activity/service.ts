@@ -101,7 +101,7 @@ export async function reconcileChatgptActivity(user: AuthenticatedUser, payload:
   for (const date of [...dates].sort()) {
     if (date < DEFAULT_HISTORICAL_START_DATE) continue;
     const [rows] = await pool.query(
-      `SELECT f.id, f.source_id, f.category, f.title, f.output_state
+      `SELECT f.id, f.source_id, f.category, f.title, f.summary, f.output_state
        FROM activity_facts f
        INNER JOIN activity_sources s ON s.id = f.source_id
        WHERE f.user_id = ? AND f.date_key = ?
@@ -114,6 +114,7 @@ export async function reconcileChatgptActivity(user: AuthenticatedUser, payload:
       sourceId: Number((row as any).source_id),
       category: String((row as any).category),
       title: String((row as any).title),
+      summary: String((row as any).summary || ''),
       outputState: String((row as any).output_state),
     })) satisfies ChatgptJournalFact[];
     const journal = renderChatgptDailyJournal(date, facts);
@@ -125,18 +126,22 @@ export async function reconcileChatgptActivity(user: AuthenticatedUser, payload:
     await pool.query(
       `INSERT INTO chatgpt_daily_journals
         (user_id, journal_date, source_type, status, summary_markdown, activity_count, conversation_count, source_version, generated_at)
-       VALUES (?, ?, 'chatgpt-local-sync', ?, ?, ?, ?, 'journal-v1', CURRENT_TIMESTAMP)
+       VALUES (?, ?, 'chatgpt-local-sync', ?, ?, ?, ?, 'journal-v2', CURRENT_TIMESTAMP)
        ON DUPLICATE KEY UPDATE status = VALUES(status), summary_markdown = VALUES(summary_markdown),
          activity_count = VALUES(activity_count), conversation_count = VALUES(conversation_count),
          source_version = VALUES(source_version), generated_at = CURRENT_TIMESTAMP`,
       [user.id, date, status, journal.summaryMarkdown, journal.activityCount, journal.conversationCount],
     );
     journals.push({ date, status, activityCount: journal.activityCount, conversationCount: journal.conversationCount });
-    await dirtyClosedWeekForJournalDate(user.id, date);
+    if (!input.presentationOnly) {
+      await dirtyClosedWeekForJournalDate(user.id, date);
+    }
   }
 
   await upsertConnection(user.id, input);
-  await generateCurrentWeeklyReviewSnapshot(user).catch(() => undefined);
+  if (!input.presentationOnly) {
+    await generateCurrentWeeklyReviewSnapshot(user).catch(() => undefined);
+  }
   return { journals };
 }
 

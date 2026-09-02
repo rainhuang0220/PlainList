@@ -324,6 +324,25 @@
       justify-self: start;
       font-family: var(--mono); font-size: 15px; font-weight: 700; letter-spacing: -.02em;
     }
+    html.pl-desktop .app-nav {
+      -webkit-app-region: drag;
+    }
+    html.pl-desktop .app-nav a,
+    html.pl-desktop .app-nav button,
+    html.pl-desktop .nav-logo,
+    html.pl-desktop .nav-right {
+      -webkit-app-region: no-drag;
+    }
+    html.pl-desktop-darwin .nav-logo {
+      grid-column: 3;
+      justify-self: end;
+      z-index: 2;
+    }
+    html.pl-desktop-darwin .nav-right {
+      grid-column: 3;
+      justify-self: end;
+      padding-right: 2.75rem;
+    }
     .nav-links {
       justify-self: center;
       display: flex; gap: 32px;

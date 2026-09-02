@@ -13,11 +13,16 @@ import {
   listChatgptDailyJournals,
   reconcileChatgptActivity,
 } from './service';
+import { dirtyClosedWeekForJournalDate, generateCurrentWeeklyReviewSnapshot } from '../reviews/weeklyReviewSnapshot';
 
 const user = { id: 7, username: 'reader', isAdmin: false };
 
 describe('ChatGPT activity journal service', () => {
-  beforeEach(() => query.mockReset());
+  beforeEach(() => {
+    query.mockReset();
+    vi.mocked(dirtyClosedWeekForJournalDate).mockClear();
+    vi.mocked(generateCurrentWeeklyReviewSnapshot).mockClear();
+  });
 
   it('persists one derived journal for multiple same-day conversations without raw transcript fields', async () => {
     query
@@ -38,7 +43,9 @@ describe('ChatGPT activity journal service', () => {
 
     expect(result.journals).toEqual([{ date: '2026-09-01', status: 'final', activityCount: 2, conversationCount: 2 }]);
     const journalWrite = query.mock.calls.find(([sql]) => /INSERT INTO chatgpt_daily_journals/i.test(String(sql)));
-    expect((journalWrite?.[1] as unknown[])?.some((value) => typeof value === 'string' && value.includes('## 9 月 1 日'))).toBe(true);
+    const markdown = (journalWrite?.[1] as unknown[]).find((value) => typeof value === 'string' && value.includes('登录'));
+    expect(String(markdown)).toContain('登录问题');
+    expect(String(markdown)).not.toContain('## ');
     expect(JSON.stringify(journalWrite?.[1])).not.toMatch(/messages|transcript|cookie|session/i);
   });
 
@@ -129,6 +136,26 @@ describe('ChatGPT activity journal service', () => {
       expect(values?.[0]).toBe(2);
       expect(values).not.toContain(7);
     }
+  });
+
+  it('recompose presentation without dirtying closed weekly summaries', async () => {
+    query
+      .mockResolvedValueOnce([[{ id: 1, source_id: 10, category: 'engineering', title: '修复周回顾空状态', summary: '修复周回顾空状态', output_state: 'produced' }]])
+      .mockResolvedValueOnce([{ affectedRows: 1 }])
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
+
+    await reconcileChatgptActivity(user, {
+      affectedDates: ['2026-08-31'],
+      finalizeThrough: '2026-08-31',
+      checked: 1,
+      changed: 1,
+      skipped: 0,
+      historicalBootstrap: false,
+      presentationOnly: true,
+    });
+
+    expect(dirtyClosedWeekForJournalDate).not.toHaveBeenCalled();
+    expect(generateCurrentWeeklyReviewSnapshot).not.toHaveBeenCalled();
   });
 
   it('rejects a foreign userId field on reconcile so one account cannot write another', async () => {

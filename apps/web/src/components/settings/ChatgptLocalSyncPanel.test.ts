@@ -21,4 +21,10 @@ describe('ChatgptLocalSyncPanel layout', () => {
     expect(source).toContain('chatgpt-local-sync');
     expect(source).toContain('v-if="hasActions"');
   });
+
+  it('keeps one primary action and compact secondary controls', () => {
+    expect(source).toContain('class="ghost"');
+    expect(source).toContain('count-line');
+    expect(source).toContain('height: 32px');
+  });
 });

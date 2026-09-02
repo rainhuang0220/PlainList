@@ -18,7 +18,14 @@ export interface ChatgptActivityCardModel {
   lastUpdated: string | null;
   todayLine: string | null;
   progressLine: string | null;
+  countLine: string | null;
   showDesktopDownload: boolean;
+}
+
+function countLineFor(checked?: number, processed?: number): string | null {
+  if (!checked) return null;
+  if (processed && processed !== checked) return `${checked} 个对话 · 已处理 ${processed}`;
+  return `${checked} 个对话`;
 }
 
 export function presentChatgptActivityCard(input: {
@@ -38,12 +45,10 @@ export function presentChatgptActivityCard(input: {
   lastResult: { changed?: number; activities?: number; processed?: number; checked?: number } | null;
 }): ChatgptActivityCardModel {
   const lastUpdated = input.connection.lastSyncedAt ?? null;
-  const todayLine = input.lastResult
-    ? `这次整理了 ${input.lastResult.changed ?? 0} 个对话，形成 ${input.lastResult.activities ?? 0} 条活动记录。`
-    : null;
   const processed = input.lastResult?.processed ?? input.connection.processed ?? 0;
   const total = input.lastResult?.checked ?? input.connection.checked ?? 0;
-  const progressLine = total > 0 && processed < total
+  const countLine = countLineFor(total, processed);
+  const progressLine = total > 0 && processed > 0 && processed < total
     ? `已处理 ${processed} / ${total} 个对话`
     : null;
 
@@ -53,10 +58,11 @@ export function presentChatgptActivityCard(input: {
         variant: 'desktop-paused',
         connected: true,
         headline: '已暂停自动记录',
-        body: '资料库仍保留在本机。恢复后会继续整理每日 AI 小记。',
+        body: '资料库仍保留在本机。',
         lastUpdated,
-        todayLine,
+        todayLine: null,
         progressLine,
+        countLine,
         showDesktopDownload: false,
       };
     }
@@ -65,21 +71,23 @@ export function presentChatgptActivityCard(input: {
         variant: 'desktop-connected',
         connected: true,
         headline: '自动记录中',
-        body: '完整对话保留在本机，PlainList 只保存整理后的活动摘要。',
+        body: '',
         lastUpdated,
-        todayLine: todayLine ?? '连接后，每天的活动会自动整理成 AI 小记。',
-        progressLine,
+        todayLine: null,
+        progressLine: null,
+        countLine,
         showDesktopDownload: false,
       };
     }
     return {
       variant: 'desktop-disconnected',
       connected: false,
-      headline: '自动记录你通过 ChatGPT 完成的学习、研究和项目活动。',
-      body: '完整对话保留在本机，PlainList 只保存整理后的活动摘要。',
+      headline: '连接本机 ChatGPT 资料库后，活动会整理成每日小记。',
+      body: '完整对话留在本机。',
       lastUpdated: null,
       todayLine: null,
       progressLine: null,
+      countLine: null,
       showDesktopDownload: false,
     };
   }
@@ -96,6 +104,7 @@ export function presentChatgptActivityCard(input: {
       lastUpdated,
       todayLine: null,
       progressLine,
+      countLine,
       showDesktopDownload: false,
     };
   }
@@ -103,11 +112,12 @@ export function presentChatgptActivityCard(input: {
     return {
       variant: 'web-waiting',
       connected: true,
-      headline: '等待 ChatGPT 本地资料库同步历史记录',
-      body: 'Desktop 已连接，正在等待 chatgpt-local-sync 完成历史导出。',
+      headline: '等待本地资料库同步',
+      body: 'Desktop 已连接，正在等待历史导出。',
       lastUpdated,
       todayLine: null,
       progressLine: null,
+      countLine: null,
       showDesktopDownload: false,
     };
   }
@@ -115,11 +125,12 @@ export function presentChatgptActivityCard(input: {
     return {
       variant: 'web-empty',
       connected: true,
-      headline: '暂时没有可记录的 ChatGPT 活动',
-      body: '已连接 Desktop。有值得记录的活动后，这里会出现每日摘要。',
+      headline: '暂时没有可记录的活动',
+      body: '已连接 Desktop。',
       lastUpdated,
       todayLine: null,
       progressLine: null,
+      countLine,
       showDesktopDownload: false,
     };
   }
@@ -127,11 +138,12 @@ export function presentChatgptActivityCard(input: {
     return {
       variant: 'web-connected',
       connected: true,
-      headline: '自动记录已通过 Desktop 开启',
-      body: '每日活动记录会自动同步到这里，可在 AI 小记中查看。',
+      headline: '自动记录中',
+      body: '',
       lastUpdated,
-      todayLine,
+      todayLine: null,
       progressLine: null,
+      countLine,
       showDesktopDownload: false,
     };
   }
@@ -140,10 +152,11 @@ export function presentChatgptActivityCard(input: {
     variant: 'web-disconnected',
     connected: false,
     headline: '尚未连接桌面资料库',
-    body: '通过 PlainList Desktop 连接 ChatGPT Local Sync 后，这里会自动显示每日活动记录。',
+    body: '用 PlainList Desktop 连接后，这里会显示每日活动记录。',
     lastUpdated: null,
     todayLine: null,
     progressLine: null,
+    countLine: null,
     showDesktopDownload: true,
   };
 }

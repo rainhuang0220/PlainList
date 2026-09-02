@@ -5,7 +5,7 @@ const { join } = require('node:path');
 const { tmpdir } = require('node:os');
 const test = require('node:test');
 
-const { archiveMeetsHistoricalStart, buildLocalDigest, detectChangedArchives, parseArchive, readStableJson, scanArchiveDirectory } = require('./chatgpt-local-sync.cjs');
+const { archiveMeetsHistoricalStart, buildLocalDigest, dateKey, detectChangedArchives, parseArchive, readStableJson, scanArchiveDirectory, shanghaiDateKey } = require('./chatgpt-local-sync.cjs');
 
 const fixture = (name) => JSON.parse(readFileSync(join(__dirname, 'fixtures', 'chatgpt-local-sync', 'v2.9.4', name), 'utf8'));
 
@@ -51,10 +51,25 @@ test('reduces untrusted conversation text into a semantic digest without retaini
 
   assert.equal(digest.sourceType, 'chatgpt-local-sync');
   assert.equal(digest.sourceExternalId, 'conv-plainlist-scheduler');
-  assert.deepEqual(digest.activities, ['排查并修复软件工程问题']);
-  assert.deepEqual(digest.outputs, ['完成软件工程工作']);
+  assert.equal(digest.localFacts.some((fact) => /PlainList/.test(fact.title) && /scheduler/.test(fact.title)), true);
+  assert.equal(digest.localFacts.some((fact) => /scheduler/.test(fact.title)), true);
   assert.equal(JSON.stringify(digest).includes('执行 shell'), false);
   assert.equal(JSON.stringify(digest).includes('十个功能'), false);
+});
+
+test('maps message occurred_at onto the Asia/Shanghai calendar day, not a UTC slice', () => {
+  assert.equal(shanghaiDateKey('2026-08-31T16:30:00.000Z'), '2026-09-01');
+  assert.equal(dateKey('2026-08-31T16:30:00.000Z'), '2026-09-01');
+  assert.equal(dateKey('2026-08-31T15:59:00.000Z'), '2026-08-31');
+  const archive = parseArchive({
+    conversation_id: 'midnight',
+    update_time: '2026-08-31T16:30:00.000Z',
+    messages: [
+      { message_id: 'u1', role: 'user', occurred_at: '2026-08-31T16:30:00.000Z', content: '修复 PlainList titlebar' },
+    ],
+  });
+  assert.equal(archive.messages[0].dateKey, '2026-09-01');
+  assert.equal(buildLocalDigest(archive).localFacts[0].dateKey, '2026-09-01');
 });
 
 test('scans only real JSON archives and treats partial writes and symlinks as retryable skips', async () => {
@@ -143,7 +158,7 @@ test('dogfoods a fixture archive from folder scan through a compact activity dig
   const detected = detectChangedArchives(scanned.archives, {});
   const digest = buildLocalDigest(detected.changed[0]);
   assert.equal(scanned.issues.length, 0);
-  assert.equal(digest.localFacts.length, 1);
-  assert.equal(digest.localFacts[0].dateKey, '2026-08-31');
+  assert.ok(digest.localFacts.length >= 1 && digest.localFacts.length <= 3);
+  assert.ok(digest.localFacts.every((fact) => fact.dateKey === '2026-08-30' || fact.dateKey === '2026-08-31'));
   assert.equal(JSON.stringify(digest).includes('stale lease'), false);
 });

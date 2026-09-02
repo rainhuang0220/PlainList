@@ -34,11 +34,11 @@ export const useUserProfileStore = defineStore('userProfile', () => {
     }
   }
 
-  async function analyze(days = 60): Promise<UserProfileAnalyzeResponse> {
+  async function analyze(): Promise<UserProfileAnalyzeResponse> {
     analyzing.value = true;
     error.value = '';
     try {
-      const result = await post<UserProfileAnalyzeResponse>('/user-profile/analyze', { days });
+      const result = await post<UserProfileAnalyzeResponse>('/user-profile/analyze', {});
       await fetch();
       return result;
     } catch (caughtError) {

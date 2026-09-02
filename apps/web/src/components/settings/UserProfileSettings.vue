@@ -3,13 +3,16 @@
     <div class="profile-hero">
       <div>
         <div class="profile-kicker">{{ t('profile.kicker', 'AI PROFILE') }}</div>
-        <h3>{{ t('profile.title', '可解释的排程画像') }}</h3>
+        <h3>{{ t('profile.title', '用户画像') }}</h3>
         <p>
-          {{ t('profile.subtitle', '只读取你的日记/当日总结生成画像。每条画像都能展开查看日期、原文依据和影响比例。') }}
+          {{ t('profile.subtitle', '基于你在 PlainList 中积累的目标、日记、活动和历史回顾，整理长期偏好与当前状态。') }}
+        </p>
+        <p class="profile-hint">
+          {{ t('profile.hint', '结合全部可用历史，并提高近期活动的权重。') }}
         </p>
       </div>
       <button type="button" class="profile-analyze" :disabled="profile.analyzing" @click="runAnalyze">
-        {{ profile.analyzing ? t('profile.analyzing', '分析中…') : t('profile.analyze', '分析最近 60 天') }}
+        {{ profile.analyzing ? t('profile.analyzing', '分析中…') : t('profile.analyze', '更新用户画像') }}
       </button>
     </div>
 
@@ -25,12 +28,17 @@
 
     <div v-if="profile.loading" class="profile-empty">{{ t('app.loader', '加载中…') }}</div>
     <div v-else-if="profile.traits.length === 0" class="profile-empty">
-      {{ t('profile.empty', '还没有画像。先写几天当日总结，再点击分析。') }}
+      {{ t('profile.empty', '还没有画像。写日记、完成计划或连接活动记录后，再点击更新。') }}
     </div>
 
-    <div v-else class="profile-list">
+    <article v-if="portrait" class="profile-portrait">
+      <!-- eslint-disable-next-line vue/no-v-html -->
+      <div class="profile-prose" v-html="portraitHtml" />
+    </article>
+
+    <div v-if="supportingTraits.length" class="profile-list">
       <article
-        v-for="trait in profile.traits"
+        v-for="trait in supportingTraits"
         :key="trait.id"
         class="profile-card"
         :class="{ disabled: !trait.enabled }"
@@ -114,7 +122,8 @@
 
 <script setup lang="ts">
 import type { UserProfileEvidenceRecord, UserProfileTraitRecord } from '@plainlist/shared';
-import { onMounted, reactive, ref, watch } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { renderSafeMarkdown } from '@/features/chatgpt-activity/safeMarkdown';
 import { useUserProfileStore } from '@/features/user-profile/model/useUserProfileStore';
 import { useI18nStore } from '@/shared/i18n/useI18nStore';
 
@@ -131,6 +140,9 @@ const openTraitId = ref<number | null>(null);
 const fullEvidence = reactive<Record<number, UserProfileEvidenceRecord[]>>({});
 const evidenceLoading = ref(false);
 const message = ref('');
+const portrait = computed(() => profile.traits.find((trait) => trait.traitKey === 'user_portrait') ?? null);
+const supportingTraits = computed(() => profile.traits.filter((trait) => trait.traitKey !== 'user_portrait'));
+const portraitHtml = computed(() => renderSafeMarkdown(portrait.value?.effectiveSummary || portrait.value?.generatedSummary || ''));
 
 function t(key: string, fallback: string, params?: Record<string, string | number>) {
   return i18n.t(key, fallback, params);
@@ -163,7 +175,7 @@ function editFor(trait: UserProfileTraitRecord): TraitEdit {
 
 async function runAnalyze() {
   message.value = '';
-  const result = await profile.analyze(60);
+  const result = await profile.analyze();
   message.value = t(
     'profile.analyze_done',
     '分析完成：生成 {evidence} 条证据，覆盖 {traits} 条画像。',
@@ -258,6 +270,34 @@ onMounted(async () => {
   font-size: 13px;
   line-height: 1.6;
   color: var(--mid);
+}
+
+.profile-hint {
+  margin-top: 6px !important;
+  font-size: 12px !important;
+}
+
+.profile-portrait {
+  padding: 16px 18px;
+  border: 1px solid var(--faint);
+  border-radius: calc(var(--r) + 2px);
+  background: var(--surface);
+}
+
+.profile-prose :deep(h2) {
+  margin: 1rem 0 0.4rem;
+  font-size: 14px;
+}
+
+.profile-prose :deep(h2:first-child) {
+  margin-top: 0;
+}
+
+.profile-prose :deep(p) {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--dark);
 }
 
 .profile-analyze,

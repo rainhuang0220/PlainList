@@ -26,6 +26,15 @@ function wireDayClock() {
   });
 }
 
+function markDesktopShell() {
+  const desktop = (window as Window & { plainlistDesktop?: unknown }).plainlistDesktop;
+  if (!desktop) return;
+  document.documentElement.classList.add('pl-desktop');
+  if (/Mac/i.test(navigator.platform)) {
+    document.documentElement.classList.add('pl-desktop-darwin');
+  }
+}
+
 async function initNativePlugins() {
   if (!Capacitor.isNativePlatform()) return;
 
@@ -71,6 +80,7 @@ async function bootstrap() {
 
   app.mount('#app');
 
+  markDesktopShell();
   wireDayClock();
   await initNativePlugins();
 }
