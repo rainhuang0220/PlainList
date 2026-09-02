@@ -139,7 +139,7 @@ The handoff is not permission to skip verification. Complete in this order:
 
 ## Known unfinished items at handoff creation
 
-- Production 2.4.0 cutover and post-cutover verification were not yet completed when this file was created.
+- Production 2.4.0 cutover and post-cutover verification were not yet completed when the first draft of this file was created; the closure update below records their completion.
 - Visual browser QA of the redesigned settings/daily viewer was planned but not completed.
 - arm64/x64 DMGs and Android APK were not yet built for 2.4.0.
 - `v2.4.0` tag and GitHub Release were not yet created.
@@ -149,3 +149,17 @@ The handoff is not permission to skip verification. Complete in this order:
 ## Stop conditions
 
 Stop and report only for a real blocker: unsafe DB migration, forced raw transcript upload, incompatible external archive format, failed production cutover/rollback, or unrecoverable artifact signing/build failure. Never expose production secrets or real user content in diagnostics.
+
+## Closure update — 2026-09-02
+
+- PR [#20](https://github.com/rainhuang0220/PlainList/pull/20) merged the feature into `main` at `32321ac7d01f045314d6030c5abc1f4c4742fe22`.
+- Migration 012 applied successfully in production.
+- An isolated API process with background schedulers disabled passed health smoke; the new journal route returned the expected unauthenticated 401.
+- Production API cut over to the immutable 32321ac release with zero PM2 restarts after launch.
+- Both HTTP and HTTPS Nginx roots cut over from the older 2.3.0 Web tree to the immutable 32321ac Web release.
+- Authenticated public smoke passed for health, login, `/auth/me`, weekly summary, journals, and connection state without printing tokens or user content.
+- The former production failure now returns `status=no_data`, `notice=no_data`, no fallback, and no technical reason. This validates the real `NO_SOURCE_DATA` fix on the public API.
+- At closure verification time the active release worktree, `origin/main`, the original local `main`, PM2 API cwd, Nginx Web root, and public release marker all resolved to the same release commit.
+- The original checkout's modified `package-lock.json` was preserved in `stash@{0}` under the message `preserve local package-lock before 2.4.0 fast-forward`; its untracked images and nested FishTime state remain in place.
+
+The remaining work is artifact/UX follow-up, not an API/Web production blocker: visual browser QA, arm64/x64 DMGs, Android signer audit/APK, `v2.4.0` tag, and GitHub Release.
