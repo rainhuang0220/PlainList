@@ -66,6 +66,9 @@ export function isReadableDailyParagraph(text: string): boolean {
   if (/\b10\.\d{4,9}/.test(value) || /https?:\/\//i.test(value) || /\b(?:19|20)\d{2}\.\d+/.test(value)) return false;
   if (GENERIC_FILLER.test(value) || KEYWORD_DUMP.test(value)) return false;
   if (/(^|\n)[-*] /.test(value) || /推进[\u4e00-\u9fffA-Za-z]+ [\u4e00-\u9fff]{2,}/.test(value)) return false;
+  if (/完了(?!成)/.test(value) || /当取|当天户|相关活动。$/.test(value)) return false;
+  if (/[“”"]/.test(value) && (value.match(/[“”"]/g) ?? []).length % 2 !== 0) return false;
+  if (!/今天|当天|完成了|继续|讨论了|确定了/.test(value)) return false;
   const count = chineseCharCount(value);
   return count > 12 && count <= 280;
 }

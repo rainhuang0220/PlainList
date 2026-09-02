@@ -97,4 +97,19 @@ describe('composeDailyJournal', () => {
     expect(result.text).toContain('PlainList');
     expect(result.text).toMatch(/论文/);
   });
+
+  it('rejects truncated model prose and uses the readable fallback', async () => {
+    const input = normalizeDailyFacts('2026-09-02', [
+      fact({ id: 1, title: '完成 PlainList 桌面同步验收', outputState: 'produced' }),
+    ]);
+    const result = await composeDailyJournal(input, {
+      tryModel: true,
+      complete: async () => '2026年9月2日，当天户”的相关活动。',
+    });
+    expect(result.compositionMode).toBe('fallback');
+    assertReadable(result.text);
+    expect(result.text).not.toMatch(/当天户/);
+    expect(result.text).not.toMatch(/相关活动。$/);
+    expect(result.text).toContain('PlainList');
+  });
 });
