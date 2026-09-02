@@ -152,25 +152,6 @@ function factsFromSourceRows(rows: unknown[], date: string): ChatgptJournalFact[
       });
     });
   }
-  for (const raw of rows) {
-    const row = raw as {
-      id: number;
-      source_id: number;
-      category: string;
-      title: string;
-      summary?: string;
-      output_state: string;
-    };
-    if (semanticSources.has(Number(row.source_id))) continue;
-    facts.push({
-      id: Number(row.id),
-      sourceId: Number(row.source_id),
-      category: String(row.category),
-      title: String(row.title),
-      summary: String(row.summary || ''),
-      outputState: String(row.output_state),
-    });
-  }
   return facts;
 }
 
