@@ -2,9 +2,6 @@
   <div class="us-overlay" @click.self="emit('close')">
     <div
       class="us-modal"
-      :class="{
-        'us-modal--compact': activeSection === 'chatgpt-local-sync' || activeSection === 'ai-journal',
-      }"
       role="dialog"
       aria-label="用户设置"
     >
@@ -41,9 +38,7 @@
         </header>
         <div
           class="us-main-body"
-          :class="{
-            'us-main-body--compact': activeSection === 'chatgpt-local-sync' || activeSection === 'ai-journal',
-          }"
+          :class="{ 'us-main-body--journal': activeSection === 'ai-journal' }"
         >
           <AiSettingsForm v-if="activeSection === 'ai'" :key="formKey" />
           <UserProfileSettings v-else-if="activeSection === 'profile'" :key="formKey" />
@@ -171,20 +166,14 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
-.us-modal--compact {
-  height: auto;
-  min-height: 0;
-  align-items: flex-start;
+.us-main-body--journal {
+  display: flex;
+  flex-direction: column;
 }
 
-.us-modal--compact .us-main,
-.us-modal--compact .us-side {
+.us-main-body--journal > * {
+  flex: 1 1 auto;
   min-height: 0;
-}
-
-.us-modal--compact .us-main-body {
-  flex: 0 0 auto;
-  overflow: visible;
 }
 
 /* 左侧导航：固定 220px，永远在左 */
@@ -328,10 +317,6 @@ onUnmounted(() => {
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   padding: 18px 24px 24px;
-}
-
-.us-main-body--compact {
-  padding: 16px 20px 18px;
 }
 
 /* 账户面板 */

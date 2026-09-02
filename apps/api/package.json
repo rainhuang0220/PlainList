@@ -1,6 +1,6 @@
 {
   "name": "@plainlist/api",
-  "version": "2.4.3",
+  "version": "2.4.4",
   "private": true,
   "main": "dist/server.js",
   "scripts": {
@@ -11,7 +11,8 @@
     "start": "node dist/server.js",
     "lint": "eslint src --ext .ts",
     "test": "vitest run src",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "recompose-daily": "tsx src/modules/chatgpt-activity/recomposeCli.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.30.0",

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authMiddleware, type AuthRequest } from '../../middleware/auth';
-import { getChatgptActivityConnection, listChatgptDailyJournals, reconcileChatgptActivity, reportChatgptActivityProgress } from './service';
+import { getChatgptActivityConnection, listChatgptDailyJournals, reconcileChatgptActivity, recomposeHistoricalDailyJournals, reportChatgptActivityProgress } from './service';
 
 export const chatgptActivityRouter = Router();
 chatgptActivityRouter.use(authMiddleware);
@@ -25,4 +25,14 @@ chatgptActivityRouter.post('/connection', async (req, res) => {
 chatgptActivityRouter.post('/reconcile', async (req, res) => {
   try { res.json(await reconcileChatgptActivity((req as AuthRequest).user, req.body)); }
   catch (error) { respond(error, res); }
+});
+chatgptActivityRouter.post('/recompose-daily', async (req, res) => {
+  try {
+    const user = (req as AuthRequest).user;
+    if (!user.isAdmin) {
+      res.status(403).json({ error: 'forbidden' });
+      return;
+    }
+    res.json(await recomposeHistoricalDailyJournals(user, { tryModel: true }));
+  } catch (error) { respond(error, res); }
 });
