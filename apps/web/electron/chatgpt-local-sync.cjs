@@ -4,6 +4,20 @@ const path = require('node:path');
 
 const SOURCE_TYPE = 'chatgpt-local-sync';
 const MAX_ARCHIVE_BYTES = 8 * 1024 * 1024;
+const DEFAULT_HISTORICAL_START_DATE = '2026-08-01';
+
+function archiveActivityDates(archive) {
+  const dates = (archive.messages || []).map((message) => message.dateKey).filter(Boolean).sort();
+  if (dates.length) return dates;
+  const fallback = dateKey(archive.updatedAt);
+  return fallback ? [fallback] : [];
+}
+
+function archiveMeetsHistoricalStart(archive, startDate = DEFAULT_HISTORICAL_START_DATE) {
+  if (!startDate) return true;
+  const dates = archiveActivityDates(archive);
+  return dates.some((date) => date >= startDate);
+}
 
 function dateKey(iso) {
   const date = new Date(iso);
@@ -198,4 +212,15 @@ function detectChangedArchives(archives, state = {}) {
   return { changed, unchanged, nextState };
 }
 
-module.exports = { MAX_ARCHIVE_BYTES, SOURCE_TYPE, buildLocalDigest, canonicalHash, detectChangedArchives, parseArchive, readStableJson, scanArchiveDirectory };
+module.exports = {
+  MAX_ARCHIVE_BYTES,
+  SOURCE_TYPE,
+  DEFAULT_HISTORICAL_START_DATE,
+  archiveMeetsHistoricalStart,
+  buildLocalDigest,
+  canonicalHash,
+  detectChangedArchives,
+  parseArchive,
+  readStableJson,
+  scanArchiveDirectory,
+};

@@ -7,7 +7,12 @@ vi.mock('../reviews/weeklyReviewSnapshot', () => ({
   generateCurrentWeeklyReviewSnapshot: vi.fn().mockResolvedValue(null),
 }));
 
-import { listChatgptDailyJournals, reconcileChatgptActivity } from './service';
+import {
+  chatgptConnectionDisplayState,
+  getChatgptActivityConnection,
+  listChatgptDailyJournals,
+  reconcileChatgptActivity,
+} from './service';
 
 const user = { id: 7, username: 'reader', isAdmin: false };
 
@@ -65,5 +70,65 @@ describe('ChatGPT activity journal service', () => {
     expect(result.journals.map((journal) => journal.date)).toEqual(['2026-08-30', '2026-08-31']);
     expect(result.journals.every((journal) => journal.status === 'final')).toBe(true);
     expect(query.mock.calls.filter(([sql]) => /INSERT INTO chatgpt_daily_journals/i.test(String(sql)))).toHaveLength(2);
+  });
+
+  it('does not materialize journals before the 2026-08-01 historical floor', async () => {
+    query
+      .mockResolvedValueOnce([[{ id: 1, source_id: 10, category: 'engineering', title: '推进工程工作', output_state: 'partial' }]])
+      .mockResolvedValueOnce([{ affectedRows: 1 }])
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
+
+    const result = await reconcileChatgptActivity(user, {
+      affectedDates: ['2026-07-20', '2026-08-01'],
+      finalizeThrough: '2026-08-31',
+      checked: 2,
+      changed: 2,
+      skipped: 0,
+    });
+
+    expect(result.journals.map((journal) => journal.date)).toEqual(['2026-08-01']);
+    expect(query.mock.calls.some(([sql, values]) => (
+      /SELECT[\s\S]*FROM activity_facts/i.test(String(sql)) && Array.isArray(values) && values.includes('2026-07-20')
+    ))).toBe(false);
+  });
+
+  it('exposes connection metadata without transcripts', async () => {
+    query
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[{ journal_count: 0, earliest: null, latest: null }]]);
+
+    const result = await getChatgptActivityConnection(user);
+    expect(result).toMatchObject({
+      status: 'not_connected',
+      displayState: 'not_connected',
+      historicalStartDate: '2026-08-01',
+      journalCount: 0,
+    });
+    expect(JSON.stringify(result)).not.toMatch(/transcript|apiKey|cookie/i);
+  });
+});
+
+describe('chatgptConnectionDisplayState', () => {
+  it('keeps bootstrapping, empty, and ready states distinct', () => {
+    expect(chatgptConnectionDisplayState({
+      status: 'not_connected', viaDesktop: false, journalCount: 0, checked: 0,
+    })).toBe('not_connected');
+    expect(chatgptConnectionDisplayState({
+      status: 'connected', viaDesktop: true, journalCount: 0, checked: 0,
+    })).toBe('waiting_archive');
+    expect(chatgptConnectionDisplayState({
+      status: 'connected',
+      viaDesktop: true,
+      journalCount: 0,
+      checked: 40,
+      processed: 12,
+      lastSyncedAt: new Date().toISOString(),
+    })).toBe('bootstrapping');
+    expect(chatgptConnectionDisplayState({
+      status: 'connected', viaDesktop: true, journalCount: 0, checked: 40, processed: 40,
+    })).toBe('no_activity');
+    expect(chatgptConnectionDisplayState({
+      status: 'connected', viaDesktop: true, journalCount: 12, checked: 40,
+    })).toBe('ready');
   });
 });

@@ -95,6 +95,29 @@ export interface ResolvedAiConfig {
   source: 'user' | 'server' | 'none';
 }
 
+function publicHost(baseUrl: string | null | undefined): string | null {
+  if (!baseUrl) return null;
+  try {
+    return new URL(baseUrl).host || null;
+  } catch {
+    return null;
+  }
+}
+
+async function lastSuccessfulReviewRuntime(userId: number) {
+  const [rows] = await pool.query(
+    `SELECT provider, model FROM weekly_review_snapshots
+     WHERE user_id = ? AND status = 'ready' AND model IS NOT NULL
+     ORDER BY generated_at DESC LIMIT 1`,
+    [userId],
+  );
+  const row = Array.isArray(rows) ? rows[0] as { provider?: string; model?: string } : null;
+  return {
+    lastSuccessfulProvider: row?.provider ? String(row.provider) : null,
+    lastSuccessfulModel: row?.model ? String(row.model) : null,
+  };
+}
+
 function maskApiKey(key: string): string | null {
   const trimmed = key.trim();
   if (!trimmed || isPlaceholderKey(trimmed)) {
@@ -207,6 +230,14 @@ export async function getAiSettingsView(userId: number): Promise<AiUserSettingsV
   const effectiveIntakeModel = effective
     ? resolveIntakeModel(stored, effective)
     : (env.AI_INTAKE_MODEL.trim() || env.AI_REVIEW_MODEL);
+  const last = await lastSuccessfulReviewRuntime(userId);
+  const runtime = {
+    effectiveProvider: effective?.provider ?? null,
+    effectiveModel: effective?.model ?? null,
+    effectiveHost: publicHost(effective?.baseUrl),
+    lastSuccessfulProvider: last.lastSuccessfulProvider,
+    lastSuccessfulModel: last.lastSuccessfulModel,
+  };
 
   if (stored) {
     return {
@@ -220,6 +251,7 @@ export async function getAiSettingsView(userId: number): Promise<AiUserSettingsV
       apiKeyConfigured: !isPlaceholderKey(userKey),
       apiKeyPreview: maskApiKey(userKey),
       effectiveSource: effective?.source ?? 'none',
+      ...runtime,
     };
   }
 
@@ -237,6 +269,7 @@ export async function getAiSettingsView(userId: number): Promise<AiUserSettingsV
     apiKeyConfigured: Boolean(server),
     apiKeyPreview: server ? maskApiKey(server.apiKey) : null,
     effectiveSource: server ? 'server' : 'none',
+    ...runtime,
   };
 }
 

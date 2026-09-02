@@ -105,6 +105,23 @@ export function closedWeekReviewAsOf(windowEnd: string): string {
   return shiftCalendarDate(windowEnd, 1);
 }
 
+/** Monday of the first full Mon–Sun week that begins on or after the historical floor. */
+export function firstFullClosedWeekStart(historicalStart: string): string {
+  const monday = mondayFor(historicalStart);
+  return monday < historicalStart ? shiftCalendarDate(monday, 7) : monday;
+}
+
+export function closedWeekStartsThrough(historicalStart: string, previousClosedStart: string): string[] {
+  const first = firstFullClosedWeekStart(historicalStart);
+  const starts: string[] = [];
+  let current = first;
+  while (current <= previousClosedStart) {
+    starts.push(current);
+    current = shiftCalendarDate(current, 7);
+  }
+  return starts;
+}
+
 export function createReviewClock(options: ReviewClockOptions) {
   const now = options.now ?? (() => new Date());
   const formatter = new Intl.DateTimeFormat('en-CA', {

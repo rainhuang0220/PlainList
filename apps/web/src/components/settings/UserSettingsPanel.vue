@@ -1,6 +1,14 @@
 <template>
   <div class="us-overlay" @click.self="emit('close')">
-    <div class="us-modal" role="dialog" aria-label="用户设置">
+    <div
+      class="us-modal"
+      :class="{
+        'us-modal--compact': activeSection === 'chatgpt-local-sync',
+        'us-modal--reader': activeSection === 'ai-journal',
+      }"
+      role="dialog"
+      aria-label="用户设置"
+    >
       <!-- 左侧导航栏：永远在左侧，不再受任何响应式断点影响 -->
       <aside class="us-side">
         <div class="us-side-head">
@@ -28,7 +36,9 @@
       <section class="us-main">
         <header class="us-main-head">
           <h2 class="us-main-title">{{ activeTitle }}</h2>
-          <button type="button" class="us-main-x" aria-label="close" @click="emit('close')">×</button>
+          <button type="button" class="us-main-x" aria-label="关闭" @click="emit('close')">
+            <span aria-hidden="true">×</span>
+          </button>
         </header>
         <div class="us-main-body">
           <AiSettingsForm v-if="activeSection === 'ai'" :key="formKey" />
@@ -157,6 +167,27 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
+.us-modal--compact {
+  height: auto;
+  min-height: 0;
+  align-items: flex-start;
+}
+
+.us-modal--compact .us-main,
+.us-modal--compact .us-side {
+  min-height: 0;
+}
+
+.us-modal--compact .us-main-body {
+  flex: 0 0 auto;
+  overflow: visible;
+}
+
+.us-modal--reader {
+  width: min(1100px, calc(100vw - 48px));
+  height: min(860px, calc(100vh - 48px));
+}
+
 /* 左侧导航：固定 220px，永远在左 */
 .us-side {
   flex: 0 0 220px;
@@ -272,17 +303,23 @@ onUnmounted(() => {
 }
 
 .us-main-x {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
   border: none;
+  border-radius: 8px;
   background: transparent;
-  font-size: 26px;
+  font-size: 22px;
   line-height: 1;
   color: var(--muted);
   cursor: pointer;
-  padding: 4px 8px;
+  padding: 0;
 }
 
 .us-main-x:hover {
   color: var(--dark);
+  background: var(--faint2);
 }
 
 .us-main-body {

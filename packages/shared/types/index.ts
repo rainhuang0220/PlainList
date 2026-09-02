@@ -288,6 +288,8 @@ export interface WeeklyReviewPage {
   asOfDate: string;
   isMonday: boolean;
   trueEmpty: boolean;
+  hasPriorHistory: boolean;
+  previousWeekState: 'summary' | 'preparing' | 'first_week';
   previousClosedWeek: WeeklyReviewSection | null;
   currentWeek: WeeklyReviewSection | null;
   currentDailyJournals: WeeklyReviewDailyEntry[];
@@ -354,6 +356,33 @@ export interface AiUserSettingsView {
   apiKeyConfigured: boolean;
   apiKeyPreview: string | null;
   effectiveSource: 'user' | 'server' | 'none';
+  effectiveProvider: AiProvider | null;
+  effectiveModel: string | null;
+  effectiveHost: string | null;
+  lastSuccessfulProvider: string | null;
+  lastSuccessfulModel: string | null;
+}
+
+export type ChatgptConnectionDisplayState =
+  | 'not_connected'
+  | 'bootstrapping'
+  | 'waiting_archive'
+  | 'no_activity'
+  | 'ready';
+
+export interface ChatgptActivityConnectionView {
+  status: 'not_connected' | 'connected' | 'bootstrapping';
+  viaDesktop: boolean;
+  lastSyncedAt: string | null;
+  checked?: number;
+  changed?: number;
+  skipped?: number;
+  processed?: number;
+  journalCount: number;
+  earliestJournalDate: string | null;
+  latestJournalDate: string | null;
+  historicalStartDate: string;
+  displayState: ChatgptConnectionDisplayState;
 }
 
 /**

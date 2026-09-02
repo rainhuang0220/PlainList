@@ -18,9 +18,21 @@
       <progress :value="lastResult.processed" :max="Math.max(1, lastResult.changed)" />
     </div>
 
-    <div class="actions">
+    <p v-if="card.progressLine" class="meta">{{ card.progressLine }}</p>
+    <p v-if="connection.earliestJournalDate && connection.latestJournalDate" class="meta">
+      历史小记 {{ formatDay(connection.earliestJournalDate) }} → {{ formatDay(connection.latestJournalDate) }}
+    </p>
+
+    <div v-if="hasActions" class="actions">
       <button v-if="isDesktop && !rootName" class="primary" type="button" @click="choose">连接本地资料库</button>
       <button v-if="card.connected" class="primary" type="button" @click="emit('openAiJournal')">查看 AI 小记</button>
+      <a
+        v-if="card.showDesktopDownload"
+        class="primary link-btn"
+        href="https://github.com/rainhuang0220/PlainList/releases/latest"
+        target="_blank"
+        rel="noreferrer"
+      >下载 Desktop</a>
       <button v-if="isDesktop && rootName" type="button" :disabled="status !== 'enabled'" @click="checkNow">立即检查</button>
       <button v-if="isDesktop && rootName" type="button" @click="choose">重新选择资料库</button>
       <button v-if="isDesktop && status === 'enabled'" type="button" @click="pause">暂停</button>
@@ -56,9 +68,25 @@ const card = computed(() => presentChatgptActivityCard({
     status: connection.value.status,
     viaDesktop: connection.value.viaDesktop,
     lastSyncedAt: lastSyncAt.value || connection.value.lastSyncedAt,
+    displayState: connection.value.displayState,
+    checked: connection.value.checked,
+    processed: connection.value.processed,
+    journalCount: connection.value.journalCount,
+    earliestJournalDate: connection.value.earliestJournalDate,
   },
   lastResult: lastResult.value,
 }));
+const hasActions = computed(() => (
+  Boolean(isDesktop.value && !rootName.value)
+  || card.value.connected
+  || card.value.showDesktopDownload
+  || Boolean(isDesktop.value && rootName.value)
+));
+
+function formatDay(date: string) {
+  const [, month, day] = date.split('-').map(Number);
+  return `${Number(month)} 月 ${Number(day)} 日`;
+}
 
 function formatTime(value: string) {
   try {
@@ -110,8 +138,8 @@ onUnmounted(() => {
 <style scoped>
 .activity-card {
   display: grid;
-  gap: 14px;
-  max-width: 640px;
+  gap: 10px;
+  max-width: 520px;
 }
 .status-row {
   display: flex;
@@ -127,8 +155,13 @@ onUnmounted(() => {
   flex: 0 0 auto;
 }
 .pulse.desktop-connected,
-.pulse.web-connected {
+.pulse.web-connected,
+.pulse.web-bootstrapping,
+.pulse.web-waiting {
   background: #4d8064;
+}
+.pulse.web-empty {
+  background: #b0893a;
 }
 .pulse.desktop-paused {
   background: #b0893a;
@@ -186,6 +219,11 @@ p {
 .actions .primary {
   background: var(--text);
   color: var(--surface);
+}
+.actions .link-btn {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
 }
 .sync-error {
   color: #a33;

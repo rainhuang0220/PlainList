@@ -17,6 +17,8 @@ describe('ChatgptLocalSyncPanel layout', () => {
   it('keeps a living connected state and an AI journal entry', () => {
     expect(source).toContain('连接本地资料库');
     expect(source).toContain('查看 AI 小记');
+    expect(source).toContain('下载 Desktop');
     expect(source).toContain('chatgpt-local-sync');
+    expect(source).toContain('v-if="hasActions"');
   });
 });

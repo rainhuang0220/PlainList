@@ -15,7 +15,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const fsp = require('node:fs/promises');
 const { startFishTimeLocal, DEFAULT_PORT: FISHTIME_PORT } = require('./fishtime-local.cjs');
-const { buildLocalDigest, detectChangedArchives, scanArchiveDirectory } = require('./chatgpt-local-sync.cjs');
+const { archiveMeetsHistoricalStart, buildLocalDigest, DEFAULT_HISTORICAL_START_DATE, detectChangedArchives, scanArchiveDirectory } = require('./chatgpt-local-sync.cjs');
 const { createDesktopApiRequest } = require('./desktop-api.cjs');
 const { createChatgptSyncSignalCoordinator } = require('./chatgpt-sync-scheduler.cjs');
 
@@ -63,6 +63,7 @@ ipcMain.handle('chatgpt-local-sync:choose-directory', async (_event, userScope) 
   const rootPath = result.filePaths[0];
   const state = await readChatgptSyncState();
   state.rootPath = rootPath; state.paused = false; state.users ??= {}; state.users[safeScope(userScope)] ??= {};
+  state.historicalStartDate = state.historicalStartDate || DEFAULT_HISTORICAL_START_DATE;
   await writeChatgptSyncState(state); await startChatgptSyncWatcher(rootPath);
   return { status: 'enabled', rootName: path.basename(rootPath) };
 });
@@ -83,8 +84,14 @@ ipcMain.handle('chatgpt-local-sync:scan', async (_event, userScope, bootstrapWin
     ? new Date(new Date().setHours(0, 0, 0, 0)).getTime()
     : Date.now() - days * 86_400_000;
   const isBootstrap = !state.bootstrapScopes[scope];
-  const eligible = isBootstrap && cutoff !== null ? detected.changed.filter((archive) => Date.parse(archive.updatedAt) >= cutoff) : detected.changed;
-  const bootstrapSkipped = isBootstrap ? detected.changed.filter((archive) => !eligible.includes(archive)) : [];
+  if (!state.historicalStartDate) {
+    state.historicalStartDate = DEFAULT_HISTORICAL_START_DATE;
+    await writeChatgptSyncState(state);
+  }
+  const historicalStartDate = state.historicalStartDate;
+  const historicallyEligible = detected.changed.filter((archive) => archiveMeetsHistoricalStart(archive, historicalStartDate));
+  const eligible = isBootstrap && cutoff !== null ? historicallyEligible.filter((archive) => Date.parse(archive.updatedAt) >= cutoff) : historicallyEligible;
+  const bootstrapSkipped = detected.changed.filter((archive) => !eligible.includes(archive));
   return { status: scan.issues.some((issue) => issue.retryable) ? 'unavailable' : 'enabled', checked: scan.archives.length, changed: eligible.length, skipped: detected.unchanged.length + bootstrapSkipped.length, bootstrap: isBootstrap, issues: scan.issues.map((issue) => issue.code), digests: eligible.map((archive) => ({ hash: archive.canonicalHash, digest: buildLocalDigest(archive) })), skippedArchives: bootstrapSkipped.map((archive) => ({ conversationId: archive.conversationId, hash: archive.canonicalHash, updatedAt: archive.updatedAt, skip: true })) };
 });
 ipcMain.handle('chatgpt-local-sync:acknowledge', async (_event, userScope, completed, summary, options = {}) => {

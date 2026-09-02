@@ -13,7 +13,7 @@
         <!-- eslint-disable-next-line vue/no-v-html -->
         <div v-if="previousHtml" class="weekly-prose" v-html="previousHtml" />
         <p v-else class="weekly-muted">
-          {{ t('week.page.previous_missing', '这是你的第一个自然周，还没有上周回顾。') }}
+          {{ previousMissingCopy }}
         </p>
       </article>
 
@@ -28,6 +28,9 @@
         </p>
         <p v-else-if="dailyJournals.length" class="weekly-muted">
           {{ t('week.page.current_from_daily', '周总结正在更新，下面是已经形成的每日小记。') }}
+        </p>
+        <p v-else class="weekly-muted">
+          {{ t('week.page.current_waiting', '本周已完成的日子会逐渐出现在这里。') }}
         </p>
       </article>
 
@@ -138,6 +141,15 @@ function formatRange(start?: string, end?: string) {
 }
 
 const previousRange = computed(() => formatRange(previous.value?.weekStart, previous.value?.weekEnd));
+const previousMissingCopy = computed(() => {
+  if (page.value?.previousWeekState === 'preparing') {
+    return t('week.page.previous_preparing', '上周回顾正在准备');
+  }
+  if (page.value?.hasPriorHistory) {
+    return t('week.page.previous_preparing', '上周回顾正在准备');
+  }
+  return t('week.page.previous_missing', '这是你的第一个自然周，还没有上周回顾。');
+});
 const currentRange = computed(() => {
   if (isMonday.value) return '';
   const start = current.value?.weekStart || page.value?.currentDailyJournals[0]?.date;
@@ -206,6 +218,12 @@ const runtimeLabel = computed(() => {
   border-radius: 8px;
   color: var(--mid);
   font-size: .78rem;
+}
+.weekly-prose :deep(> :first-child) {
+  margin-top: 0;
+}
+.weekly-prose :deep(> :last-child) {
+  margin-bottom: 0;
 }
 .weekly-prose :deep(h2),
 .weekly-prose :deep(h3) {
