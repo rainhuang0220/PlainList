@@ -7,6 +7,13 @@ export interface DigestIngestResult { sourceId: number; factCount: number; creat
 
 function serviceError(status: number, message: string): Error & { status: number } { return Object.assign(new Error(message), { status }); }
 
+function mysqlDateTime(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString().replace('T', ' ').replace('Z', '').slice(0, 23);
+}
+
 function factCandidates(input: AppendActivityDigestInput): Array<{ key: string; dateKey: string; category: string; title: string; summary: string; output: 'produced' | 'partial' | 'not_applicable' | 'unknown'; exploration: 'explored' | 'not_applicable' | 'unknown' }> {
   if (input.localFacts?.length) return input.localFacts.map((fact, index) => ({ key: `local:${index}`, dateKey: fact.dateKey, category: fact.category, title: fact.title, summary: fact.title, output: fact.completed ? 'produced' : 'partial', exploration: fact.category === 'research' || fact.category === 'learning' ? 'explored' : 'not_applicable' }));
   const entries: Array<{ category: string; values: string[]; output: 'produced' | 'partial' | 'not_applicable' | 'unknown'; exploration: 'explored' | 'not_applicable' | 'unknown' }> = [
@@ -61,14 +68,14 @@ export async function appendActivityDigest(user: AuthenticatedUser, payload: unk
     oldDates = Array.isArray(oldDateRows) ? (oldDateRows as Array<{ date_key: string }>).map((row) => row.date_key) : [];
     await pool.query(
       `UPDATE activity_sources SET external_id = ?, date_start = ?, date_end = ?, occurred_at = ?, schema_version = 'v1', compact_payload = ?, content_hash = ?, status = 'active', deleted_at = NULL WHERE id = ? AND user_id = ?`,
-      [input.sourceExternalId, dateStart, dateEnd, input.occurredAt ?? null, JSON.stringify(input), contentHash, sourceId, user.id],
+      [input.sourceExternalId, dateStart, dateEnd, mysqlDateTime(input.occurredAt), JSON.stringify(input), contentHash, sourceId, user.id],
     );
     await pool.query('DELETE FROM activity_facts WHERE source_id = ? AND user_id = ?', [sourceId, user.id]);
   } else {
     const [result] = await pool.query(
       `INSERT INTO activity_sources (user_id, source_type, external_id, idempotency_key, date_start, date_end, occurred_at, schema_version, compact_payload, content_hash)
        VALUES (?, ?, ?, ?, ?, ?, ?, 'v1', ?, ?)`,
-      [user.id, sourceType, input.sourceExternalId, input.idempotencyKey, dateStart, dateEnd, input.occurredAt ?? null, JSON.stringify(input), contentHash],
+      [user.id, sourceType, input.sourceExternalId, input.idempotencyKey, dateStart, dateEnd, mysqlDateTime(input.occurredAt), JSON.stringify(input), contentHash],
     );
     sourceId = Number((result as { insertId: number }).insertId);
   }
