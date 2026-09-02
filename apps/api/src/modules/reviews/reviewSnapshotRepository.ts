@@ -26,6 +26,13 @@ const SNAPSHOT_FIELDS = `
   content_json, generated_at, model, provider, error_message, evidence_json, evidence_hash, prompt_version, attempt_count
 `;
 
+export function mysqlDateTime(value: string | Date | null | undefined): string | null {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString().replace('T', ' ').replace('Z', '').slice(0, 23);
+}
+
 function calendarDateKey(value: unknown): string {
   if (value instanceof Date) {
     return new Intl.DateTimeFormat('en-CA', {
@@ -147,7 +154,7 @@ export function createMysqlReviewSnapshotRepository(query: SqlQuery): ReviewSnap
           JSON.stringify(result.evidence ?? null),
           result.evidenceHash ?? null,
           result.promptVersion ?? null,
-          result.generatedAt,
+          mysqlDateTime(result.generatedAt),
           result.model,
           result.provider,
           userId,
