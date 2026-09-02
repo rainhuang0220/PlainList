@@ -237,7 +237,7 @@ export interface UserProfileAnalyzeResponse {
   model?: string | null;
 }
 
-export const WEEKLY_SUMMARY_PROMPT_VERSION = 'weekly-summary-v1';
+export const WEEKLY_SUMMARY_PROMPT_VERSION = 'weekly-summary-v2';
 
 export interface WeeklySummaryContent {
   overall: string;
@@ -246,9 +246,54 @@ export interface WeeklySummaryContent {
   positive: string;
   concerns: string;
   nextFocus: string[];
+  narrativeMarkdown?: string;
 }
 
 export type WeeklySummaryStatus = 'ready' | 'missing' | 'unavailable' | 'pending' | 'generating' | 'error' | 'no_data' | 'no_provider';
+
+export interface WeeklyReviewSection {
+  weekStart: string;
+  weekEnd: string;
+  status: WeeklySummaryStatus;
+  content?: WeeklySummaryContent;
+  narrativeMarkdown?: string;
+  notice?: WeeklySummaryResponse['notice'];
+  model?: string | null;
+  provider?: string | null;
+  generatedAt?: string;
+  source?: 'model' | 'deterministic';
+}
+
+export interface WeeklyReviewDailyEntry {
+  date: string;
+  summaryMarkdown: string;
+  activityCount: number;
+  conversationCount: number;
+}
+
+export interface WeeklyReviewPlanItem {
+  kind: 'goal' | 'plan' | 'task' | 'intention';
+  text: string;
+}
+
+export interface WeeklyReviewRuntime {
+  weeklyProvider: string | null;
+  weeklyModel: string | null;
+  weeklySource: 'user' | 'server' | 'none';
+  weeklyHost: string | null;
+  activityMethod: 'deterministic_local';
+}
+
+export interface WeeklyReviewPage {
+  asOfDate: string;
+  isMonday: boolean;
+  trueEmpty: boolean;
+  previousClosedWeek: WeeklyReviewSection | null;
+  currentWeek: WeeklyReviewSection | null;
+  currentDailyJournals: WeeklyReviewDailyEntry[];
+  currentPlans: WeeklyReviewPlanItem[];
+  runtime: WeeklyReviewRuntime;
+}
 
 export interface WeeklySummaryResponse {
   status: WeeklySummaryStatus;
@@ -264,6 +309,7 @@ export interface WeeklySummaryResponse {
   reviewAsOfDate?: string;
   fallback?: boolean;
   notice?: 'updating' | 'not_updated' | 'unavailable' | 'no_data' | 'no_provider' | 'preparing';
+  page?: WeeklyReviewPage;
 }
 
 export interface InstalledPlugin {

@@ -27,60 +27,10 @@
     <p v-if="aiError && aiSummary" class="week-ai-banner">{{ aiError }}</p>
 
     <div v-show="weekView === 'ai'" class="week-ai-panel">
-      <div v-if="weeklyInsight" class="week-ai-block weekly-intelligence">
-        <h3>{{ t('week.intelligence.title', '本周洞察') }}</h3>
-        <template v-if="weeklyInsight.outputs?.length">
-          <h4>{{ t('week.intelligence.outputs', '本周产出') }}</h4>
-          <ul><li v-for="item in weeklyInsight.outputs" :key="item">{{ item }}</li></ul>
-        </template>
-        <p v-if="weeklyInsight.summary">{{ weeklyInsight.summary }}</p>
-        <template v-if="weeklyInsight.openLoops?.length">
-          <h4>{{ t('week.intelligence.open_loops', '待完成事项') }}</h4>
-          <ul><li v-for="item in weeklyInsight.openLoops" :key="item">{{ item }}</li></ul>
-        </template>
-        <template v-if="weeklyInsight.opportunityCost === 'evidenced'">
-          <h4>{{ t('week.intelligence.attention', '注意力与机会成本') }}</h4>
-          <p>{{ t('week.intelligence.attention_copy', '当前记录显示高优先级目标可能需要更多连续投入。') }}</p>
-        </template>
-        <template v-if="weeklyInsight.suggestedNextFocus?.length">
-          <h4>{{ t('week.intelligence.next', '下周焦点') }}</h4>
-          <ul><li v-for="item in weeklyInsight.suggestedNextFocus.slice(0, 3)" :key="item">{{ item }}</li></ul>
-        </template>
-      </div>
-      <div class="week-ai-kicker">{{ t('week.summary.title', '周进展回顾') }}</div>
-      <div v-if="reviewWindowLabel" class="week-ai-range">{{ reviewWindowLabel }}</div>
       <div v-if="aiStatus === 'loading'" class="week-ai-loading">
         {{ t('week.summary.loading', '正在整理本周观察…') }}
       </div>
-      <template v-else-if="aiSummary">
-        <div class="week-ai-block">
-          <h3>{{ t('week.summary.overall', '总体状态') }}</h3>
-          <p>{{ aiSummary.overall }}</p>
-        </div>
-        <div class="week-ai-block">
-          <h3>{{ t('week.summary.what', '本周发生了什么') }}</h3>
-          <p>{{ aiSummary.summary }}</p>
-        </div>
-        <div class="week-ai-block">
-          <h3>{{ t('week.summary.comparison', '与过去相比') }}</h3>
-          <p>{{ aiSummary.comparison }}</p>
-        </div>
-        <div class="week-ai-block">
-          <h3>{{ t('week.summary.positive', '值得肯定') }}</h3>
-          <p>{{ aiSummary.positive }}</p>
-        </div>
-        <div class="week-ai-block">
-          <h3>{{ t('week.summary.concerns', '值得注意') }}</h3>
-          <p>{{ aiSummary.concerns }}</p>
-        </div>
-        <div class="week-ai-block">
-          <h3>{{ t('week.summary.next', '下周关注') }}</h3>
-          <ul>
-            <li v-for="item in aiSummary.nextFocus" :key="item">{{ item }}</li>
-          </ul>
-        </div>
-      </template>
-      <p v-else class="week-ai-empty">{{ aiError || t('week.summary.unavailable', '本期回顾暂不可用') }}</p>
+      <WeeklyReviewPanel v-else :result="weeklyResult" :weekly-insight="weeklyInsight" />
     </div>
 
     <div v-show="weekView === 'data'" class="week-data-panel">
@@ -191,6 +141,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import * as echarts from 'echarts'
 import DurationHoursPanel from '@/components/stats/DurationHoursPanel.vue'
 import HabitCheckCountsPanel from '@/components/stats/HabitCheckCountsPanel.vue'
+import WeeklyReviewPanel from '@/components/reviews/WeeklyReviewPanel.vue'
 import { completionPctForDate } from '@plainlist/shared'
 import { isoWeekScopeKey, weekDateRange } from '@/features/duration-stats/scopeKeys'
 import { usePlansStore } from '@/features/plans/model/usePlansStore'
@@ -210,9 +161,9 @@ const weekView = ref('ai')
 const aiStatus = ref('loading')
 const aiError = ref('')
 const aiSummary = ref(null)
+const weeklyResult = ref(null)
 const weeklyInsight = ref(null)
 const api = useApi()
-const reviewWindow = ref(null)
 function t(key, fallback, params) { return i18n.t(key, fallback, params) }
 
 const radarEl = ref(null)
@@ -261,18 +212,6 @@ const rangeLabel = computed(() => {
   }
 
   return `${monthNamesShort.value[monday.value.getMonth()]} ${monday.value.getDate()} - ${monthNamesShort.value[sunday.getMonth()]} ${sunday.getDate()}`
-})
-
-const reviewWindowLabel = computed(() => {
-  if (!reviewWindow.value) return ''
-  const [startYear, startMonth, startDay] = reviewWindow.value.start.split('-').map(Number)
-  const [endYear, endMonth, endDay] = reviewWindow.value.end.split('-').map(Number)
-  if (i18n.locale === 'zh-CN') {
-    const start = `${startMonth}月${startDay}日`
-    const end = startYear === endYear ? `${endMonth}月${endDay}日` : `${endYear}年${endMonth}月${endDay}日`
-    return `${start}－${end}`
-  }
-  return `${monthNamesShort.value[startMonth - 1]} ${startDay} - ${monthNamesShort.value[endMonth - 1]} ${endDay}`
 })
 
 const chartTabs = computed(() => [
@@ -641,10 +580,10 @@ async function loadAiSummary() {
   aiError.value = ''
   try {
     const result = await reviewsStore.fetchWeeklySummary()
-    reviewWindow.value = result.weekStart && result.weekEnd ? { start: result.weekStart, end: result.weekEnd } : null
+    weeklyResult.value = result
     const presentation = presentWeeklyReview(result, t)
     aiSummary.value = presentation.summary
-    aiStatus.value = presentation.status
+    aiStatus.value = result.page ? 'ready' : presentation.status
     aiError.value = presentation.message
   } catch {
     aiError.value = t('week.summary.unavailable', '本期回顾暂不可用')

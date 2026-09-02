@@ -132,7 +132,7 @@ const { get } = useApi();
 const authMode = ref<'terminal' | 'graphic'>(isNativePlatform() ? 'graphic' : 'terminal');
 const marketplaceOpen = ref(false);
 const userSettingsOpen = ref(false);
-const userSettingsSection = ref<'account' | 'ai' | 'profile' | 'theme' | 'chatgpt-local-sync'>('ai');
+const userSettingsSection = ref<'account' | 'ai' | 'profile' | 'theme' | 'chatgpt-local-sync' | 'ai-journal'>('ai');
 const activeWidget = ref<string | null>(null);
 
 const showPluginChrome = computed(() => !isNativePlatform());
@@ -260,7 +260,7 @@ async function logout() {
   await auth.logout();
 }
 
-function openUserSettings(section: 'account' | 'ai' | 'profile' | 'theme' | 'chatgpt-local-sync') {
+function openUserSettings(section: 'account' | 'ai' | 'profile' | 'theme' | 'chatgpt-local-sync' | 'ai-journal') {
   userSettingsSection.value = section;
   userSettingsOpen.value = true;
 }

@@ -50,6 +50,25 @@ function createRepository(): ReviewSnapshotRepository {
     async latestReady(userId) {
       return [...records.values()].filter((item) => item.userId === userId && item.status === 'ready').at(-1) ?? null;
     },
+    async findByWindow(userId, windowStartDate, windowEndDate) {
+      return [...records.values()].find((item) => (
+        item.userId === userId
+        && item.windowStartDate === windowStartDate
+        && item.windowEndDate === windowEndDate
+        && item.status === 'ready'
+      )) ?? null;
+    },
+    async listClosedWeeks(userId) {
+      return [...records.values()].filter((item) => item.userId === userId && item.status === 'ready');
+    },
+    async markDirty(userId, reviewAsOfDate) {
+      const snapshot = records.get(key(userId, reviewAsOfDate));
+      if (snapshot && (snapshot.status === 'ready' || snapshot.status === 'error')) {
+        snapshot.status = 'pending';
+        snapshot.attemptCount = 0;
+      }
+    },
+    async expireExhaustedLeases() {},
   };
 }
 
@@ -109,5 +128,32 @@ describe('review snapshot coordinator', () => {
     expect(monday).toMatchObject({ windowStartDate: '2026-08-31', windowEndDate: '2026-09-06' });
     expect(await coordinator.read(user.id, '2026-09-06')).toMatchObject({ reviewAsOfDate: '2026-09-06' });
     expect(generate).toHaveBeenCalledTimes(2);
+  });
+
+  it('allows one controlled regeneration of a closed week after late Sunday evidence arrives', async () => {
+    const generate = vi.fn()
+      .mockResolvedValueOnce({ content, model: 'demo', provider: 'openai' })
+      .mockResolvedValueOnce({
+        content: { ...content, summary: '补回了周日日记后的最终周总结。' },
+        model: 'demo',
+        provider: 'openai',
+      });
+    const coordinator = createReviewSnapshotCoordinator({
+      repository: createRepository(),
+      generate,
+      now: () => new Date('2026-09-07T00:30:00.000Z'),
+    });
+    const user = { id: 7, username: 'rain', isAdmin: false };
+
+    await coordinator.generate(user, '2026-09-07');
+    const regenerated = await coordinator.generate(user, '2026-09-07', { force: true });
+
+    expect(generate).toHaveBeenCalledTimes(2);
+    expect(regenerated).toMatchObject({
+      status: 'ready',
+      windowStartDate: '2026-08-31',
+      windowEndDate: '2026-09-06',
+      content: { summary: '补回了周日日记后的最终周总结。' },
+    });
   });
 });

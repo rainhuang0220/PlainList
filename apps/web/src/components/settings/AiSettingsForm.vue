@@ -11,6 +11,17 @@
         <strong>{{ effectiveLabel }}</strong>
       </div>
 
+      <div class="settings-runtime">
+        <div>
+          <span>周进展回顾</span>
+          <strong>{{ weeklyRuntimeLabel }}</strong>
+        </div>
+        <div>
+          <span>ChatGPT 活动处理</span>
+          <strong>本地规则处理</strong>
+        </div>
+      </div>
+
       <div class="settings-presets">
         <span class="settings-presets-label">{{ t('intake.settings_presets', '快速填充') }}</span>
         <button type="button" class="settings-preset-btn" @click="applyQwenPreset" :disabled="applyingPreset">
@@ -141,6 +152,20 @@ const effectiveLabel = computed(() => {
   if (source === 'user') return t('intake.settings_source_user', '你的个人 Key');
   if (source === 'server') return t('intake.settings_source_server', '服务端 .env 默认');
   return t('intake.settings_source_none', '未配置');
+});
+
+const weeklyRuntimeLabel = computed(() => {
+  if (!view.value?.apiKeyConfigured || view.value.effectiveSource === 'none') {
+    return '未配置';
+  }
+  let host = '';
+  try {
+    host = new URL(view.value.baseUrl).host;
+  } catch {
+    host = '';
+  }
+  const source = view.value.effectiveSource === 'user' ? '个人配置' : '服务器默认';
+  return `${view.value.provider} · ${view.value.model} · 远程${host ? ` · ${host}` : ''} · ${source}`;
 });
 
 const apiKeyPlaceholder = computed(() => {
@@ -355,6 +380,32 @@ onUnmounted(() => {
   padding: 10px 12px;
   background: var(--faint2);
   font-size: 13px;
+}
+
+.settings-runtime {
+  display: grid;
+  gap: 8px;
+  margin: -8px 0 18px;
+  padding: 10px 12px;
+  border: 1px solid var(--faint);
+  border-radius: 10px;
+  font-size: 12px;
+}
+
+.settings-runtime div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.settings-runtime span {
+  color: var(--muted);
+}
+
+.settings-runtime strong {
+  font-weight: 600;
+  color: var(--dark);
+  text-align: right;
 }
 
 .settings-effective-sub {

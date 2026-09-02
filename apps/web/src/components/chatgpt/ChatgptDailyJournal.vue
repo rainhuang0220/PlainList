@@ -1,13 +1,13 @@
 <template>
   <article class="chatgpt-journal">
     <header>
-      <div><span class="source-dot"></span>ChatGPT 活动</div>
+      <div><span class="source-dot"></span>AI 小记</div>
       <span v-if="journal">{{ journal.conversationCount }} 个对话 · {{ journal.activityCount }} 项活动</span>
     </header>
     <!-- The renderer escapes all input before adding a narrow Markdown allowlist. -->
     <!-- eslint-disable-next-line vue/no-v-html -->
     <div v-if="journal" class="journal-markdown" v-html="safeHtml"></div>
-    <p v-else class="journal-empty">当天还没有 ChatGPT 活动记录。</p>
+    <p v-else class="journal-empty">当天还没有 AI 小记。</p>
   </article>
 </template>
 <script setup lang="ts">

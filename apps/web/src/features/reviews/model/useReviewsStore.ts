@@ -37,6 +37,20 @@ export const useReviewsStore = defineStore('reviews', () => {
     return get<WeeklySummaryResponse>('/reviews/weekly-summary');
   }
 
+  async function fetchWeeklyHistory() {
+    return get<{
+      daily: Array<{ date: string; summaryMarkdown: string; activityCount: number; conversationCount: number }>;
+      weekly: Array<{
+        weekStart: string;
+        weekEnd: string;
+        narrativeMarkdown?: string;
+        content?: WeeklySummaryResponse['content'];
+        provider?: string | null;
+        model?: string | null;
+      }>;
+    }>('/reviews/weekly-history');
+  }
+
   function clear() {
     reviews.value = {};
   }
@@ -48,6 +62,7 @@ export const useReviewsStore = defineStore('reviews', () => {
     persist,
     getReview,
     fetchWeeklySummary,
+    fetchWeeklyHistory,
     clear,
   };
 });

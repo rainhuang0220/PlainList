@@ -83,6 +83,32 @@ export function createMysqlReviewSnapshotRepository(query: SqlQuery): ReviewSnap
       return snapshot;
     },
     find,
+    async findByWindow(userId, windowStartDate, windowEndDate) {
+      const rows = await rowsFor(query,
+        `SELECT ${SNAPSHOT_FIELDS} FROM weekly_review_snapshots
+         WHERE user_id = ? AND window_start_date = ? AND window_end_date = ? AND status = 'ready'
+         ORDER BY review_as_of_date DESC LIMIT 1`,
+        [userId, windowStartDate, windowEndDate]);
+      return rows[0] ? toSnapshot(rows[0]) : null;
+    },
+    async listClosedWeeks(userId, limit) {
+      const rows = await rowsFor(query,
+        `SELECT ${SNAPSHOT_FIELDS} FROM weekly_review_snapshots
+         WHERE user_id = ? AND status = 'ready'
+           AND DATEDIFF(window_end_date, window_start_date) = 6
+         ORDER BY window_start_date DESC
+         LIMIT ?`,
+        [userId, Math.max(1, Math.min(limit, 52))]);
+      return rows.map(toSnapshot);
+    },
+    async markDirty(userId, reviewAsOfDate) {
+      await query(
+        `UPDATE weekly_review_snapshots
+         SET status = 'pending', attempt_count = 0, claim_token = NULL, lease_expires_at = NULL, error_message = NULL
+         WHERE user_id = ? AND review_as_of_date = ? AND status IN ('ready', 'error')`,
+        [userId, reviewAsOfDate],
+      );
+    },
     async claim(userId, reviewAsOfDate) {
       const claimToken = randomUUID();
       const result = await query(

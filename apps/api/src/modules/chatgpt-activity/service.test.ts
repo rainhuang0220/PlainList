@@ -2,6 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const query = vi.fn();
 vi.mock('../../db/pool', () => ({ pool: { query: (...args: unknown[]) => query(...args) } }));
+vi.mock('../reviews/weeklyReviewSnapshot', () => ({
+  dirtyClosedWeekForJournalDate: vi.fn().mockResolvedValue(undefined),
+  generateCurrentWeeklyReviewSnapshot: vi.fn().mockResolvedValue(null),
+}));
 
 import { listChatgptDailyJournals, reconcileChatgptActivity } from './service';
 
@@ -29,18 +33,18 @@ describe('ChatGPT activity journal service', () => {
 
     expect(result.journals).toEqual([{ date: '2026-09-01', status: 'final', activityCount: 2, conversationCount: 2 }]);
     const journalWrite = query.mock.calls.find(([sql]) => /INSERT INTO chatgpt_daily_journals/i.test(String(sql)));
-    expect((journalWrite?.[1] as unknown[])?.some((value) => typeof value === 'string' && value.includes('## 今日 ChatGPT 活动'))).toBe(true);
+    expect((journalWrite?.[1] as unknown[])?.some((value) => typeof value === 'string' && value.includes('## 9 月 1 日'))).toBe(true);
     expect(JSON.stringify(journalWrite?.[1])).not.toMatch(/messages|transcript|cookie|session/i);
   });
 
   it('lists server-derived journals for web and mobile without source payloads', async () => {
     query.mockResolvedValueOnce([[
-      { journal_date: '2026-09-01', summary_markdown: '## 今日 ChatGPT 活动', activity_count: 2, conversation_count: 2, status: 'final', generated_at: '2026-09-01T16:00:00.000Z', updated_at: '2026-09-01T16:00:00.000Z' },
+      { journal_date: '2026-09-01', summary_markdown: '## 9 月 1 日', activity_count: 2, conversation_count: 2, status: 'final', generated_at: '2026-09-01T16:00:00.000Z', updated_at: '2026-09-01T16:00:00.000Z' },
     ]]);
 
     const result = await listChatgptDailyJournals(user, '2026-09-01', '2026-09-01');
 
-    expect(result[0]).toMatchObject({ date: '2026-09-01', summaryMarkdown: '## 今日 ChatGPT 活动', activityCount: 2, conversationCount: 2, status: 'final' });
+    expect(result[0]).toMatchObject({ date: '2026-09-01', summaryMarkdown: '## 9 月 1 日', activityCount: 2, conversationCount: 2, status: 'final' });
     expect(JSON.stringify(result)).not.toMatch(/compact_payload|messages|transcript/i);
   });
 
