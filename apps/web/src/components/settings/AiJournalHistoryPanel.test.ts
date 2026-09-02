@@ -18,12 +18,12 @@ describe('AiJournalHistoryPanel reader', () => {
     expect(source).toContain('renderSafeMarkdown');
   });
 
-  it('uses a compact date list beside the reader without nested cards', () => {
-    expect(source).toContain('grid-template-columns: 220px minmax(0, 1fr)');
-    expect(source).toContain('padding: 11px 0');
+  it('uses a date list beside the reader only when history exists', () => {
+    expect(source).toContain("class=\"layout\" :class=\"{ 'has-index': daily.length }\"");
+    expect(source).toContain('grid-template-columns: 148px minmax(0, 1fr)');
     expect(source).not.toContain('journal-shell');
-    expect(source).not.toContain('min-height: 0');
     expect(source).not.toContain('!important');
     expect(source).not.toContain('height: calc');
+    expect(source).toContain('@media (max-width: 768px)');
   });
 });

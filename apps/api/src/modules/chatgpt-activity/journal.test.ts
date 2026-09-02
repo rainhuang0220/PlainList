@@ -157,7 +157,7 @@ describe('composeDailyJournalWithModel', () => {
     expect(text).toContain('桌面同步验收');
     expect(payload).not.toMatch(/transcript|messages\[\]|rawMarkdown|cookie|session/i);
     expect(payload).toContain('PlainList');
-    expect(payload).toContain('produced');
+    expect(payload).toContain('completed');
   });
 
   it('falls back to the deterministic paragraph when the model returns unreadable text', async () => {

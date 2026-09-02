@@ -6,27 +6,23 @@
     </p>
     <p v-if="card.body" class="copy">{{ card.body }}</p>
     <p v-if="card.countLine" class="meta">{{ card.countLine }}</p>
-    <p v-if="card.lastUpdated" class="meta">最后同步 {{ formatSync(card.lastUpdated) }}</p>
+    <p v-if="card.lastUpdated" class="meta">最后同步：{{ formatSync(card.lastUpdated) }}</p>
     <p v-if="card.progressLine" class="meta">{{ card.progressLine }}</p>
 
-    <div v-if="lastResult?.historicalBootstrap && !lastResult.bootstrapComplete" class="meta">
-      正在建立历史活动记录 · 已处理 {{ lastResult.processed }} / {{ lastResult.changed }}
-    </div>
-
     <div class="actions">
-      <button v-if="isDesktop && !rootName" type="button" class="btn-primary" @click="choose">连接本地资料库</button>
-      <button v-if="card.connected" type="button" class="btn-primary" @click="emit('openAiJournal')">查看 AI 小记</button>
+      <button v-if="isDesktop && !rootName" type="button" class="settings-btn-primary" @click="choose">连接本地资料库</button>
+      <button v-if="card.connected" type="button" class="settings-btn-primary" @click="emit('openAiJournal')">查看 AI 小记</button>
       <a
         v-if="card.showDesktopDownload"
-        class="btn-primary link"
+        class="text-link"
         href="https://github.com/rainhuang0220/PlainList/releases/latest"
         target="_blank"
         rel="noreferrer"
       >下载 Desktop</a>
-      <button v-if="isDesktop && rootName" type="button" class="btn-secondary" :disabled="status !== 'enabled'" @click="checkNow">立即检查</button>
-      <button v-if="isDesktop && rootName" type="button" class="btn-secondary" @click="choose">重新选择资料库</button>
-      <button v-if="isDesktop && status === 'enabled'" type="button" class="btn-secondary" @click="pause">暂停</button>
-      <button v-if="isDesktop && status === 'paused'" type="button" class="btn-secondary" @click="resume">继续同步</button>
+      <button v-if="isDesktop && rootName" type="button" class="settings-btn-secondary" :disabled="status !== 'enabled'" @click="checkNow">立即检查</button>
+      <button v-if="isDesktop && rootName" type="button" class="settings-btn-secondary" @click="choose">重新选择资料库</button>
+      <button v-if="isDesktop && status === 'enabled'" type="button" class="settings-btn-secondary" @click="pause">暂停</button>
+      <button v-if="isDesktop && status === 'paused'" type="button" class="settings-btn-secondary" @click="resume">继续同步</button>
     </div>
     <p v-if="error" class="error">同步暂不可用，请稍后重试。</p>
   </section>
@@ -118,16 +114,13 @@ onUnmounted(() => {
 });
 </script>
 <style scoped>
-.chatgpt-source {
-  max-width: 520px;
-}
 .status {
   display: flex;
   align-items: center;
   gap: 8px;
   margin: 0;
-  font-size: 13px;
-  line-height: 1.6;
+  font-size: 14px;
+  line-height: 1.5;
   color: var(--dark);
 }
 .dot {
@@ -150,12 +143,12 @@ onUnmounted(() => {
 .copy {
   margin: 8px 0 0;
   font-size: 13px;
-  line-height: 1.6;
-  color: var(--mid);
+  line-height: 1.5;
+  color: var(--muted);
 }
 .meta {
   margin: 8px 0 0;
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.5;
   color: var(--muted);
 }
@@ -163,11 +156,11 @@ onUnmounted(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  align-items: center;
   margin-top: 16px;
 }
-.btn-primary,
-.btn-secondary,
-.actions .link {
+.settings-btn-primary,
+.settings-btn-secondary {
   border: 1px solid var(--faint);
   padding: 8px 14px;
   font-size: 12px;
@@ -175,21 +168,28 @@ onUnmounted(() => {
   cursor: pointer;
   border-radius: var(--r);
   font-family: inherit;
-  text-decoration: none;
 }
-.btn-primary,
-.actions .link {
+.settings-btn-primary {
   background: var(--dark);
   color: var(--surface);
   border-color: var(--dark);
 }
-.btn-secondary {
+.settings-btn-secondary {
   background: transparent;
   color: var(--mid);
 }
-.btn-secondary:disabled {
+.settings-btn-secondary:disabled {
   opacity: 0.5;
   cursor: default;
+}
+.text-link {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--mid);
+  text-decoration: none;
+}
+.text-link:hover {
+  color: var(--dark);
 }
 .error {
   margin: 12px 0 0;

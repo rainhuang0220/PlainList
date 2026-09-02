@@ -9,10 +9,14 @@ describe('UserSettingsPanel AI journal entry', () => {
     expect(source).toContain("label: 'AI 小记'");
     expect(source).toContain('AiJournalHistoryPanel');
     expect(source).toContain("switchSection('ai-journal')");
-    expect(source).toContain('us-modal--compact');
-    expect(source).not.toContain('us-modal--reader');
-    expect(source).not.toContain('us-main-body--reader');
-    expect(source).toContain('us-main-body--compact');
     expect(source).toContain('aria-label="关闭"');
+  });
+
+  it('keeps ChatGPT and AI journal on the same settings modal as Account', () => {
+    expect(source).not.toContain('us-modal--compact');
+    expect(source).not.toContain('us-main-body--compact');
+    expect(source).toContain('width: 860px');
+    expect(source).toContain('height: 640px');
+    expect(source).toContain('us-main-body--journal');
   });
 });

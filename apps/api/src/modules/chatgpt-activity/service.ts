@@ -10,9 +10,10 @@ import {
 import { pool } from '../../db/pool';
 import { resolveAiConfigForUser } from '../ai-intake/settings';
 import { aiProviderConfigured, chatComplete } from '../ai-shared/llm';
+import { composeDailyJournal } from './dailyCompose';
+import { normalizeDailyFacts } from './dailyNormalize';
 import {
   DAILY_JOURNAL_SOURCE_VERSION,
-  composeDailyJournalWithModel,
   renderChatgptDailyJournal,
   type ChatgptJournalFact,
 } from './journal';
@@ -109,22 +110,26 @@ async function factsForDate(userId: number, date: string): Promise<ChatgptJourna
   }));
 }
 
-async function composeMarkdown(userId: number, facts: ChatgptJournalFact[], fallback: string, tryModel: boolean): Promise<string> {
-  if (!tryModel) return fallback;
+async function composeMarkdown(userId: number, date: string, facts: ChatgptJournalFact[], tryModel: boolean) {
+  const input = normalizeDailyFacts(date, facts);
+  if (!tryModel) return composeDailyJournal(input, { tryModel: false });
   try {
     const config = await resolveAiConfigForUser(userId);
-    if (!aiProviderConfigured(config)) return fallback;
-    return await composeDailyJournalWithModel(facts, async (request) => {
-      const result = await chatComplete(config, {
-        system: request.system,
-        user: request.user,
-        temperature: 0.2,
-        maxTokens: 400,
-      });
-      return result.text;
+    if (!aiProviderConfigured(config)) return composeDailyJournal(input, { tryModel: false });
+    return await composeDailyJournal(input, {
+      tryModel: true,
+      complete: async (request) => {
+        const result = await chatComplete(config, {
+          system: request.system,
+          user: request.user,
+          temperature: 0.2,
+          maxTokens: 400,
+        });
+        return result.text;
+      },
     });
   } catch {
-    return fallback;
+    return composeDailyJournal(input, { tryModel: false });
   }
 }
 
@@ -135,14 +140,21 @@ async function persistDailyJournal(
 ) {
   const facts = await factsForDate(user.id, date);
   const journal = renderChatgptDailyJournal(date, facts);
-  if (!journal.activityCount) {
+  if (!journal.summaryMarkdown) {
     await pool.query(
       'DELETE FROM chatgpt_daily_journals WHERE user_id = ? AND journal_date = ? AND source_type = ?',
       [user.id, date, 'chatgpt-local-sync'],
     );
     return null;
   }
-  const summaryMarkdown = await composeMarkdown(user.id, facts, journal.summaryMarkdown, options.tryModel);
+  const composed = await composeMarkdown(user.id, date, facts, options.tryModel);
+  if (!composed.text) {
+    await pool.query(
+      'DELETE FROM chatgpt_daily_journals WHERE user_id = ? AND journal_date = ? AND source_type = ?',
+      [user.id, date, 'chatgpt-local-sync'],
+    );
+    return null;
+  }
   await pool.query(
     `INSERT INTO chatgpt_daily_journals
       (user_id, journal_date, source_type, status, summary_markdown, activity_count, conversation_count, source_version, generated_at)
@@ -150,7 +162,7 @@ async function persistDailyJournal(
      ON DUPLICATE KEY UPDATE status = VALUES(status), summary_markdown = VALUES(summary_markdown),
        activity_count = VALUES(activity_count), conversation_count = VALUES(conversation_count),
        source_version = VALUES(source_version), generated_at = CURRENT_TIMESTAMP`,
-    [user.id, date, options.status, summaryMarkdown, journal.activityCount, journal.conversationCount, DAILY_JOURNAL_SOURCE_VERSION],
+    [user.id, date, options.status, composed.text, journal.activityCount, journal.conversationCount, DAILY_JOURNAL_SOURCE_VERSION],
   );
   if (!options.presentationOnly) {
     await dirtyClosedWeekForJournalDate(user.id, date);
@@ -160,18 +172,12 @@ async function persistDailyJournal(
     status: options.status,
     activityCount: journal.activityCount,
     conversationCount: journal.conversationCount,
+    compositionMode: composed.compositionMode,
+    providerCalled: composed.providerCalled,
   };
 }
 
-export async function recomposeStaleChatgptDailyJournals(user: AuthenticatedUser) {
-  const [stale] = await pool.query(
-    `SELECT 1 AS stale FROM chatgpt_daily_journals
-     WHERE user_id = ? AND source_type = 'chatgpt-local-sync' AND source_version <> ?
-     LIMIT 1`,
-    [user.id, DAILY_JOURNAL_SOURCE_VERSION],
-  );
-  if (!Array.isArray(stale) || stale.length === 0) return { updated: 0 };
-
+export async function recomposeHistoricalDailyJournals(user: AuthenticatedUser, options?: { tryModel?: boolean }) {
   const [dateRows] = await pool.query(
     `SELECT DISTINCT f.date_key FROM activity_facts f
      INNER JOIN activity_sources s ON s.id = f.source_id
@@ -180,23 +186,43 @@ export async function recomposeStaleChatgptDailyJournals(user: AuthenticatedUser
      ORDER BY f.date_key`,
     [user.id, user.id, DEFAULT_HISTORICAL_START_DATE],
   );
-  let updated = 0;
+  let upgraded = 0;
+  let failed = 0;
+  const compositionMode = { model: 0, fallback: 0 };
   for (const row of Array.isArray(dateRows) ? dateRows : []) {
     const date = dateValue((row as { date_key: string }).date_key);
     if (date < DEFAULT_HISTORICAL_START_DATE) continue;
-    const written = await persistDailyJournal(user, date, {
-      status: 'final',
-      presentationOnly: true,
-      tryModel: false,
-    });
-    if (written) updated += 1;
+    try {
+      const written = await persistDailyJournal(user, date, {
+        status: date < new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(new Date()) ? 'final' : 'ready',
+        presentationOnly: true,
+        tryModel: options?.tryModel !== false,
+      });
+      if (written) {
+        upgraded += 1;
+        compositionMode[written.compositionMode] += 1;
+      }
+    } catch {
+      failed += 1;
+    }
   }
-  return { updated };
+  return {
+    journalCount: upgraded,
+    upgraded,
+    failed,
+    sourceVersion: DAILY_JOURNAL_SOURCE_VERSION,
+    compositionMode,
+  };
+}
+
+/** @deprecated use recomposeHistoricalDailyJournals — kept for existing tests during the cutover */
+export async function recomposeStaleChatgptDailyJournals(user: AuthenticatedUser) {
+  const result = await recomposeHistoricalDailyJournals(user, { tryModel: false });
+  return { updated: result.upgraded };
 }
 
 export async function reconcileChatgptActivity(user: AuthenticatedUser, payload: unknown) {
   const input = chatgptActivityReconcileSchema.parse(payload);
-  await recomposeStaleChatgptDailyJournals(user);
   const dates = new Set(input.affectedDates.filter((date) => date >= DEFAULT_HISTORICAL_START_DATE));
   if (input.historicalBootstrap) {
     const [historicalRows] = await pool.query(
