@@ -47,6 +47,7 @@ describe('activity digest ingestion', () => {
       sourceType: 'chatgpt-local-sync',
       sourceExternalId: 'conversation-stable-id',
       idempotencyKey: 'local-conversation-stable-id',
+      occurredAt: '2026-08-31T10:00:00.000Z',
       localFacts: [
         { dateKey: '2026-08-30', category: 'engineering', title: '开展软件工程工作', completed: false },
         { dateKey: '2026-08-31', category: 'engineering', title: '排查并修复软件工程问题', completed: true },
@@ -54,6 +55,7 @@ describe('activity digest ingestion', () => {
     });
     const sourceInsert = query.mock.calls.find(([sql]) => /INSERT INTO activity_sources/i.test(String(sql)));
     expect(sourceInsert?.[1]).toContain('chatgpt-local-sync');
+    expect(sourceInsert?.[1]?.[6]).toBe('2026-08-31 10:00:00.000');
     const factDates = query.mock.calls.filter(([sql]) => /INSERT INTO activity_facts/i.test(String(sql))).map(([, values]) => values?.[2]);
     expect(factDates).toEqual(['2026-08-30', '2026-08-31']);
   });
