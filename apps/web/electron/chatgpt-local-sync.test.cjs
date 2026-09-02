@@ -57,6 +57,32 @@ test('reduces untrusted conversation text into a semantic digest without retaini
   assert.equal(JSON.stringify(digest).includes('十个功能'), false);
 });
 
+test('attaches Daily semantic facts without changing Activity localFacts titles', () => {
+  const archive = parseArchive({
+    conversation_id: 'conv-plainlist-ui',
+    title: 'PlainList scheduler stale lease debugging',
+    update_time: '2026-09-01T10:00:00.000Z',
+    messages: [
+      {
+        message_id: 'u1',
+        role: 'user',
+        occurred_at: '2026-09-01T10:00:00.000Z',
+        content: '我今天完成了 PlainList 2.4.4 的 scheduler UI 重写，并重新生成历史 Daily。',
+      },
+    ],
+  });
+
+  const digest = buildLocalDigest(archive);
+
+  assert.equal(digest.localFacts.length >= 1, true);
+  assert.match(digest.localFacts[0].title, /PlainList/);
+  assert.notEqual(digest.localFacts[0].title, digest.dailySemanticFacts?.[0]?.summary);
+  assert.equal(Array.isArray(digest.dailySemanticFacts), true);
+  assert.equal(digest.dailySemanticFacts.length >= 1, true);
+  assert.match(digest.dailySemanticFacts[0].summary, /PlainList 2\.4\.4 的 scheduler UI 重写/);
+  assert.equal(digest.dailySemanticFacts[0].summary.includes('PlainList scheduler stale lease debugging'), false);
+});
+
 test('maps message occurred_at onto the Asia/Shanghai calendar day, not a UTC slice', () => {
   assert.equal(shanghaiDateKey('2026-08-31T16:30:00.000Z'), '2026-09-01');
   assert.equal(dateKey('2026-08-31T16:30:00.000Z'), '2026-09-01');
@@ -160,5 +186,8 @@ test('dogfoods a fixture archive from folder scan through a compact activity dig
   assert.equal(scanned.issues.length, 0);
   assert.ok(digest.localFacts.length >= 1 && digest.localFacts.length <= 3);
   assert.ok(digest.localFacts.every((fact) => fact.dateKey === '2026-08-30' || fact.dateKey === '2026-08-31'));
-  assert.equal(JSON.stringify(digest).includes('stale lease'), false);
+  assert.equal(digest.localFacts.some((fact) => fact.title.includes('stale lease')), false);
+  assert.equal(JSON.stringify(digest).includes('建议检查 lease'), false);
+  assert.ok(digest.dailySemanticFacts.length >= 1);
+  assert.ok(digest.dailySemanticFacts.every((fact) => fact.summary.endsWith('。')));
 });

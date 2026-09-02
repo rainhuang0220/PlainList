@@ -1,6 +1,6 @@
 {
   "name": "@plainlist/web",
-  "version": "2.4.4",
+  "version": "2.4.5",
   "private": true,
   "type": "module",
   "main": "electron/main.cjs",
@@ -11,7 +11,7 @@
     "build": "vue-tsc -p tsconfig.json --noEmit && vite build",
     "preview": "vite preview",
     "lint": "eslint src --ext .ts,.vue",
-    "test": "vitest run src && node --test electron/chatgpt-local-sync.test.cjs electron/chatgpt-sync-scheduler.test.cjs electron/desktop-api.test.cjs && node --test scripts/production-api-contract.test.cjs && node --test scripts/verify-production-api-bundle.test.cjs && node --test scripts/verify-packaged-api-bundle.test.cjs",
+    "test": "vitest run src && node --test electron/chatgpt-local-sync.test.cjs electron/daily-semantic-fact.test.cjs electron/chatgpt-sync-scheduler.test.cjs electron/desktop-api.test.cjs && node --test scripts/production-api-contract.test.cjs && node --test scripts/verify-production-api-bundle.test.cjs && node --test scripts/verify-packaged-api-bundle.test.cjs",
     "typecheck": "vue-tsc -p tsconfig.json --noEmit",
     "cap:sync": "npx cap sync",
     "cap:android": "npx cap open android",

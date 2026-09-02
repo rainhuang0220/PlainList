@@ -26,6 +26,36 @@ import { dirtyClosedWeekForJournalDate, generateCurrentWeeklyReviewSnapshot } fr
 
 const user = { id: 7, username: 'reader', isAdmin: false };
 
+function sourceRow(input: {
+  id: number;
+  source_id: number;
+  date: string;
+  summary: string;
+  title?: string;
+  category?: string;
+  output_state?: string;
+  status?: 'completed' | 'progress' | 'planned' | 'discussed';
+}) {
+  const status = input.status
+    ?? (input.output_state === 'produced' ? 'completed' : 'progress');
+  return {
+    id: input.id,
+    source_id: input.source_id,
+    category: input.category ?? 'engineering',
+    title: input.title ?? '推进工程工作',
+    summary: input.summary,
+    output_state: input.output_state ?? 'partial',
+    compact_payload: {
+      dailySemanticFacts: [{
+        topic: input.summary.includes('登录') ? '登录' : 'PlainList',
+        status,
+        summary: input.summary,
+        dateKey: input.date,
+      }],
+    },
+  };
+}
+
 describe('ChatGPT activity journal service', () => {
   beforeEach(() => {
     query.mockReset();
@@ -36,8 +66,8 @@ describe('ChatGPT activity journal service', () => {
   it('persists one derived journal for multiple same-day conversations without raw transcript fields', async () => {
     query
       .mockResolvedValueOnce([[
-        { id: 1, source_id: 10, category: 'engineering', title: '排查登录问题', output_state: 'partial' },
-        { id: 2, source_id: 11, category: 'research', title: '完成资料整理', output_state: 'produced' },
+        sourceRow({ id: 1, source_id: 10, date: '2026-09-01', summary: '继续排查了桌面端的登录问题。' }),
+        sourceRow({ id: 2, source_id: 11, date: '2026-09-01', summary: '完成了资料整理并核对了结果。', output_state: 'produced' }),
       ]])
       .mockResolvedValueOnce([{ affectedRows: 1 }])
       .mockResolvedValueOnce([{ affectedRows: 1 }]);
@@ -76,9 +106,9 @@ describe('ChatGPT activity journal service', () => {
   it('reconciles every historical fact date during first bootstrap and finalizes past days', async () => {
     query
       .mockResolvedValueOnce([[{ date_key: '2026-08-30' }, { date_key: '2026-08-31' }]])
-      .mockResolvedValueOnce([[{ id: 1, source_id: 10, category: 'engineering', title: '推进工程工作', output_state: 'partial' }]])
+      .mockResolvedValueOnce([[sourceRow({ id: 1, source_id: 10, date: '2026-08-30', summary: '继续推进 PlainList 的工程修复。' })]])
       .mockResolvedValueOnce([{ affectedRows: 1 }])
-      .mockResolvedValueOnce([[{ id: 2, source_id: 11, category: 'research', title: '完成研究整理', output_state: 'produced' }]])
+      .mockResolvedValueOnce([[sourceRow({ id: 2, source_id: 11, date: '2026-08-31', summary: '完成了研究资料整理并核对了结果。', output_state: 'produced' })]])
       .mockResolvedValueOnce([{ affectedRows: 1 }])
       .mockResolvedValueOnce([{ affectedRows: 1 }]);
 
@@ -94,7 +124,7 @@ describe('ChatGPT activity journal service', () => {
 
   it('does not materialize journals before the 2026-08-01 historical floor', async () => {
     query
-      .mockResolvedValueOnce([[{ id: 1, source_id: 10, category: 'engineering', title: '推进工程工作', output_state: 'partial' }]])
+      .mockResolvedValueOnce([[sourceRow({ id: 1, source_id: 10, date: '2026-08-01', summary: '继续推进 PlainList 的工程修复。' })]])
       .mockResolvedValueOnce([{ affectedRows: 1 }])
       .mockResolvedValueOnce([{ affectedRows: 1 }]);
 
@@ -130,7 +160,7 @@ describe('ChatGPT activity journal service', () => {
   it('lets an admin persist their own journals and never writes another user id', async () => {
     const admin = { id: 2, username: 'owner', isAdmin: true };
     query
-      .mockResolvedValueOnce([[{ id: 1, source_id: 10, category: 'engineering', title: '推进工程工作', output_state: 'partial' }]])
+      .mockResolvedValueOnce([[sourceRow({ id: 1, source_id: 10, date: '2026-08-31', summary: '继续推进 PlainList 的工程修复。' })]])
       .mockResolvedValueOnce([{ affectedRows: 1 }])
       .mockResolvedValueOnce([{ affectedRows: 1 }]);
 
@@ -153,7 +183,13 @@ describe('ChatGPT activity journal service', () => {
 
   it('recompose presentation without dirtying closed weekly summaries', async () => {
     query
-      .mockResolvedValueOnce([[{ id: 1, source_id: 10, category: 'engineering', title: '修复周回顾空状态', summary: '修复周回顾空状态', output_state: 'produced' }]])
+      .mockResolvedValueOnce([[sourceRow({
+        id: 1,
+        source_id: 10,
+        date: '2026-08-31',
+        summary: '完成了周回顾空状态的修复。',
+        output_state: 'produced',
+      })]])
       .mockResolvedValueOnce([{ affectedRows: 1 }])
       .mockResolvedValueOnce([{ affectedRows: 1 }]);
 
@@ -174,7 +210,13 @@ describe('ChatGPT activity journal service', () => {
   it('force-recomposes historical daily journals from compact facts and upgrades source_version', async () => {
     query
       .mockResolvedValueOnce([[{ date_key: '2026-08-31' }]])
-      .mockResolvedValueOnce([[{ id: 1, source_id: 10, category: 'engineering', title: '完成 PlainList 桌面同步验收', output_state: 'produced' }]])
+      .mockResolvedValueOnce([[sourceRow({
+        id: 1,
+        source_id: 10,
+        date: '2026-08-31',
+        summary: '完成了 PlainList 桌面同步验收。',
+        output_state: 'produced',
+      })]])
       .mockResolvedValueOnce([{ affectedRows: 1 }]);
 
     const result = await recomposeHistoricalDailyJournals(user, { tryModel: false });
@@ -182,9 +224,9 @@ describe('ChatGPT activity journal service', () => {
     expect(result.upgraded).toBe(1);
     expect(result.failed).toBe(0);
     expect(result.sourceVersion).toBe(DAILY_JOURNAL_SOURCE_VERSION);
-    expect(DAILY_JOURNAL_SOURCE_VERSION).toBe('journal-v4');
+    expect(DAILY_JOURNAL_SOURCE_VERSION).toBe('journal-v5');
     expect(query.mock.calls.some(([sql, values]) => (
-      /INSERT INTO chatgpt_daily_journals/i.test(String(sql)) && Array.isArray(values) && values.includes('journal-v4')
+      /INSERT INTO chatgpt_daily_journals/i.test(String(sql)) && Array.isArray(values) && values.includes('journal-v5')
     ))).toBe(true);
     expect(query.mock.calls.some(([sql]) => /source_version <>/.test(String(sql)))).toBe(false);
     expect(dirtyClosedWeekForJournalDate).not.toHaveBeenCalled();
@@ -193,7 +235,13 @@ describe('ChatGPT activity journal service', () => {
 
   it('does not recompose historical journals during ordinary reconcile', async () => {
     query
-      .mockResolvedValueOnce([[{ id: 1, source_id: 10, category: 'engineering', title: '完成 PlainList 桌面同步验收', output_state: 'produced' }]])
+      .mockResolvedValueOnce([[sourceRow({
+        id: 1,
+        source_id: 10,
+        date: '2026-08-31',
+        summary: '完成了 PlainList 桌面同步验收。',
+        output_state: 'produced',
+      })]])
       .mockResolvedValueOnce([{ affectedRows: 1 }])
       .mockResolvedValueOnce([{ affectedRows: 1 }]);
 

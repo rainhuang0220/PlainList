@@ -10,8 +10,9 @@ import {
 import { pool } from '../../db/pool';
 import { resolveAiConfigForUser } from '../ai-intake/settings';
 import { aiProviderConfigured, chatComplete } from '../ai-shared/llm';
-import { composeDailyJournal } from './dailyCompose';
+import { composeDailyJournal, type DailyFallbackReason } from './dailyCompose';
 import { normalizeDailyFacts } from './dailyNormalize';
+import { isCompleteSemanticFact } from './semanticFact';
 import {
   DAILY_JOURNAL_SOURCE_VERSION,
   renderChatgptDailyJournal,
@@ -90,9 +91,92 @@ export async function reportChatgptActivityProgress(user: AuthenticatedUser, pay
   return getChatgptActivityConnection(user);
 }
 
+interface SemanticFactPayload {
+  topic?: string;
+  status?: 'completed' | 'progress' | 'planned' | 'discussed';
+  summary?: string;
+  dateKey?: string;
+  sourceConversationId?: string;
+}
+
+function parseCompactPayload(value: unknown): { dailySemanticFacts?: SemanticFactPayload[] } {
+  if (!value) return {};
+  if (typeof value === 'string') {
+    try { return JSON.parse(value) as { dailySemanticFacts?: SemanticFactPayload[] }; } catch { return {}; }
+  }
+  if (typeof value === 'object') return value as { dailySemanticFacts?: SemanticFactPayload[] };
+  return {};
+}
+
+function outputStateFor(status: SemanticFactPayload['status']): string {
+  if (status === 'completed') return 'produced';
+  if (status === 'progress') return 'partial';
+  return 'unknown';
+}
+
+function categoryFor(status: SemanticFactPayload['status']): string {
+  if (status === 'planned') return 'planning';
+  if (status === 'discussed') return 'research';
+  if (status === 'progress') return 'engineering';
+  return 'engineering';
+}
+
+function factsFromSourceRows(rows: unknown[], date: string): ChatgptJournalFact[] {
+  const facts: ChatgptJournalFact[] = [];
+  const semanticSources = new Set<number>();
+  for (const raw of rows) {
+    const row = raw as {
+      id: number;
+      source_id: number;
+      compact_payload?: unknown;
+    };
+    const sourceId = Number(row.source_id);
+    if (semanticSources.has(sourceId)) continue;
+    const payload = parseCompactPayload(row.compact_payload);
+    const semantic = (payload.dailySemanticFacts || []).filter((item) => (
+      item.summary
+      && isCompleteSemanticFact(item.summary)
+      && (!item.dateKey || item.dateKey === date)
+    ));
+    if (!semantic.length) continue;
+    semanticSources.add(sourceId);
+    semantic.forEach((item, index) => {
+      facts.push({
+        id: Number(row.id) * 100 + index,
+        sourceId,
+        category: categoryFor(item.status),
+        title: String(item.summary),
+        summary: String(item.summary),
+        outputState: outputStateFor(item.status),
+        topic: item.topic,
+      });
+    });
+  }
+  for (const raw of rows) {
+    const row = raw as {
+      id: number;
+      source_id: number;
+      category: string;
+      title: string;
+      summary?: string;
+      output_state: string;
+    };
+    if (semanticSources.has(Number(row.source_id))) continue;
+    facts.push({
+      id: Number(row.id),
+      sourceId: Number(row.source_id),
+      category: String(row.category),
+      title: String(row.title),
+      summary: String(row.summary || ''),
+      outputState: String(row.output_state),
+    });
+  }
+  return facts;
+}
+
 async function factsForDate(userId: number, date: string): Promise<ChatgptJournalFact[]> {
   const [rows] = await pool.query(
-    `SELECT f.id, f.source_id, f.category, f.title, f.summary, f.output_state
+    `SELECT f.id, f.source_id, f.category, f.title, f.summary, f.output_state, s.compact_payload
      FROM activity_facts f
      INNER JOIN activity_sources s ON s.id = f.source_id
      WHERE f.user_id = ? AND f.date_key = ?
@@ -100,14 +184,7 @@ async function factsForDate(userId: number, date: string): Promise<ChatgptJourna
      ORDER BY f.category, f.id`,
     [userId, date, userId],
   );
-  return (Array.isArray(rows) ? rows : []).map((row) => ({
-    id: Number((row as { id: number }).id),
-    sourceId: Number((row as { source_id: number }).source_id),
-    category: String((row as { category: string }).category),
-    title: String((row as { title: string }).title),
-    summary: String((row as { summary?: string }).summary || ''),
-    outputState: String((row as { output_state: string }).output_state),
-  }));
+  return factsFromSourceRows(Array.isArray(rows) ? rows : [], date);
 }
 
 async function composeMarkdown(userId: number, date: string, facts: ChatgptJournalFact[], tryModel: boolean) {
@@ -174,6 +251,7 @@ async function persistDailyJournal(
     conversationCount: journal.conversationCount,
     compositionMode: composed.compositionMode,
     providerCalled: composed.providerCalled,
+    fallbackReason: composed.fallbackReason,
   };
 }
 
@@ -189,6 +267,15 @@ export async function recomposeHistoricalDailyJournals(user: AuthenticatedUser, 
   let upgraded = 0;
   let failed = 0;
   const compositionMode = { model: 0, fallback: 0 };
+  const fallbackReasons: Record<DailyFallbackReason, number> = {
+    provider_error: 0,
+    timeout: 0,
+    '429': 0,
+    invalid_output: 0,
+    validator_reject: 0,
+    empty_output: 0,
+    other: 0,
+  };
   for (const row of Array.isArray(dateRows) ? dateRows : []) {
     const date = dateValue((row as { date_key: string }).date_key);
     if (date < DEFAULT_HISTORICAL_START_DATE) continue;
@@ -201,6 +288,9 @@ export async function recomposeHistoricalDailyJournals(user: AuthenticatedUser, 
       if (written) {
         upgraded += 1;
         compositionMode[written.compositionMode] += 1;
+        if (written.compositionMode === 'fallback' && written.fallbackReason) {
+          fallbackReasons[written.fallbackReason] += 1;
+        }
       }
     } catch {
       failed += 1;
@@ -212,6 +302,7 @@ export async function recomposeHistoricalDailyJournals(user: AuthenticatedUser, 
     failed,
     sourceVersion: DAILY_JOURNAL_SOURCE_VERSION,
     compositionMode,
+    fallbackReasons,
   };
 }
 
