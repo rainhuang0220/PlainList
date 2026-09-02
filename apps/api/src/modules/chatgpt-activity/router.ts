@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authMiddleware, type AuthRequest } from '../../middleware/auth';
-import { getChatgptActivityConnection, listChatgptDailyJournals, reconcileChatgptActivity } from './service';
+import { getChatgptActivityConnection, listChatgptDailyJournals, reconcileChatgptActivity, reportChatgptActivityProgress } from './service';
 
 export const chatgptActivityRouter = Router();
 chatgptActivityRouter.use(authMiddleware);
@@ -16,6 +16,10 @@ chatgptActivityRouter.get('/journals', async (req, res) => {
 });
 chatgptActivityRouter.get('/connection', async (req, res) => {
   try { res.json(await getChatgptActivityConnection((req as AuthRequest).user)); }
+  catch (error) { respond(error, res); }
+});
+chatgptActivityRouter.post('/connection', async (req, res) => {
+  try { res.json(await reportChatgptActivityProgress((req as AuthRequest).user, req.body)); }
   catch (error) { respond(error, res); }
 });
 chatgptActivityRouter.post('/reconcile', async (req, res) => {

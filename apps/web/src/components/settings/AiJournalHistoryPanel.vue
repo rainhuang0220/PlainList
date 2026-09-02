@@ -1,63 +1,91 @@
 <template>
-  <section class="journal-history">
-    <div class="tabs">
-      <button type="button" :class="{ active: tab === 'daily' }" @click="tab = 'daily'">每日小记</button>
-      <button type="button" :class="{ active: tab === 'weekly' }" @click="tab = 'weekly'">每周回顾</button>
+  <section class="journal-shell">
+    <p class="journal-intro">查看由 PlainList 自动整理的每日活动记录与历史周回顾。</p>
+
+    <div class="journal-tabs" role="tablist">
+      <button type="button" role="tab" :aria-selected="tab === 'daily'" :class="{ active: tab === 'daily' }" @click="tab = 'daily'">每日小记</button>
+      <button type="button" role="tab" :aria-selected="tab === 'weekly'" :class="{ active: tab === 'weekly' }" @click="tab = 'weekly'">每周回顾</button>
     </div>
 
     <p v-if="loading" class="muted">正在读取 AI 小记…</p>
     <p v-else-if="error" class="muted">暂时无法读取历史记录，请稍后重试。</p>
 
-    <template v-else-if="tab === 'daily'">
-      <label class="picker">
-        <span>日期</span>
-        <input v-model="selectedDate" type="date" :max="today" />
-      </label>
-      <ul class="index">
+    <div v-else-if="tab === 'daily'" class="journal-layout">
+      <ul v-if="daily.length" class="journal-index">
         <li v-for="entry in daily" :key="entry.date">
           <button type="button" :class="{ active: selectedDate === entry.date }" @click="selectedDate = entry.date">
-            {{ formatDay(entry.date) }}
+            <strong>{{ presentJournalDate(entry.date, today).primary }}</strong>
             <small>{{ entry.activityCount }} 条活动</small>
           </button>
         </li>
       </ul>
-      <p v-if="!daily.length" class="muted">还没有每日小记。连接 ChatGPT 活动记录后，这里会按天出现。</p>
-      <article v-else-if="selectedDaily" class="article">
-        <!-- eslint-disable-next-line vue/no-v-html -->
-        <div class="prose" v-html="renderSafeMarkdown(selectedDaily.summaryMarkdown)" />
-      </article>
-    </template>
+      <div class="journal-reader">
+        <template v-if="selectedDaily">
+          <header class="journal-reader-head">
+            <h3>{{ presentJournalDate(selectedDaily.date, today).primary }}</h3>
+            <p class="journal-meta">
+              ChatGPT 活动 · {{ selectedDaily.activityCount }} 条
+              <span v-if="selectedDaily.updatedAt"> · 最后更新 {{ formatClock(selectedDaily.updatedAt) }}</span>
+            </p>
+          </header>
+          <!-- eslint-disable-next-line vue/no-v-html -->
+          <div class="journal-prose" v-html="renderSafeMarkdown(selectedDaily.summaryMarkdown)" />
+        </template>
+        <div v-else class="journal-empty">
+          <p class="journal-empty-title">{{ emptyDaily.title }}</p>
+          <p v-if="emptyDaily.body">{{ emptyDaily.body }}</p>
+        </div>
+      </div>
+    </div>
 
-    <template v-else>
-      <ul class="index">
+    <div v-else class="journal-layout">
+      <ul v-if="weekly.length" class="journal-index">
         <li v-for="week in weekly" :key="week.weekStart">
           <button type="button" :class="{ active: selectedWeek === week.weekStart }" @click="selectedWeek = week.weekStart">
-            {{ weekLabel(week.weekStart, week.weekEnd) }}
-            <small>{{ week.weekStart }} → {{ week.weekEnd }}</small>
+            <strong>{{ presentWeekRange(week.weekStart, week.weekEnd) }}</strong>
           </button>
         </li>
       </ul>
-      <p v-if="!weekly.length" class="muted">还没有已结束的周回顾。每个自然周结束后，这里会留下一篇约 500 字的总结。</p>
-      <article v-else-if="selectedWeekly" class="article">
-        <!-- eslint-disable-next-line vue/no-v-html -->
-        <div class="prose" v-html="renderSafeMarkdown(selectedWeekly.narrativeMarkdown || selectedWeekly.content?.summary || '')" />
-      </article>
-    </template>
+      <div class="journal-reader">
+        <template v-if="selectedWeekly">
+          <header class="journal-reader-head">
+            <h3>{{ presentWeekRange(selectedWeekly.weekStart, selectedWeekly.weekEnd) }}</h3>
+            <p class="journal-meta">已结束的一周</p>
+          </header>
+          <!-- eslint-disable-next-line vue/no-v-html -->
+          <div class="journal-prose" v-html="renderSafeMarkdown(selectedWeekly.narrativeMarkdown || selectedWeekly.content?.summary || '')" />
+        </template>
+        <div v-else class="journal-empty">
+          <p class="journal-empty-title">{{ emptyWeekly.title }}</p>
+          <p v-if="emptyWeekly.body">{{ emptyWeekly.body }}</p>
+        </div>
+      </div>
+    </div>
   </section>
 </template>
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { renderSafeMarkdown } from '@/features/chatgpt-activity/safeMarkdown';
+import { presentAiJournalEmpty, presentJournalDate, presentWeekRange } from '@/features/chatgpt-activity/presentAiJournal';
+import { useChatgptActivityStore } from '@/features/chatgpt-activity/useChatgptActivityStore';
 import { useReviewsStore } from '@/features/reviews/model/useReviewsStore';
 
 const reviews = useReviewsStore();
+const activity = useChatgptActivityStore();
 const tab = ref<'daily' | 'weekly'>('daily');
 const loading = ref(true);
 const error = ref('');
-const today = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`;
+const now = new Date();
+const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 const selectedDate = ref(today);
 const selectedWeek = ref('');
-const daily = ref<Array<{ date: string; summaryMarkdown: string; activityCount: number; conversationCount: number }>>([]);
+const daily = ref<Array<{
+  date: string;
+  summaryMarkdown: string;
+  activityCount: number;
+  conversationCount: number;
+  updatedAt?: string;
+}>>([]);
 const weekly = ref<Array<{
   weekStart: string;
   weekEnd: string;
@@ -67,30 +95,26 @@ const weekly = ref<Array<{
 
 const selectedDaily = computed(() => daily.value.find((item) => item.date === selectedDate.value) ?? daily.value[0] ?? null);
 const selectedWeekly = computed(() => weekly.value.find((item) => item.weekStart === selectedWeek.value) ?? weekly.value[0] ?? null);
+const emptyDaily = computed(() => presentAiJournalEmpty(activity.connection.displayState, 'daily', {
+  processed: activity.connection.processed,
+  checked: activity.connection.checked,
+}));
+const emptyWeekly = computed(() => presentAiJournalEmpty(activity.connection.displayState, 'weekly', {
+  processed: activity.connection.processed,
+  checked: activity.connection.checked,
+}));
 
-function formatDay(date: string) {
-  const [, month, day] = date.split('-').map(Number);
-  return `${Number(month)} 月 ${Number(day)} 日`;
-}
-
-function isoWeek(dateKey: string) {
-  const [year, month, day] = dateKey.split('-').map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  const weekday = date.getUTCDay() || 7;
-  date.setUTCDate(date.getUTCDate() + 4 - weekday);
-  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
-  const week = Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-  return `${date.getUTCFullYear()} W${String(week).padStart(2, '0')}`;
-}
-
-function weekLabel(start: string, end: string) {
-  const [, startMonth, startDay] = start.split('-').map(Number);
-  const [, endMonth, endDay] = end.split('-').map(Number);
-  return `${isoWeek(start)}  ·  ${Number(startMonth)}/${Number(startDay)}–${Number(endMonth)}/${Number(endDay)}`;
+function formatClock(value: string) {
+  try {
+    return new Date(value).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return '';
+  }
 }
 
 onMounted(async () => {
   try {
+    await activity.fetchConnection().catch(() => {});
     const result = await reviews.fetchWeeklyHistory();
     daily.value = result.daily ?? [];
     weekly.value = result.weekly ?? [];
@@ -104,76 +128,144 @@ onMounted(async () => {
 });
 </script>
 <style scoped>
-.journal-history {
+.journal-shell {
   display: grid;
-  gap: 16px;
-  max-width: 680px;
+  gap: 14px;
+  min-width: 0;
 }
-.tabs {
-  display: flex;
-  gap: 8px;
-}
-.tabs button,
-.index button {
-  border: 1px solid var(--faint);
-  background: var(--surface);
-  color: var(--mid);
-  border-radius: 999px;
-  padding: 7px 12px;
-  cursor: pointer;
-}
-.tabs button.active,
-.index button.active {
-  background: var(--dark);
-  color: var(--bg);
-  border-color: var(--dark);
-}
-.index {
-  display: grid;
-  gap: 6px;
+.journal-intro {
   margin: 0;
-  padding: 0;
-  list-style: none;
-  max-height: 220px;
-  overflow: auto;
-}
-.index button {
-  width: 100%;
-  display: flex;
-  justify-content: space-between;
-  border-radius: 10px;
-  text-align: left;
-}
-.picker {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: 12px;
-  font-weight: 700;
-}
-.picker input {
-  padding: 7px 9px;
-  border: 1px solid var(--faint);
-  border-radius: 8px;
-  background: var(--surface);
-  color: var(--text);
-}
-.article {
-  padding-top: 8px;
-}
-.muted {
   color: var(--muted);
   font-size: 13px;
   line-height: 1.6;
 }
-.prose :deep(h2),
-.prose :deep(h3) {
-  margin: 1rem 0 .4rem;
+.journal-tabs {
+  display: inline-flex;
+  width: fit-content;
+  padding: 3px;
+  border: 1px solid var(--faint);
+  border-radius: 999px;
+  background: var(--faint2);
+  gap: 0;
 }
-.prose :deep(p),
-.prose :deep(li) {
+.journal-tabs button {
+  border: 0;
+  background: transparent;
+  color: var(--mid);
+  border-radius: 999px;
+  padding: 7px 14px;
+  cursor: pointer;
+  font: inherit;
+}
+.journal-tabs button.active {
+  background: var(--surface);
+  color: var(--dark);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+.journal-layout {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+  min-height: 0;
+}
+.journal-index {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: min(560px, calc(100vh - 260px));
+  overflow: auto;
+}
+.journal-index button {
+  width: 100%;
+  display: grid;
+  gap: 2px;
+  border: 0;
+  background: transparent;
+  color: var(--mid);
+  border-radius: 10px;
+  padding: 10px 12px;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+.journal-index button strong {
   font-size: 13px;
+  font-weight: 600;
+  color: var(--dark);
+}
+.journal-index button small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.journal-index button.active {
+  background: var(--faint2);
+}
+.journal-reader {
+  min-width: 0;
+}
+.journal-reader-head h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+.journal-meta {
+  margin: 6px 0 14px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.journal-empty {
+  padding: 8px 0;
+}
+.journal-empty-title,
+.muted {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.journal-empty p + p,
+.journal-empty-title + p {
+  margin: 6px 0 0;
+}
+.journal-prose :deep(> :first-child) {
+  margin-top: 0;
+}
+.journal-prose :deep(> :last-child) {
+  margin-bottom: 0;
+}
+.journal-prose :deep(h2),
+.journal-prose :deep(h3) {
+  margin: 1rem 0 .4rem;
+  font-size: 15px;
+}
+.journal-prose :deep(p),
+.journal-prose :deep(li) {
+  font-size: 14px;
   line-height: 1.75;
+  color: var(--dark);
+}
+@media (max-width: 768px) {
+  .journal-layout {
+    grid-template-columns: 1fr;
+  }
+  .journal-index {
+    display: flex;
+    gap: 8px;
+    max-height: none;
+    overflow-x: auto;
+  }
+  .journal-index li {
+    flex: 0 0 auto;
+  }
+  .journal-index button {
+    white-space: nowrap;
+    border: 1px solid var(--faint);
+    border-radius: 999px;
+    padding: 7px 12px;
+  }
 }
 </style>

@@ -5,9 +5,28 @@ const { join } = require('node:path');
 const { tmpdir } = require('node:os');
 const test = require('node:test');
 
-const { buildLocalDigest, detectChangedArchives, parseArchive, readStableJson, scanArchiveDirectory } = require('./chatgpt-local-sync.cjs');
+const { archiveMeetsHistoricalStart, buildLocalDigest, detectChangedArchives, parseArchive, readStableJson, scanArchiveDirectory } = require('./chatgpt-local-sync.cjs');
 
 const fixture = (name) => JSON.parse(readFileSync(join(__dirname, 'fixtures', 'chatgpt-local-sync', 'v2.9.4', name), 'utf8'));
+
+test('keeps the first historical bootstrap floor at 2026-08-01', () => {
+  const before = parseArchive({
+    conversation_id: 'old',
+    update_time: '2026-07-20T10:00:00.000Z',
+    messages: [
+      { message_id: 'u1', role: 'user', occurred_at: '2026-07-20T10:00:00.000Z', content: '修复 scheduler' },
+    ],
+  });
+  const after = parseArchive({
+    conversation_id: 'new',
+    update_time: '2026-08-11T10:00:00.000Z',
+    messages: [
+      { message_id: 'u1', role: 'user', occurred_at: '2026-08-11T10:00:00.000Z', content: '修复 scheduler' },
+    ],
+  });
+  assert.equal(archiveMeetsHistoricalStart(before, '2026-08-01'), false);
+  assert.equal(archiveMeetsHistoricalStart(after, '2026-08-01'), true);
+});
 
 test('parses a v2.9.4 archive with its stable conversation identity and message timeline', () => {
   const archive = parseArchive(fixture('new-conversation.json'));

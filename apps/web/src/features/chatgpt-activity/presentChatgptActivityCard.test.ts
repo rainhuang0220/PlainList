@@ -34,12 +34,32 @@ describe('presentChatgptActivityCard', () => {
       isDesktop: false,
       localStatus: 'disabled',
       rootName: null,
-      connection: { viaDesktop: false, lastSyncedAt: null },
+      connection: { viaDesktop: false, lastSyncedAt: null, displayState: 'not_connected' },
       lastResult: null,
     });
     expect(card.variant).toBe('web-disconnected');
+    expect(card.headline).toBe('尚未连接桌面资料库');
     expect(card.body).toContain('PlainList Desktop');
-    expect(card.body).not.toContain('资料库');
+    expect(card.showDesktopDownload).toBe(true);
+  });
+
+  it('shows bootstrap progress instead of a generic empty journal copy', () => {
+    const card = presentChatgptActivityCard({
+      isDesktop: false,
+      localStatus: 'disabled',
+      rootName: null,
+      connection: {
+        viaDesktop: true,
+        lastSyncedAt: '2026-09-02T15:41:00.000Z',
+        displayState: 'bootstrapping',
+        checked: 40,
+        processed: 12,
+      },
+      lastResult: null,
+    });
+    expect(card.variant).toBe('web-bootstrapping');
+    expect(card.headline).toBe('正在建立历史活动记录');
+    expect(card.progressLine).toContain('12 / 40');
   });
 
   it('shows derived desktop connection on web and mobile', () => {

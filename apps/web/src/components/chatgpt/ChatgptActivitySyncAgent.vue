@@ -27,7 +27,21 @@ async function run(reason: string) {
       scan: desktop().scan,
       acknowledge: async (userScope, completed, summary, options) => {
         const response = await desktop().acknowledge(userScope, completed, summary, options);
-        window.dispatchEvent(new CustomEvent('chatgpt-activity:progress', { detail: { ...summary as object, ...options } }));
+        const progress = summary as {
+          checked?: number; changed?: number; skipped?: number; processed?: number;
+          historicalBootstrap?: boolean; dateFrom?: string | null; dateTo?: string | null;
+        };
+        window.dispatchEvent(new CustomEvent('chatgpt-activity:progress', { detail: { ...progress, ...options } }));
+        await post('/chatgpt-activity/connection', {
+          checked: Number(progress.checked || 0),
+          changed: Number(progress.changed || 0),
+          skipped: Number(progress.skipped || 0),
+          processed: Number(progress.processed || 0),
+          historicalBootstrap: Boolean(progress.historicalBootstrap),
+          bootstrapComplete: Boolean(options.bootstrapComplete),
+          dateFrom: progress.dateFrom ?? null,
+          dateTo: progress.dateTo ?? null,
+        }).catch(() => {});
         return response;
       },
       postDigest: (digest) => post('/activity/sources/chatgpt-digest', digest),

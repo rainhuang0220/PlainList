@@ -9,5 +9,8 @@ describe('UserSettingsPanel AI journal entry', () => {
     expect(source).toContain("label: 'AI 小记'");
     expect(source).toContain('AiJournalHistoryPanel');
     expect(source).toContain("switchSection('ai-journal')");
+    expect(source).toContain('us-modal--compact');
+    expect(source).toContain('us-modal--reader');
+    expect(source).toContain('aria-label="关闭"');
   });
 });

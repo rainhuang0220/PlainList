@@ -36,6 +36,22 @@ describe('MySQL review snapshot repository', () => {
     expect(snapshot).toMatchObject({ status: 'ready', reviewAsOfDate: '2026-09-01' });
   });
 
+  it('reads MySQL DATE values shifted to UTC as Shanghai calendar dates', async () => {
+    const query = vi.fn().mockResolvedValueOnce([[{
+      ...row,
+      review_as_of_date: new Date('2026-08-30T16:00:00.000Z'),
+      window_start_date: new Date('2026-08-23T16:00:00.000Z'),
+      window_end_date: new Date('2026-08-29T16:00:00.000Z'),
+    }]]);
+    const repository = createMysqlReviewSnapshotRepository(query);
+    const snapshot = await repository.find(7, '2026-08-31');
+    expect(snapshot).toMatchObject({
+      reviewAsOfDate: '2026-08-31',
+      windowStartDate: '2026-08-24',
+      windowEndDate: '2026-08-30',
+    });
+  });
+
   it('atomically claims retryable or expired generating work but never overwrites a ready snapshot', async () => {
     const query = vi.fn().mockResolvedValue([{ affectedRows: 1 }]);
     const repository = createMysqlReviewSnapshotRepository(query);

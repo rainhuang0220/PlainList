@@ -1,13 +1,18 @@
 import {
   closedWeekReviewAsOf,
+  closedWeekStartsThrough,
   createReviewClock,
+  DEFAULT_HISTORICAL_START_DATE,
   reviewWindowFor,
+  shiftDateKey,
   weeklyReviewPageFor,
   type AuthenticatedUser,
   type PlanRecord,
   type WeeklyReviewDailyEntry,
   type WeeklyReviewPlanItem,
   type WeeklyReviewRuntime,
+  type WeeklyReviewSection,
+  type WeeklySummaryContent,
   type WeeklySummaryResponse,
   WEEKLY_SUMMARY_PROMPT_VERSION,
 } from '@plainlist/shared';
@@ -26,8 +31,15 @@ import {
   reviewSourceDataCount,
   sourceHash,
   weeklyLookbackRange,
+  weeklySummarySettingKey,
 } from './weeklySummaryCore';
-import { buildWeeklyReviewPage, sectionFromSnapshot } from './weeklyReviewPage';
+import {
+  buildWeeklyReviewPage,
+  mergeClosedWeeklyHistory,
+  recoverClosedWeekSection,
+  sectionFromSnapshot,
+  type ClosedHistoryWeek,
+} from './weeklyReviewPage';
 import { createReviewSnapshotCoordinator, type ReviewSnapshot } from './reviewSnapshotCoordinator';
 import { createMysqlReviewSnapshotRepository } from './reviewSnapshotRepository';
 import { listReviews } from './service';
@@ -345,7 +357,7 @@ async function hasAnyReviewHistory(userId: number): Promise<boolean> {
   return Number((rows[0] as { history_count?: number }).history_count ?? 0) > 0;
 }
 
-function snapshotSection(snapshot: ReviewSnapshot | null) {
+function snapshotSection(snapshot: ReviewSnapshot | null): WeeklyReviewSection | null {
   if (!snapshot) return null;
   return sectionFromSnapshot({
     weekStart: snapshot.windowStartDate,
@@ -356,6 +368,75 @@ function snapshotSection(snapshot: ReviewSnapshot | null) {
     provider: snapshot.provider,
     generatedAt: snapshot.generatedAt,
   });
+}
+
+async function loadWeeklyCacheSection(userId: number, weekStart: string, weekEnd: string): Promise<WeeklyReviewSection | null> {
+  const [rows] = await pool.query(
+    'SELECT value FROM user_settings WHERE user_id = ? AND key_name = ?',
+    [userId, weeklySummarySettingKey(weekStart)],
+  );
+  if (!Array.isArray(rows) || !rows[0]) return null;
+  try {
+    const parsed = JSON.parse(String((rows[0] as { value: string }).value)) as {
+      content?: WeeklySummaryContent;
+      model?: string | null;
+      generatedAt?: string;
+    };
+    if (!parsed?.content) return null;
+    return sectionFromSnapshot({
+      weekStart,
+      weekEnd,
+      status: 'ready',
+      content: parsed.content,
+      model: parsed.model,
+      generatedAt: parsed.generatedAt,
+    });
+  } catch {
+    return null;
+  }
+}
+
+async function composeWeekSection(user: AuthenticatedUser, weekStart: string, weekEnd: string): Promise<WeeklyReviewSection | null> {
+  const reviewAsOfDate = closedWeekReviewAsOf(weekEnd);
+  const range = weeklyLookbackRange(weekStart);
+  const [plans, checks, reviews, profile, chatgptJournals] = await Promise.all([
+    loadPlans(user.id),
+    listChecks(user, { from: range.from, to: weekEnd }),
+    listReviews(user, { from: range.from, to: weekEnd }),
+    listUserProfile(user),
+    loadChatgptJournals(user.id, weekStart, weekEnd),
+  ]);
+  const evidence = assembleReviewSnapshotEvidence({
+    reviewAsOfDate,
+    plans,
+    checks,
+    reviews,
+    profile: profile.traits,
+    chatgptJournals,
+  });
+  const content = composeDeterministicWeeklyContent(evidence);
+  if (!content) return null;
+  return sectionFromSnapshot({
+    weekStart,
+    weekEnd,
+    status: 'ready',
+    content,
+    provider: 'deterministic',
+  });
+}
+
+async function resolveClosedWeekSection(
+  user: AuthenticatedUser,
+  weekStart: string,
+  weekEnd: string,
+  snapshot: ReviewSnapshot | null,
+): Promise<WeeklyReviewSection | null> {
+  const fromSnapshot = snapshotSection(snapshot && snapshot.windowStartDate === weekStart ? snapshot : null);
+  if (fromSnapshot?.content || fromSnapshot?.narrativeMarkdown) return fromSnapshot;
+  const cached = await loadWeeklyCacheSection(user.id, weekStart, weekEnd);
+  if (cached) return recoverClosedWeekSection({ weekStart, weekEnd, snapshot: fromSnapshot, cached });
+  const composed = await composeWeekSection(user, weekStart, weekEnd);
+  return recoverClosedWeekSection({ weekStart, weekEnd, snapshot: fromSnapshot, cached, composed });
 }
 
 export async function attachWeeklyReviewPage(
@@ -378,10 +459,27 @@ export async function attachWeeklyReviewPage(
     loadRuntime(user.id),
   ]);
 
-  const currentSection = snapshotSection(currentSnapshot);
-  const previousSection = snapshotSection(previousClosed && previousClosed.windowStartDate === pageWindow.previousClosedStart
-    ? previousClosed
-    : null);
+  const previousSection = await resolveClosedWeekSection(
+    user,
+    pageWindow.previousClosedStart,
+    pageWindow.previousClosedEnd,
+    previousClosed && previousClosed.windowStartDate === pageWindow.previousClosedStart ? previousClosed : null,
+  );
+
+  let currentSection = snapshotSection(currentSnapshot);
+  if (!pageWindow.isMonday && !(currentSection?.content || currentSection?.narrativeMarkdown)) {
+    const composedCurrent = await composeWeekSection(
+      user,
+      pageWindow.currentWeekStart,
+      pageWindow.currentCompletedEnd ?? pageWindow.currentWeekEnd,
+    );
+    currentSection = recoverClosedWeekSection({
+      weekStart: pageWindow.currentCompletedStart ?? pageWindow.currentWeekStart,
+      weekEnd: pageWindow.currentCompletedEnd ?? pageWindow.currentWeekEnd,
+      snapshot: currentSection,
+      composed: composedCurrent,
+    }) ?? currentSection;
+  }
 
   const page = buildWeeklyReviewPage({
     asOfDate: asOf,
@@ -390,23 +488,72 @@ export async function attachWeeklyReviewPage(
     currentDailyJournals: journals,
     currentPlans: plans,
     hasHistory: history || Boolean(previousSection?.content) || journals.length > 0 || plans.length > 0,
+    hasPriorHistory: history || Boolean(previousSection),
     runtime,
   });
 
   return { ...base, page };
 }
 
+function historyWeekFromSection(section: WeeklyReviewSection): ClosedHistoryWeek {
+  return {
+    weekStart: section.weekStart,
+    weekEnd: section.weekEnd,
+    reviewAsOfDate: closedWeekReviewAsOf(section.weekEnd),
+    status: section.status,
+    content: section.content,
+    narrativeMarkdown: section.narrativeMarkdown,
+    model: section.model,
+    provider: section.provider,
+    generatedAt: section.generatedAt,
+  };
+}
+
+function groupDatesByClosedWeek(dates: string[]) {
+  const groups = new Map<string, { weekStart: string; weekEnd: string; dates: string[] }>();
+  for (const date of dates) {
+    const page = weeklyReviewPageFor(date);
+    const existing = groups.get(page.currentWeekStart);
+    if (existing) {
+      existing.dates.push(date);
+      continue;
+    }
+    groups.set(page.currentWeekStart, {
+      weekStart: page.currentWeekStart,
+      weekEnd: page.currentWeekEnd,
+      dates: [date],
+    });
+  }
+  return [...groups.values()];
+}
+
 export async function listClosedWeeklyHistory(user: AuthenticatedUser, limit = 24) {
+  const asOf = clock.currentDateKey();
   const snapshots = await repository.listClosedWeeks(user.id, limit);
-  const [journalRows] = await pool.query(
-    `SELECT journal_date, summary_markdown, activity_count, conversation_count, status, generated_at, updated_at
-     FROM chatgpt_daily_journals
-     WHERE user_id = ? AND source_type = 'chatgpt-local-sync' AND status IN ('ready', 'final')
-     ORDER BY journal_date DESC
-     LIMIT 400`,
-    [user.id],
-  );
-  const daily = (Array.isArray(journalRows) ? journalRows : []).map((row) => ({
+  const [journalRows, diaryRows, cacheRows] = await Promise.all([
+    pool.query(
+      `SELECT journal_date, summary_markdown, activity_count, conversation_count, status, generated_at, updated_at
+       FROM chatgpt_daily_journals
+       WHERE user_id = ? AND source_type = 'chatgpt-local-sync' AND status IN ('ready', 'final')
+         AND journal_date >= ?
+       ORDER BY journal_date DESC
+       LIMIT 400`,
+      [user.id, DEFAULT_HISTORICAL_START_DATE],
+    ),
+    pool.query(
+      `SELECT review_date FROM daily_reviews
+       WHERE user_id = ? AND TRIM(content) <> '' AND review_date >= ?
+       ORDER BY review_date DESC LIMIT 400`,
+      [user.id, DEFAULT_HISTORICAL_START_DATE],
+    ),
+    pool.query(
+      `SELECT key_name, value FROM user_settings
+       WHERE user_id = ? AND key_name LIKE 'weekly_ai_summary:%'`,
+      [user.id],
+    ),
+  ]);
+
+  const daily = (Array.isArray(journalRows[0]) ? journalRows[0] : []).map((row) => ({
     date: localDateKey((row as { journal_date: string }).journal_date) ?? '',
     summaryMarkdown: String((row as { summary_markdown: string }).summary_markdown),
     activityCount: Number((row as { activity_count: number }).activity_count),
@@ -416,69 +563,122 @@ export async function listClosedWeeklyHistory(user: AuthenticatedUser, limit = 2
     updatedAt: new Date(String((row as { updated_at: string }).updated_at)).toISOString(),
   })).filter((row) => row.date);
 
-  const weekly = snapshots.map((snapshot) => ({
-    weekStart: snapshot.windowStartDate,
-    weekEnd: snapshot.windowEndDate,
-    reviewAsOfDate: snapshot.reviewAsOfDate,
-    status: snapshot.status,
-    content: snapshot.content,
-    narrativeMarkdown: snapshot.content ? sectionFromSnapshot({
-      weekStart: snapshot.windowStartDate,
-      weekEnd: snapshot.windowEndDate,
-      status: 'ready',
-      content: snapshot.content,
-      provider: snapshot.provider,
-      model: snapshot.model,
-      generatedAt: snapshot.generatedAt,
-    }).narrativeMarkdown : undefined,
-    model: snapshot.model,
-    provider: snapshot.provider,
-    generatedAt: snapshot.generatedAt,
-  }));
+  const snapshotWeeks = snapshots
+    .map((snapshot) => snapshotSection(snapshot))
+    .filter((section): section is WeeklyReviewSection => Boolean(section))
+    .map(historyWeekFromSection);
+  const cachedWeeks: ClosedHistoryWeek[] = [];
+  for (const row of Array.isArray(cacheRows[0]) ? cacheRows[0] : []) {
+    const key = String((row as { key_name: string }).key_name);
+    const weekStart = key.replace(/^weekly_ai_summary:/, '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(weekStart)) continue;
+    try {
+      const parsed = JSON.parse(String((row as { value: string }).value)) as {
+        content?: WeeklySummaryContent;
+        model?: string | null;
+        generatedAt?: string;
+      };
+      if (!parsed?.content) continue;
+      cachedWeeks.push(historyWeekFromSection(sectionFromSnapshot({
+        weekStart,
+        weekEnd: shiftDateKey(weekStart, 6),
+        status: 'ready',
+        content: parsed.content,
+        model: parsed.model,
+        generatedAt: parsed.generatedAt,
+      })));
+    } catch {
+      continue;
+    }
+  }
 
-  const snapshotWeeks = new Set(weekly.map((item) => item.weekStart));
-  const asOf = clock.currentDateKey();
-  for (const entry of daily) {
-    const page = weeklyReviewPageFor(entry.date);
-    if (snapshotWeeks.has(page.currentWeekStart)) continue;
-    if (asOf < closedWeekReviewAsOf(page.currentWeekEnd)) continue;
-    const weekDays = daily.filter((item) => weeklyReviewPageFor(item.date).currentWeekStart === page.currentWeekStart);
-    if (!weekDays.length) continue;
-    snapshotWeeks.add(page.currentWeekStart);
-    weekly.push({
-      weekStart: page.currentWeekStart,
-      weekEnd: page.currentWeekEnd,
-      reviewAsOfDate: closedWeekReviewAsOf(page.currentWeekEnd),
+  const fromJournals: ClosedHistoryWeek[] = [];
+  for (const group of groupDatesByClosedWeek(daily.map((item) => item.date))) {
+    const weekDays = daily.filter((item) => group.dates.includes(item.date));
+    const narrative = weekDays.map((item) => item.summaryMarkdown).join('\n\n').slice(0, 4000);
+    fromJournals.push({
+      weekStart: group.weekStart,
+      weekEnd: group.weekEnd,
+      reviewAsOfDate: closedWeekReviewAsOf(group.weekEnd),
       status: 'ready',
       content: {
         overall: '由每日小记整理',
-        summary: weekDays.map((item) => item.summaryMarkdown).join('\n\n').slice(0, 1800),
+        summary: narrative.slice(0, 1800),
         comparison: '无法判断',
         positive: '无法判断',
         concerns: '无法判断',
         nextFocus: ['查看每日小记'],
-        narrativeMarkdown: weekDays.map((item) => item.summaryMarkdown).join('\n\n').slice(0, 4000),
+        narrativeMarkdown: narrative,
       },
-      narrativeMarkdown: weekDays.map((item) => item.summaryMarkdown).join('\n\n').slice(0, 4000),
+      narrativeMarkdown: narrative,
       model: null,
       provider: 'deterministic',
       generatedAt: null,
     });
   }
 
-  weekly.sort((left, right) => right.weekStart.localeCompare(left.weekStart));
-  return { daily, weekly: weekly.slice(0, limit) };
+  const diaryDates = (Array.isArray(diaryRows[0]) ? diaryRows[0] : [])
+    .map((row) => localDateKey((row as { review_date: string }).review_date))
+    .filter((date): date is string => Boolean(date));
+  const fromDiaries: ClosedHistoryWeek[] = [];
+  for (const group of groupDatesByClosedWeek(diaryDates)) {
+    const composed = await composeWeekSection(user, group.weekStart, group.weekEnd);
+    if (composed) fromDiaries.push(historyWeekFromSection(composed));
+  }
+
+  const weekly = mergeClosedWeeklyHistory({
+    asOf,
+    historicalStart: DEFAULT_HISTORICAL_START_DATE,
+    limit,
+    snapshots: snapshotWeeks,
+    cached: cachedWeeks,
+    fromJournals,
+    fromDiaries,
+  });
+
+  return { daily, weekly };
+}
+
+const MAX_CLOSED_BACKFILL = 6;
+
+async function backfillClosedWeeklyReviews(user: AuthenticatedUser): Promise<ReviewSnapshot | null> {
+  const asOf = clock.currentDateKey();
+  const page = weeklyReviewPageFor(asOf);
+  const starts = closedWeekStartsThrough(DEFAULT_HISTORICAL_START_DATE, page.previousClosedStart)
+    .reverse()
+    .slice(0, MAX_CLOSED_BACKFILL);
+  let last: ReviewSnapshot | null = null;
+  for (const weekStart of starts) {
+    const weekEnd = shiftDateKey(weekStart, 6);
+    const closeAsOf = closedWeekReviewAsOf(weekEnd);
+    const existing = await repository.find(user.id, closeAsOf);
+    if (existing?.status === 'ready' && existing.content) continue;
+    const availability = await currentReviewAvailability(user, weekStart, weekEnd);
+    if (availability === 'no_data') continue;
+    if (existing?.status === 'error') await repository.markDirty(user.id, closeAsOf);
+    last = await generateWindowIfPossible(user, closeAsOf) ?? last;
+  }
+  return last;
 }
 
 export async function catchUpWeeklyReviewSnapshots(): Promise<boolean> {
   const [rows] = await pool.query('SELECT id, username, is_admin FROM users');
   if (!Array.isArray(rows)) return false;
-  const snapshots = await Promise.all(rows.map((row) => generateCurrentWeeklyReviewSnapshot({
-    id: Number((row as { id: number }).id),
-    username: String((row as { username: string }).username),
-    isAdmin: Boolean((row as { is_admin: number }).is_admin),
-  })));
-  return snapshots.some((snapshot) => snapshot?.status === 'error' && (snapshot.attemptCount ?? 0) < 2);
+  let shouldRetry = false;
+  for (const row of rows) {
+    const user = {
+      id: Number((row as { id: number }).id),
+      username: String((row as { username: string }).username),
+      isAdmin: Boolean((row as { is_admin: number }).is_admin),
+    };
+    const current = await generateCurrentWeeklyReviewSnapshot(user);
+    if (current.status === 'error') shouldRetry = true;
+    if (!user.isAdmin) {
+      const closed = await backfillClosedWeeklyReviews(user);
+      if (closed?.status === 'error' && (closed.attemptCount ?? 0) < 2) shouldRetry = true;
+    }
+  }
+  return shouldRetry;
 }
 
 export async function recoverExpiredWeeklyReviewSnapshots(): Promise<void> {

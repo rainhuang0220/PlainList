@@ -26,6 +26,19 @@ const SNAPSHOT_FIELDS = `
   content_json, generated_at, model, provider, error_message, evidence_json, evidence_hash, prompt_version, attempt_count
 `;
 
+function calendarDateKey(value: unknown): string {
+  if (value instanceof Date) {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Shanghai',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(value);
+  }
+  const text = String(value ?? '');
+  return /^\d{4}-\d{2}-\d{2}/.test(text) ? text.slice(0, 10) : text.slice(0, 10);
+}
+
 function toSnapshot(row: SnapshotRow): ReviewSnapshot {
   let content: WeeklySummaryContent | null = null;
   if (row.content_json) {
@@ -38,9 +51,9 @@ function toSnapshot(row: SnapshotRow): ReviewSnapshot {
 
   return {
     userId: Number(row.user_id),
-    reviewAsOfDate: String(row.review_as_of_date).slice(0, 10),
-    windowStartDate: String(row.window_start_date).slice(0, 10),
-    windowEndDate: String(row.window_end_date).slice(0, 10),
+    reviewAsOfDate: calendarDateKey(row.review_as_of_date),
+    windowStartDate: calendarDateKey(row.window_start_date),
+    windowEndDate: calendarDateKey(row.window_end_date),
     status: row.status,
     content,
     generatedAt: row.generated_at ? new Date(row.generated_at).toISOString() : null,

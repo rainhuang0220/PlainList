@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveIntakeModel, resolveIntakeTimeout } from './settings';
+import { resolveAiConfig, resolveIntakeModel, resolveIntakeTimeout } from './settings';
 import type { ResolvedAiConfig } from './settings';
 
 const baseConfig: ResolvedAiConfig = {
@@ -20,6 +20,38 @@ describe('resolveIntakeTimeout', () => {
   it('bumps short timeouts to intake minimum', () => {
     expect(resolveIntakeTimeout(30_000)).toBe(180_000);
     expect(resolveIntakeTimeout(90_000)).toBe(180_000);
+  });
+});
+
+describe('resolveAiConfig effective weekly runtime', () => {
+  it('uses the user BYOK model rather than the server default when a user key is present', () => {
+    const effective = resolveAiConfig({
+      provider: 'openai',
+      baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+      model: 'qwen3.7-plus',
+      apiKey: 'sk-user-not-a-real-secret',
+      timeoutMs: 60_000,
+    });
+    expect(effective).toMatchObject({
+      source: 'user',
+      provider: 'openai',
+      model: 'qwen3.7-plus',
+      baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    });
+  });
+
+  it('does not treat stored qwen fields as the next weekly call when the user key is empty', () => {
+    const effective = resolveAiConfig({
+      provider: 'openai',
+      baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+      model: 'qwen3.7-plus',
+      apiKey: '',
+      timeoutMs: 60_000,
+    });
+    expect(effective?.source).not.toBe('user');
+    if (effective) {
+      expect(effective.model).not.toBe('qwen3.7-plus');
+    }
   });
 });
 

@@ -114,6 +114,7 @@
 <script setup lang="ts">
 import type { AiConnectionTestResult, AiProvider, AiUserSettingsView, AiUserSettingsViewWithKey } from '@plainlist/shared';
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue';
+import { formatWeeklyRuntimeLabel } from '@/features/ai-settings/formatWeeklyRuntime';
 import { useApi } from '@/shared/api/useApi';
 import { useI18nStore } from '@/shared/i18n/useI18nStore';
 
@@ -154,19 +155,7 @@ const effectiveLabel = computed(() => {
   return t('intake.settings_source_none', '未配置');
 });
 
-const weeklyRuntimeLabel = computed(() => {
-  if (!view.value?.apiKeyConfigured || view.value.effectiveSource === 'none') {
-    return '未配置';
-  }
-  let host = '';
-  try {
-    host = new URL(view.value.baseUrl).host;
-  } catch {
-    host = '';
-  }
-  const source = view.value.effectiveSource === 'user' ? '个人配置' : '服务器默认';
-  return `${view.value.provider} · ${view.value.model} · 远程${host ? ` · ${host}` : ''} · ${source}`;
-});
+const weeklyRuntimeLabel = computed(() => formatWeeklyRuntimeLabel(view.value));
 
 const apiKeyPlaceholder = computed(() => {
   if (view.value?.apiKeyConfigured) {

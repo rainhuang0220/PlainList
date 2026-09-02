@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { createReviewClock, reviewWindowFor, weeklyReviewPageFor } from './reviewClock';
+import {
+  closedWeekStartsThrough,
+  createReviewClock,
+  firstFullClosedWeekStart,
+  reviewWindowFor,
+  weeklyReviewPageFor,
+} from './reviewClock';
 
 describe('reviewWindowFor', () => {
   // A regression in either Monday handling or the cutoff must fail this table.
@@ -108,5 +114,17 @@ describe('ReviewClock', () => {
     expect(beforeMidnight.currentDateKey()).toBe('2026-08-31');
     expect(atMidnight.currentDateKey()).toBe('2026-09-01');
     expect(beforeMidnight.millisecondsUntilNextMidnight()).toBe(1_000);
+  });
+});
+
+describe('historical closed-week floor', () => {
+  it('starts the first full natural week on 2026-08-03 after a Saturday Aug 1 floor', () => {
+    expect(firstFullClosedWeekStart('2026-08-01')).toBe('2026-08-03');
+    expect(closedWeekStartsThrough('2026-08-01', '2026-08-24')).toEqual([
+      '2026-08-03',
+      '2026-08-10',
+      '2026-08-17',
+      '2026-08-24',
+    ]);
   });
 });
