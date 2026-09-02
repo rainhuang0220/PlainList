@@ -46,28 +46,29 @@ function calendarDateKey(value: unknown): string {
   return /^\d{4}-\d{2}-\d{2}/.test(text) ? text.slice(0, 10) : text.slice(0, 10);
 }
 
-function toSnapshot(row: SnapshotRow): ReviewSnapshot {
-  let content: WeeklySummaryContent | null = null;
-  if (row.content_json) {
-    try {
-      content = JSON.parse(row.content_json) as WeeklySummaryContent;
-    } catch {
-      content = null;
-    }
+function parseJsonColumn<T>(value: unknown): T | null {
+  if (value == null || value === '') return null;
+  if (typeof value === 'object') return value as T;
+  try {
+    return JSON.parse(String(value)) as T;
+  } catch {
+    return null;
   }
+}
 
+function toSnapshot(row: SnapshotRow): ReviewSnapshot {
   return {
     userId: Number(row.user_id),
     reviewAsOfDate: calendarDateKey(row.review_as_of_date),
     windowStartDate: calendarDateKey(row.window_start_date),
     windowEndDate: calendarDateKey(row.window_end_date),
     status: row.status,
-    content,
+    content: parseJsonColumn<WeeklySummaryContent>(row.content_json),
     generatedAt: row.generated_at ? new Date(row.generated_at).toISOString() : null,
     model: row.model,
     provider: row.provider,
     errorMessage: row.error_message,
-    evidence: row.evidence_json ? JSON.parse(row.evidence_json) : null,
+    evidence: parseJsonColumn(row.evidence_json),
     evidenceHash: row.evidence_hash ?? null,
     promptVersion: row.prompt_version ?? null,
     attemptCount: Number(row.attempt_count ?? 0),
