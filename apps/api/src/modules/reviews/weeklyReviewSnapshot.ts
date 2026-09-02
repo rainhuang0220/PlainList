@@ -691,10 +691,8 @@ export async function catchUpWeeklyReviewSnapshots(): Promise<boolean> {
     try {
       const current = await generateCurrentWeeklyReviewSnapshot(user);
       if (current?.status === 'error') shouldRetry = true;
-      if (!user.isAdmin) {
-        const closed = await backfillClosedWeeklyReviews(user);
-        if (closed?.status === 'error' && (closed.attemptCount ?? 0) < 2) shouldRetry = true;
-      }
+      const closed = await backfillClosedWeeklyReviews(user);
+      if (closed?.status === 'error' && (closed.attemptCount ?? 0) < 2) shouldRetry = true;
     } catch (error) {
       console.error('[weekly-review] catch-up skipped a user', error instanceof Error ? error.message : 'unknown');
       shouldRetry = true;
