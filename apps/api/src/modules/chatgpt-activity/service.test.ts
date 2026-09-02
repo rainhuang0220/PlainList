@@ -208,16 +208,18 @@ describe('ChatGPT activity journal service', () => {
   });
 
   it('ignores keyword activity titles when composing Daily journals', async () => {
+    const keyword = {
+      id: 1,
+      source_id: 10,
+      category: 'engineering',
+      title: '推进PlainList UI 历史 Daily',
+      summary: '推进PlainList UI 历史 Daily',
+      output_state: 'produced',
+    };
     query
       .mockResolvedValueOnce([[{ date_key: '2026-08-31' }]])
-      .mockResolvedValueOnce([[{
-        id: 1,
-        source_id: 10,
-        category: 'engineering',
-        title: '推进PlainList UI 历史 Daily',
-        summary: '推进PlainList UI 历史 Daily',
-        output_state: 'produced',
-      }]])
+      .mockResolvedValueOnce([[keyword]])
+      .mockResolvedValueOnce([[keyword]])
       .mockResolvedValueOnce([{ affectedRows: 1 }]);
 
     const result = await recomposeHistoricalDailyJournals(user, { tryModel: false });
@@ -226,15 +228,17 @@ describe('ChatGPT activity journal service', () => {
   });
 
   it('force-recomposes historical daily journals from compact facts and upgrades source_version', async () => {
+    const row = sourceRow({
+      id: 1,
+      source_id: 10,
+      date: '2026-08-31',
+      summary: '完成了 PlainList 桌面同步验收。',
+      output_state: 'produced',
+    });
     query
       .mockResolvedValueOnce([[{ date_key: '2026-08-31' }]])
-      .mockResolvedValueOnce([[sourceRow({
-        id: 1,
-        source_id: 10,
-        date: '2026-08-31',
-        summary: '完成了 PlainList 桌面同步验收。',
-        output_state: 'produced',
-      })]])
+      .mockResolvedValueOnce([[row]])
+      .mockResolvedValueOnce([[row]])
       .mockResolvedValueOnce([{ affectedRows: 1 }]);
 
     const result = await recomposeHistoricalDailyJournals(user, { tryModel: false });
@@ -249,6 +253,30 @@ describe('ChatGPT activity journal service', () => {
     expect(query.mock.calls.some(([sql]) => /source_version <>/.test(String(sql)))).toBe(false);
     expect(dirtyClosedWeekForJournalDate).not.toHaveBeenCalled();
     expect(generateCurrentWeeklyReviewSnapshot).not.toHaveBeenCalled();
+  });
+
+  it('recomposes a semantic-fact date even when activity_facts live on another day', async () => {
+    const row = sourceRow({
+      id: 44,
+      source_id: 44,
+      date: '2026-09-02',
+      summary: '完成了 PlainList 暂时收束与交接。',
+      output_state: 'produced',
+    });
+    query
+      .mockResolvedValueOnce([[{ date_key: '2026-08-31' }]])
+      .mockResolvedValueOnce([[row]])
+      .mockResolvedValueOnce([[row]])
+      .mockResolvedValueOnce([{ affectedRows: 1 }])
+      .mockResolvedValueOnce([[row]])
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
+
+    const result = await recomposeHistoricalDailyJournals(user, { tryModel: false });
+    expect(result.upgraded).toBeGreaterThanOrEqual(1);
+    const dates = query.mock.calls
+      .filter(([sql, values]) => /INSERT INTO chatgpt_daily_journals/i.test(String(sql)))
+      .map(([, values]) => values?.[1]);
+    expect(dates).toContain('2026-09-02');
   });
 
   it('does not recompose historical journals during ordinary reconcile', async () => {
