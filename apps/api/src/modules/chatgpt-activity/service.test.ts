@@ -106,6 +106,41 @@ describe('ChatGPT activity journal service', () => {
     });
     expect(JSON.stringify(result)).not.toMatch(/transcript|apiKey|cookie/i);
   });
+
+  it('lets an admin persist their own journals and never writes another user id', async () => {
+    const admin = { id: 2, username: 'owner', isAdmin: true };
+    query
+      .mockResolvedValueOnce([[{ id: 1, source_id: 10, category: 'engineering', title: '推进工程工作', output_state: 'partial' }]])
+      .mockResolvedValueOnce([{ affectedRows: 1 }])
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
+
+    const result = await reconcileChatgptActivity(admin, {
+      affectedDates: ['2026-08-31'],
+      finalizeThrough: '2026-08-31',
+      checked: 1,
+      changed: 1,
+      skipped: 0,
+    });
+
+    expect(result.journals.map((journal) => journal.date)).toEqual(['2026-08-31']);
+    const writes = query.mock.calls.filter(([sql]) => /INSERT INTO chatgpt_daily_journals|chatgpt_activity_connections/i.test(String(sql)));
+    expect(writes.length).toBeGreaterThan(0);
+    for (const [, values] of writes) {
+      expect(values?.[0]).toBe(2);
+      expect(values).not.toContain(7);
+    }
+  });
+
+  it('rejects a foreign userId field on reconcile so one account cannot write another', async () => {
+    await expect(reconcileChatgptActivity(user, {
+      affectedDates: ['2026-08-31'],
+      checked: 1,
+      changed: 1,
+      skipped: 0,
+      userId: 99,
+    })).rejects.toThrow();
+    expect(query).not.toHaveBeenCalled();
+  });
 });
 
 describe('chatgptConnectionDisplayState', () => {

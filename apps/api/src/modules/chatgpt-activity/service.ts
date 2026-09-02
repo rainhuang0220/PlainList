@@ -77,14 +77,12 @@ async function upsertConnection(
 }
 
 export async function reportChatgptActivityProgress(user: AuthenticatedUser, payload: unknown) {
-  if (user.isAdmin) throw Object.assign(new Error('admin account is read-only'), { status: 403 });
   const input = chatgptActivityProgressSchema.parse(payload);
   await upsertConnection(user.id, input);
   return getChatgptActivityConnection(user);
 }
 
 export async function reconcileChatgptActivity(user: AuthenticatedUser, payload: unknown) {
-  if (user.isAdmin) throw Object.assign(new Error('admin account is read-only'), { status: 403 });
   const input = chatgptActivityReconcileSchema.parse(payload);
   const dates = new Set(input.affectedDates.filter((date) => date >= DEFAULT_HISTORICAL_START_DATE));
   if (input.historicalBootstrap) {

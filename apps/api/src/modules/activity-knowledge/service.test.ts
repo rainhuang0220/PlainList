@@ -71,4 +71,21 @@ describe('activity digest ingestion', () => {
     expect(query.mock.calls.some(([sql]) => /weekly_activity_intelligence/i.test(String(sql)))).toBe(true);
     expect(query.mock.calls.every(([sql]) => !/WHERE user_id = \?\s*$/i.test(String(sql)) || !/daily_activity_digests|weekly_activity_intelligence/i.test(String(sql)))).toBe(true);
   });
+
+  it('lets an admin ingest their own chatgpt digest into their user_id only', async () => {
+    const admin = { id: 2, username: 'owner', isAdmin: true };
+    query.mockResolvedValueOnce([]).mockResolvedValueOnce([{ insertId: 91 }]).mockResolvedValue({ affectedRows: 1 });
+    await appendActivityDigest(admin, {
+      ...digest,
+      sourceType: 'chatgpt-local-sync',
+      sourceExternalId: 'conversation-admin-self',
+      idempotencyKey: 'local-conversation-admin-self',
+      localFacts: [{ dateKey: '2026-08-31', category: 'engineering', title: '推进工程工作', completed: false }],
+    });
+    const sourceInsert = query.mock.calls.find(([sql]) => /INSERT INTO activity_sources/i.test(String(sql)));
+    expect(sourceInsert?.[1]?.[0]).toBe(2);
+    const factInsert = query.mock.calls.find(([sql]) => /INSERT INTO activity_facts/i.test(String(sql)));
+    expect(factInsert?.[1]?.[0]).toBe(2);
+    expect(JSON.stringify(query.mock.calls)).not.toMatch(/"user_id":99|"userId":99/);
+  });
 });

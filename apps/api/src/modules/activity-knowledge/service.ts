@@ -39,7 +39,6 @@ async function invalidateDates(userId: number, dates: string[], invalidateChatgp
 }
 
 export async function appendActivityDigest(user: AuthenticatedUser, payload: unknown): Promise<DigestIngestResult> {
-  if (user.isAdmin) throw serviceError(403, 'admin account is read-only');
   const input = appendActivityDigestSchema.parse(payload);
   const sourceType = input.sourceType ?? 'chatgpt-explicit-digest';
   const facts = factCandidates(input);
