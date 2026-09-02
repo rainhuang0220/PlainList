@@ -53,4 +53,24 @@ describe('weekly review presentation', () => {
 
     expect(result).toEqual({ status: 'ready', summary: content, message: '本期回顾暂未更新' });
   });
+
+  it('distinguishes an empty review window from a system failure', () => {
+    const result = presentWeeklyReview({
+      ...base,
+      status: 'no_data',
+      notice: 'no_data',
+    }, t);
+
+    expect(result).toEqual({ status: 'unavailable', summary: null, message: '本期暂无足够记录' });
+  });
+
+  it('gives an actionable provider configuration message', () => {
+    const result = presentWeeklyReview({
+      ...base,
+      status: 'no_provider',
+      notice: 'no_provider',
+    }, t);
+
+    expect(result).toEqual({ status: 'unavailable', summary: null, message: '尚未配置回顾模型' });
+  });
 });

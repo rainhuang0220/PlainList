@@ -248,7 +248,7 @@ export interface WeeklySummaryContent {
   nextFocus: string[];
 }
 
-export type WeeklySummaryStatus = 'ready' | 'missing' | 'unavailable' | 'pending' | 'generating' | 'error';
+export type WeeklySummaryStatus = 'ready' | 'missing' | 'unavailable' | 'pending' | 'generating' | 'error' | 'no_data' | 'no_provider';
 
 export interface WeeklySummaryResponse {
   status: WeeklySummaryStatus;
@@ -263,7 +263,7 @@ export interface WeeklySummaryResponse {
   content?: WeeklySummaryContent;
   reviewAsOfDate?: string;
   fallback?: boolean;
-  notice?: 'updating' | 'not_updated' | 'unavailable';
+  notice?: 'updating' | 'not_updated' | 'unavailable' | 'no_data' | 'no_provider' | 'preparing';
 }
 
 export interface InstalledPlugin {

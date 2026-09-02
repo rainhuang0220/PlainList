@@ -10,3 +10,4 @@ export * from './reviews';
 export * from './activity-goals';
 export * from './activity-sources';
 export * from './activity-insights';
+export * from './chatgpt-activity';

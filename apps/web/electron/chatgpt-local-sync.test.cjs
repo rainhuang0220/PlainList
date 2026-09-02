@@ -5,7 +5,7 @@ const { join } = require('node:path');
 const { tmpdir } = require('node:os');
 const test = require('node:test');
 
-const { buildLocalDigest, detectChangedArchives, parseArchive, scanArchiveDirectory } = require('./chatgpt-local-sync.cjs');
+const { buildLocalDigest, detectChangedArchives, parseArchive, readStableJson, scanArchiveDirectory } = require('./chatgpt-local-sync.cjs');
 
 const fixture = (name) => JSON.parse(readFileSync(join(__dirname, 'fixtures', 'chatgpt-local-sync', 'v2.9.4', name), 'utf8'));
 
@@ -53,6 +53,16 @@ test('scans only real JSON archives and treats partial writes and symlinks as re
   assert.deepEqual(result.issues.map((issue) => issue.code), ['partial_json', 'symlink_skipped']);
 });
 
+test('rejects an archive whose size or modification time changes while it is being read', async () => {
+  const before = { size: 120, mtimeMs: 1_000 };
+  const result = await readStableJson('/virtual/conversation.json', before, {
+    readFile: async () => JSON.stringify(fixture('new-conversation.json')),
+    lstat: async () => ({ size: 121, mtimeMs: 1_001 }),
+  });
+
+  assert.deepEqual(result, { ok: false, code: 'file_changed_during_read' });
+});
+
 test('keeps archived conversations but never imports a conversation explicitly moved to deleted', async () => {
   const root = mkdtempSync(join(tmpdir(), 'plainlist-chatgpt-deleted-'));
   for (const folder of ['归档', '已删除']) {
@@ -89,6 +99,20 @@ test('uses conversation ID plus canonical content hash to skip unchanged archive
   assert.deepEqual(result.changed.map((archive) => archive.updatedAt), ['2026-09-01T08:00:00.000Z']);
   assert.deepEqual(Object.keys(result.nextState), ['conv-plainlist-scheduler', 'conv-updated']);
   assert.equal(JSON.stringify(result.nextState).includes('继续完成性能回归测试'), false);
+});
+
+test('re-enters conversations skipped by the 2.3 bootstrap window without reprocessing successful hashes', () => {
+  const archive = parseArchive(fixture('new-conversation.json'));
+  const result = detectChangedArchives([archive], {
+    [archive.conversationId]: {
+      canonicalHash: archive.canonicalHash,
+      lastProcessedHash: archive.canonicalHash,
+      processingStatus: 'bootstrap_skipped',
+    },
+  });
+
+  assert.equal(result.changed.length, 1);
+  assert.equal(result.unchanged.length, 0);
 });
 
 test('dogfoods a fixture archive from folder scan through a compact activity digest', async () => {

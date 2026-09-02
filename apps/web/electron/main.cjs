@@ -10,13 +10,14 @@
  *  - 文件用 .cjs 避免 ESM/CJS 互操作问题（package.json 顶层是 type: module）
  *  - 打包后路径用 app.getAppPath() 解析，确保开发态 / 打包态都能用
  */
-const { app, BrowserWindow, shell, Menu, dialog, ipcMain, net } = require('electron');
+const { app, BrowserWindow, shell, Menu, dialog, ipcMain, net, powerMonitor } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const fsp = require('node:fs/promises');
 const { startFishTimeLocal, DEFAULT_PORT: FISHTIME_PORT } = require('./fishtime-local.cjs');
 const { buildLocalDigest, detectChangedArchives, scanArchiveDirectory } = require('./chatgpt-local-sync.cjs');
 const { createDesktopApiRequest } = require('./desktop-api.cjs');
+const { createChatgptSyncSignalCoordinator } = require('./chatgpt-sync-scheduler.cjs');
 
 const isDev = !app.isPackaged;
 const APP_NAME = 'PlainList';
@@ -25,7 +26,7 @@ let mainWindow = null;
 /** @type {{ baseUrl: string, stop: () => Promise<void> } | null} */
 let fishTimeLocal = null;
 let chatgptSyncWatcher = null;
-let chatgptSyncTimer = null;
+let chatgptSyncSignals = null;
 
 const requestProductionApi = createDesktopApiRequest(net.fetch);
 
@@ -47,16 +48,13 @@ async function writeChatgptSyncState(state) {
   await fsp.writeFile(chatgptSyncStatePath(), `${JSON.stringify(state)}\n`, 'utf8');
 }
 function safeScope(value) { return String(value || '').trim().slice(0, 128); }
-function notifyChatgptSyncChanged() { mainWindow?.webContents.send('chatgpt-local-sync:changed'); }
+function notifyChatgptSyncChanged(reason = 'archive-change') { mainWindow?.webContents.send('chatgpt-local-sync:requested', reason); }
 async function startChatgptSyncWatcher(rootPath) {
   if (chatgptSyncWatcher) { chatgptSyncWatcher.close(); chatgptSyncWatcher = null; }
   try {
-    chatgptSyncWatcher = fs.watch(path.join(rootPath, 'JSON'), { recursive: true }, () => {
-      if (chatgptSyncTimer) clearTimeout(chatgptSyncTimer);
-      chatgptSyncTimer = setTimeout(notifyChatgptSyncChanged, 1200);
-    });
-    chatgptSyncWatcher.on('error', notifyChatgptSyncChanged);
-  } catch { notifyChatgptSyncChanged(); }
+    chatgptSyncWatcher = fs.watch(path.join(rootPath, 'JSON'), { recursive: true }, () => chatgptSyncSignals?.markDirty());
+    chatgptSyncWatcher.on('error', () => chatgptSyncSignals?.markDirty());
+  } catch { chatgptSyncSignals?.markDirty(); }
 }
 
 ipcMain.handle('chatgpt-local-sync:choose-directory', async (_event, userScope) => {
@@ -72,7 +70,7 @@ ipcMain.handle('chatgpt-local-sync:status', async () => {
   const state = await readChatgptSyncState();
   return { status: state.rootPath ? (state.paused ? 'paused' : 'enabled') : 'disabled', rootName: state.rootPath ? path.basename(state.rootPath) : null, lastSyncAt: state.lastSyncAt ?? null, lastResult: state.lastResult ?? null };
 });
-ipcMain.handle('chatgpt-local-sync:scan', async (_event, userScope, bootstrapWindow = '7') => {
+ipcMain.handle('chatgpt-local-sync:scan', async (_event, userScope, bootstrapWindow = 'all') => {
   const state = await readChatgptSyncState();
   if (!state.rootPath || state.paused) return { status: state.paused ? 'paused' : 'disabled', checked: 0, changed: 0, skipped: 0, digests: [] };
   const scan = await scanArchiveDirectory(state.rootPath);
@@ -89,15 +87,20 @@ ipcMain.handle('chatgpt-local-sync:scan', async (_event, userScope, bootstrapWin
   const bootstrapSkipped = isBootstrap ? detected.changed.filter((archive) => !eligible.includes(archive)) : [];
   return { status: scan.issues.some((issue) => issue.retryable) ? 'unavailable' : 'enabled', checked: scan.archives.length, changed: eligible.length, skipped: detected.unchanged.length + bootstrapSkipped.length, bootstrap: isBootstrap, issues: scan.issues.map((issue) => issue.code), digests: eligible.map((archive) => ({ hash: archive.canonicalHash, digest: buildLocalDigest(archive) })), skippedArchives: bootstrapSkipped.map((archive) => ({ conversationId: archive.conversationId, hash: archive.canonicalHash, updatedAt: archive.updatedAt, skip: true })) };
 });
-ipcMain.handle('chatgpt-local-sync:acknowledge', async (_event, userScope, completed, summary) => {
+ipcMain.handle('chatgpt-local-sync:acknowledge', async (_event, userScope, completed, summary, options = {}) => {
   const state = await readChatgptSyncState(); const scope = safeScope(userScope); state.users ??= {}; state.users[scope] ??= {}; state.bootstrapScopes ??= {};
   for (const item of Array.isArray(completed) ? completed : []) {
     const id = String(item?.conversationId || ''); const hash = String(item?.hash || ''); if (!id || !hash) continue;
     state.users[scope][id] = { sourceType: 'chatgpt-local-sync', sourceExternalId: id, canonicalHash: hash, lastSeenUpdateTime: String(item?.updatedAt || ''), lastProcessedHash: hash, lastSuccessfulDigestAt: item?.skip ? null : new Date().toISOString(), processingStatus: item?.skip ? 'bootstrap_skipped' : 'up_to_date', safeErrorCode: null };
   }
   state.lastSyncAt = new Date().toISOString();
-  state.bootstrapScopes[scope] = true;
-  state.lastResult = { checked: Number(summary?.checked || 0), changed: Number(summary?.changed || 0), skipped: Number(summary?.skipped || 0), activities: Number(summary?.activities || 0) };
+  if (options.bootstrapComplete) state.bootstrapScopes[scope] = true;
+  state.lastResult = {
+    checked: Number(summary?.checked || 0), changed: Number(summary?.changed || 0), skipped: Number(summary?.skipped || 0),
+    activities: Number(summary?.activities || 0), processed: Number(summary?.processed || 0), journalDays: Number(summary?.journalDays || 0),
+    dateFrom: summary?.dateFrom ? String(summary.dateFrom) : null, dateTo: summary?.dateTo ? String(summary.dateTo) : null,
+    historicalBootstrap: Boolean(summary?.historicalBootstrap), bootstrapComplete: Boolean(options.bootstrapComplete),
+  };
   await writeChatgptSyncState(state); return { ok: true };
 });
 ipcMain.handle('chatgpt-local-sync:set-paused', async (_event, paused) => { const state = await readChatgptSyncState(); state.paused = Boolean(paused); await writeChatgptSyncState(state); return { status: state.paused ? 'paused' : state.rootPath ? 'enabled' : 'disabled' }; });
@@ -186,6 +189,7 @@ function createMainWindow() {
   ses.setDevicePermissionHandler((_details) => true);
 
   mainWindow.loadFile(indexHtml);
+  mainWindow.webContents.once('did-finish-load', () => chatgptSyncSignals?.request('startup'));
 
   // 应用内页面（file://，如 guide.html）用新窗口打开；外部链接用系统浏览器
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -275,6 +279,14 @@ function buildMenu() {
 }
 
 app.whenReady().then(async () => {
+  chatgptSyncSignals = createChatgptSyncSignalCoordinator({
+    notify: notifyChatgptSyncChanged,
+    now: () => new Date(),
+    debounceMilliseconds: 30_000,
+    setTimer: (callback, milliseconds) => setTimeout(callback, milliseconds),
+    clearTimer: (timer) => clearTimeout(timer),
+  });
+  powerMonitor.on('resume', () => chatgptSyncSignals?.request('wake'));
   // Local FishTime: track frontmost apps on this Mac and serve UI + API.
   try {
     const staticDir = path.join(__dirname, 'fishtime-web');
@@ -307,6 +319,7 @@ app.whenReady().then(async () => {
 });
 
 app.on('before-quit', () => {
+  chatgptSyncSignals?.stop();
   if (fishTimeLocal) {
     // fire-and-forget flush/stop
     fishTimeLocal.stop().catch(() => {});

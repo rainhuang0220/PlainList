@@ -90,7 +90,7 @@ const navItems = computed(() => [
   { id: 'theme' as const, label: t('settings.nav_theme', '主题') },
   { id: 'ai' as const, label: t('settings.nav_ai', 'AI 速记') },
   { id: 'profile' as const, label: t('settings.nav_profile', 'AI 画像') },
-  ...(typeof window !== 'undefined' && (window as any).plainlistDesktop ? [{ id: 'chatgpt-local-sync' as const, label: 'ChatGPT 本地活动同步' }] : []),
+  { id: 'chatgpt-local-sync' as const, label: 'ChatGPT 活动记录' },
 ]);
 
 const activeTitle = computed(() => {
@@ -103,7 +103,7 @@ const activeTitle = computed(() => {
   if (activeSection.value === 'profile') {
     return t('profile.title', '可解释的排程画像');
   }
-  if (activeSection.value === 'chatgpt-local-sync') return 'ChatGPT 本地活动同步';
+  if (activeSection.value === 'chatgpt-local-sync') return 'ChatGPT 活动记录';
   return t('intake.settings_title', '大模型设置');
 });
 

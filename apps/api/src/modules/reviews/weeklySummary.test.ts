@@ -9,6 +9,7 @@ import {
   normalizeWeekStart,
   parseWeeklySummaryContent,
   sourceHash,
+  reviewSourceDataCount,
   weeklyLookbackRange,
   weeklySummarySettingKey,
 } from './weeklySummaryCore';
@@ -240,6 +241,45 @@ describe('assembleReviewSnapshotEvidence', () => {
     expect(evidence.weekEnd).toBe('2026-08-31');
     expect(evidence.days.at(-1)?.date).toBe('2026-08-31');
     expect(evidence.days.some((day) => day.date === '2026-09-01')).toBe(false);
+  });
+});
+
+describe('reviewSourceDataCount', () => {
+  it('treats scheduled-but-unchecked plans as no review source data', () => {
+    const evidence = assembleReviewSnapshotEvidence({
+      reviewAsOfDate: '2026-09-02',
+      plans: [{ id: 1, type: 'habit', name: 'Read', time: '09:00', sortOrder: 0, scheduledDate: null, visibleFrom: '2026-08-01' }],
+      checks: {},
+      reviews: {},
+      profile: [],
+    });
+
+    expect(reviewSourceDataCount(evidence)).toBe(0);
+  });
+
+  it('counts only diaries and completed checks as review source data', () => {
+    const evidence = assembleReviewSnapshotEvidence({
+      reviewAsOfDate: '2026-09-02',
+      plans: [{ id: 1, type: 'habit', name: 'Read', time: '09:00', sortOrder: 0, scheduledDate: null, visibleFrom: '2026-08-01' }],
+      checks: { '1': { '2026-09-01': { done: true, actualMinutes: null } } },
+      reviews: { '2026-08-31': 'Made progress.' },
+      profile: [],
+    });
+
+    expect(reviewSourceDataCount(evidence)).toBe(2);
+  });
+
+  it('counts a derived ChatGPT journal without treating it as the user diary', () => {
+    const evidence = assembleReviewSnapshotEvidence({
+      reviewAsOfDate: '2026-09-02', plans: [], checks: {}, reviews: {}, profile: [],
+      chatgptJournals: { '2026-09-01': '## 今日 ChatGPT 活动\n\n- 完成：发布桌面版本' },
+    });
+
+    expect(reviewSourceDataCount(evidence)).toBe(1);
+    expect(evidence.days.find((day) => day.date === '2026-09-01')).toMatchObject({
+      diary: null,
+      chatgptJournal: '## 今日 ChatGPT 活动\n\n- 完成：发布桌面版本',
+    });
   });
 });
 

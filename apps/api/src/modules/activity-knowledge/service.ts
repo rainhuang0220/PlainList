@@ -3,7 +3,7 @@ import { appendActivityDigestSchema, canonicalHash, normalizeWeekStart } from '@
 import { pool } from '../../db/pool';
 
 interface SourceRow { id: number; content_hash: string; }
-export interface DigestIngestResult { sourceId: number; factCount: number; created: boolean; }
+export interface DigestIngestResult { sourceId: number; factCount: number; created: boolean; affectedDates: string[]; }
 
 function serviceError(status: number, message: string): Error & { status: number } { return Object.assign(new Error(message), { status }); }
 
@@ -27,12 +27,15 @@ async function invalidateRange(userId: number, from: string, to: string): Promis
   await pool.query(`UPDATE weekly_activity_intelligence SET status = 'dirty', content = NULL, error_code = NULL WHERE user_id = ? AND source_date_from <= ? AND source_date_to >= ?`, [userId, to, from]);
 }
 
-async function invalidateDates(userId: number, dates: string[]): Promise<void> {
+async function invalidateDates(userId: number, dates: string[], invalidateChatgptJournal = false): Promise<void> {
   const uniqueDates = [...new Set(dates)].sort();
   if (!uniqueDates.length) return;
   const weeks = [...new Set(uniqueDates.map(normalizeWeekStart))];
   await pool.query(`UPDATE daily_activity_digests SET status = 'dirty', content = NULL, error_code = NULL WHERE user_id = ? AND date_key IN (${uniqueDates.map(() => '?').join(',')})`, [userId, ...uniqueDates]);
   await pool.query(`UPDATE weekly_activity_intelligence SET status = 'dirty', content = NULL, error_code = NULL WHERE user_id = ? AND week_start IN (${weeks.map(() => '?').join(',')})`, [userId, ...weeks]);
+  if (invalidateChatgptJournal) {
+    await pool.query(`UPDATE chatgpt_daily_journals SET status = 'dirty' WHERE user_id = ? AND journal_date IN (${uniqueDates.map(() => '?').join(',')})`, [userId, ...uniqueDates]);
+  }
 }
 
 export async function appendActivityDigest(user: AuthenticatedUser, payload: unknown): Promise<DigestIngestResult> {
@@ -49,7 +52,7 @@ export async function appendActivityDigest(user: AuthenticatedUser, payload: unk
     [user.id, sourceType, input.idempotencyKey],
   );
   const existing = Array.isArray(existingRows) && existingRows.length ? existingRows[0] as SourceRow : null;
-  if (existing?.content_hash === contentHash) return { sourceId: existing.id, factCount: 0, created: false };
+  if (existing?.content_hash === contentHash) return { sourceId: existing.id, factCount: 0, created: false, affectedDates: [] };
 
   let sourceId: number;
   let oldDates: string[] = [];
@@ -79,8 +82,9 @@ export async function appendActivityDigest(user: AuthenticatedUser, payload: unk
       [user.id, sourceId, fact.dateKey, fact.key, fact.category, fact.title, fact.summary, fact.output, fact.exploration, JSON.stringify(input.candidateGoalRelations.map((item) => item.goalId)), JSON.stringify([{ source: sourceType, key: fact.key }]), contentHash, factHash],
     );
   }
-  await invalidateDates(user.id, [...oldDates, ...factDates]);
-  return { sourceId, factCount: facts.length, created: !existing };
+  const affectedDates = [...new Set([...oldDates, ...factDates])].sort();
+  await invalidateDates(user.id, affectedDates, sourceType === 'chatgpt-local-sync');
+  return { sourceId, factCount: facts.length, created: !existing, affectedDates };
 }
 
 export async function deleteActivitySource(user: AuthenticatedUser, params: unknown): Promise<void> {
