@@ -52,6 +52,18 @@ describe('MySQL review snapshot repository', () => {
     });
   });
 
+  it('reads JSON columns that mysql2 already parsed as objects', async () => {
+    const query = vi.fn().mockResolvedValueOnce([[{
+      ...row,
+      content_json: JSON.parse(row.content_json),
+      evidence_json: { weekStart: '2026-08-24' },
+    }]]);
+    const repository = createMysqlReviewSnapshotRepository(query);
+    const snapshot = await repository.find(7, '2026-09-01');
+    expect(snapshot?.content?.overall).toBe('稳定推进。');
+    expect(snapshot?.evidence).toEqual({ weekStart: '2026-08-24' });
+  });
+
   it('writes generated_at as a MySQL DATETIME instead of an ISO UTC string', async () => {
     expect(mysqlDateTime('2026-09-02T05:57:59.241Z')).toBe('2026-09-02 05:57:59.241');
     const query = vi.fn().mockResolvedValueOnce([{ affectedRows: 1 }]).mockResolvedValueOnce([[row]]);

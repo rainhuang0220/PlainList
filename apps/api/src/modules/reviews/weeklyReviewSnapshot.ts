@@ -460,7 +460,7 @@ export async function attachWeeklyReviewPage(
   user: AuthenticatedUser,
   base: WeeklySummaryResponse,
 ): Promise<WeeklySummaryResponse> {
-  const asOf = base.reviewAsOfDate || clock.currentDateKey();
+  const asOf = clock.currentDateKey();
   const pageWindow = weeklyReviewPageFor(asOf);
   const [previousClosed, currentSnapshot, journals, plans, history, runtime] = await Promise.all([
     repository.findByWindow(user.id, pageWindow.previousClosedStart, pageWindow.previousClosedEnd)
