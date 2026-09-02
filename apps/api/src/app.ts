@@ -13,6 +13,7 @@ import { activityGoalsRouter } from './modules/activity-goals/router';
 import { activityKnowledgeRouter } from './modules/activity-knowledge/router';
 import { createActivityOAuthRouter } from './modules/activity-mcp/oauth/router';
 import { createActivityMcpTransportRouter } from './modules/activity-mcp/transport';
+import { chatgptActivityRouter } from './modules/chatgpt-activity/router';
 
 export function createApp() {
   const app = express();
@@ -48,6 +49,7 @@ export function createApp() {
   app.use('/api/duration-chart-prefs', durationPrefsRouter);
   app.use('/api/activity/goals', activityGoalsRouter);
   app.use('/api/activity', activityKnowledgeRouter);
+  app.use('/api/chatgpt-activity', chatgptActivityRouter);
 
   return app;
 }

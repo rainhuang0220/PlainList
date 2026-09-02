@@ -16,6 +16,7 @@ import {
   buildWeeklySummarySystemPrompt,
   buildWeeklySummaryUserPrompt,
   parseWeeklySummaryContent,
+  reviewSourceDataCount,
   sourceHash,
   weeklyLookbackRange,
 } from './weeklySummaryCore';
@@ -67,6 +68,18 @@ async function loadPlans(userId: number): Promise<PlanRecord[]> {
   return Array.isArray(rows) ? rows.map((row) => mapPlan(row as PlanRow)) : [];
 }
 
+async function loadChatgptJournals(userId: number, from: string, to: string): Promise<Record<string, string>> {
+  const [rows] = await pool.query(
+    `SELECT journal_date, summary_markdown FROM chatgpt_daily_journals
+     WHERE user_id = ? AND source_type = 'chatgpt-local-sync' AND status IN ('ready', 'final')
+       AND journal_date BETWEEN ? AND ? ORDER BY journal_date DESC LIMIT 7`,
+    [userId, from, to],
+  );
+  return Object.fromEntries((Array.isArray(rows) ? rows : []).map((row) => [
+    localDateKey((row as any).journal_date), String((row as any).summary_markdown),
+  ]).filter(([date]) => Boolean(date)) as Array<[string, string]>);
+}
+
 const clock = createReviewClock({ timezone: env.APP_TIME_ZONE });
 const repository = createMysqlReviewSnapshotRepository((sql, values) => pool.query(sql, values));
 
@@ -75,11 +88,12 @@ const coordinator = createReviewSnapshotCoordinator({
   now: () => clock.now(),
   async generate(user, snapshot) {
     const range = weeklyLookbackRange(snapshot.windowStartDate);
-    const [plans, checks, reviews, profile] = await Promise.all([
+    const [plans, checks, reviews, profile, chatgptJournals] = await Promise.all([
       loadPlans(user.id),
       listChecks(user, { from: range.from, to: snapshot.windowEndDate }),
       listReviews(user, { from: range.from, to: snapshot.windowEndDate }),
       listUserProfile(user),
+      loadChatgptJournals(user.id, snapshot.windowStartDate, snapshot.windowEndDate),
     ]);
     const evidence = assembleReviewSnapshotEvidence({
       reviewAsOfDate: snapshot.reviewAsOfDate,
@@ -87,9 +101,13 @@ const coordinator = createReviewSnapshotCoordinator({
       checks,
       reviews,
       profile: profile.traits,
+      chatgptJournals,
     });
+    if (reviewSourceDataCount(evidence) === 0) {
+      throw new Error('NO_SOURCE_DATA');
+    }
     const config = await resolveAiConfigForUser(user.id);
-    if (!config || !aiProviderConfigured(config)) throw new Error('本期回顾暂不可用');
+    if (!config || !aiProviderConfigured(config)) throw new Error('NO_PROVIDER');
     const result = await chatComplete(config, {
       system: buildWeeklySummarySystemPrompt(),
       user: buildWeeklySummaryUserPrompt(evidence),
@@ -111,6 +129,32 @@ const coordinator = createReviewSnapshotCoordinator({
     };
   },
 });
+
+async function reviewSourceCount(userId: number, windowStart: string, windowEnd: string): Promise<number> {
+  const [rows] = await pool.query(
+    `SELECT
+       (SELECT COUNT(*) FROM daily_reviews
+        WHERE user_id = ? AND review_date BETWEEN ? AND ? AND TRIM(content) <> '')
+       +
+       (SELECT COUNT(*) FROM checks c INNER JOIN plans p ON p.id = c.plan_id
+       WHERE p.user_id = ? AND c.check_date BETWEEN ? AND ? AND c.done = 1)
+       +
+       (SELECT COUNT(*) FROM chatgpt_daily_journals
+        WHERE user_id = ? AND source_type = 'chatgpt-local-sync' AND status IN ('ready', 'final')
+          AND journal_date BETWEEN ? AND ?)
+       AS source_count`,
+    [userId, windowStart, windowEnd, userId, windowStart, windowEnd, userId, windowStart, windowEnd],
+  );
+  if (!Array.isArray(rows) || !rows[0]) return 0;
+  return Number((rows[0] as { source_count?: number }).source_count ?? 0);
+}
+
+async function currentReviewAvailability(user: AuthenticatedUser, windowStart: string, windowEnd: string) {
+  const sourceCount = await reviewSourceCount(user.id, windowStart, windowEnd);
+  if (sourceCount === 0) return 'no_data' as const;
+  const config = await resolveAiConfigForUser(user.id);
+  return config && aiProviderConfigured(config) ? 'available' as const : 'no_provider' as const;
+}
 
 function response(
   snapshot: ReviewSnapshot,
@@ -142,6 +186,37 @@ export async function getCurrentWeeklyReviewSnapshot(user: AuthenticatedUser): P
     });
   }
   const window = clock.reviewWindow();
+  const availability = await currentReviewAvailability(user, window.windowStartDate, window.windowEndDate);
+  if (availability === 'no_data') {
+    return {
+      status: 'no_data',
+      weekStart: window.windowStartDate,
+      weekEnd: window.windowEndDate,
+      reviewAsOfDate,
+      promptVersion: WEEKLY_SUMMARY_PROMPT_VERSION,
+      notice: 'no_data',
+    };
+  }
+  if (availability === 'no_provider') {
+    return {
+      status: 'no_provider',
+      weekStart: window.windowStartDate,
+      weekEnd: window.windowEndDate,
+      reviewAsOfDate,
+      promptVersion: WEEKLY_SUMMARY_PROMPT_VERSION,
+      notice: 'no_provider',
+    };
+  }
+  if (!current || current.status === 'pending' || current.status === 'generating') {
+    return {
+      status: current?.status ?? 'missing',
+      weekStart: window.windowStartDate,
+      weekEnd: window.windowEndDate,
+      reviewAsOfDate,
+      promptVersion: WEEKLY_SUMMARY_PROMPT_VERSION,
+      notice: 'preparing',
+    };
+  }
   return {
     status: current?.status ?? 'missing',
     weekStart: window.windowStartDate,
@@ -154,6 +229,9 @@ export async function getCurrentWeeklyReviewSnapshot(user: AuthenticatedUser): P
 }
 
 export async function generateCurrentWeeklyReviewSnapshot(user: AuthenticatedUser) {
+  const window = clock.reviewWindow();
+  const availability = await currentReviewAvailability(user, window.windowStartDate, window.windowEndDate);
+  if (availability !== 'available') return null;
   return coordinator.generate(user, clock.currentDateKey());
 }
 

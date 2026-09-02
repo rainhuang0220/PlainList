@@ -19,7 +19,7 @@ describe('activity digest ingestion', () => {
   it('is idempotent for an unchanged explicit digest and does not duplicate facts', async () => {
     query.mockResolvedValueOnce([[{ id: 44, content_hash: canonicalHash(digest) }]]);
 
-    await expect(appendActivityDigest(user, digest)).resolves.toEqual({ sourceId: 44, factCount: 0, created: false });
+    await expect(appendActivityDigest(user, digest)).resolves.toEqual({ sourceId: 44, factCount: 0, created: false, affectedDates: [] });
     expect(query).toHaveBeenCalledTimes(1);
     expect(String(query.mock.calls[0]?.[0])).toMatch(/idempotency_key/i);
     expect(query.mock.calls[0]?.[1]).toContain(7);
@@ -30,12 +30,14 @@ describe('activity digest ingestion', () => {
       .mockResolvedValueOnce([[{ date_key: '2026-08-29' }, { date_key: '2026-08-30' }]])
       .mockResolvedValueOnce([{ affectedRows: 1 }]).mockResolvedValueOnce([{ affectedRows: 2 }])
       .mockResolvedValue([{ affectedRows: 1 }]);
-    const changed = { ...digest, summary: '更新后的摘要', dateKey: '2026-08-31' };
+    const changed = { ...digest, sourceType: 'chatgpt-local-sync' as const, summary: '更新后的摘要', dateKey: '2026-08-31' };
     await appendActivityDigest(user, changed);
     const daily = query.mock.calls.find(([sql]) => /UPDATE daily_activity_digests/i.test(String(sql)));
     expect(daily?.[1]).toEqual([7, '2026-08-29', '2026-08-30', '2026-08-31']);
     const weekly = query.mock.calls.find(([sql]) => /UPDATE weekly_activity_intelligence/i.test(String(sql)));
     expect(weekly?.[1]).toEqual([7, '2026-08-24', '2026-08-31']);
+    const journals = query.mock.calls.find(([sql]) => /UPDATE chatgpt_daily_journals/i.test(String(sql)));
+    expect(journals?.[1]).toEqual([7, '2026-08-29', '2026-08-30', '2026-08-31']);
   });
 
   it('replaces one stable local conversation source while preserving fact dates across days', async () => {

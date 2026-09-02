@@ -25,9 +25,10 @@ contextBridge.exposeInMainWorld('plainlistDesktop', {
     chooseDirectory: (userScope) => ipcRenderer.invoke('chatgpt-local-sync:choose-directory', userScope),
     status: () => ipcRenderer.invoke('chatgpt-local-sync:status'),
     scan: (userScope, bootstrapWindow) => ipcRenderer.invoke('chatgpt-local-sync:scan', userScope, bootstrapWindow),
-    acknowledge: (userScope, completed, summary) => ipcRenderer.invoke('chatgpt-local-sync:acknowledge', userScope, completed, summary),
+    acknowledge: (userScope, completed, summary, options) => ipcRenderer.invoke('chatgpt-local-sync:acknowledge', userScope, completed, summary, options),
     setPaused: (paused) => ipcRenderer.invoke('chatgpt-local-sync:set-paused', paused),
     disable: () => ipcRenderer.invoke('chatgpt-local-sync:disable'),
-    onChanged: (listener) => { const callback = () => listener(); ipcRenderer.on('chatgpt-local-sync:changed', callback); return () => ipcRenderer.removeListener('chatgpt-local-sync:changed', callback); },
+    onSyncRequested: (listener) => { const callback = (_event, reason) => listener(reason); ipcRenderer.on('chatgpt-local-sync:requested', callback); return () => ipcRenderer.removeListener('chatgpt-local-sync:requested', callback); },
+    onChanged: (listener) => { const callback = () => listener(); ipcRenderer.on('chatgpt-local-sync:requested', callback); return () => ipcRenderer.removeListener('chatgpt-local-sync:requested', callback); },
   },
 });

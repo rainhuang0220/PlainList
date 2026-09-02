@@ -12,7 +12,7 @@ case "$ARCH" in
 esac
 
 BASE_URL="${PLAINLIST_BASE_URL:-http://175.24.134.228}"
-DMG_URL="${BASE_URL}/downloads/PlainList-2.3.1-${DMG_ARCH}.dmg"
+DMG_URL="${BASE_URL}/downloads/PlainList-2.4.0-${DMG_ARCH}.dmg"
 TMP_DMG="$(mktemp -t plainlist).dmg"
 DEST="/Applications/PlainList.app"
 

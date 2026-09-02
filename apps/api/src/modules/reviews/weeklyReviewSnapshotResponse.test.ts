@@ -38,12 +38,71 @@ describe('current weekly review response', () => {
   it('never exposes a terminal scheduler error when no ready fallback exists', async () => {
     query
       .mockResolvedValueOnce([[row('error', 'review generation lease expired after maximum attempts')]])
-      .mockResolvedValueOnce([[]]);
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[{ source_count: 1 }]])
+      .mockResolvedValueOnce([[{
+        value: JSON.stringify({
+          provider: 'openai', baseUrl: 'https://example.com/v1', model: 'safe-model', apiKey: 'safe-test-key', timeoutMs: 60_000,
+        }),
+      }]]);
 
     const result = await getCurrentWeeklyReviewSnapshot(user);
 
     expect(result.reason).toBe('本期回顾暂不可用');
     expect(JSON.stringify(result)).not.toContain('lease expired');
+  });
+
+  it('returns no_data instead of unavailable when the review window has no diary or completed check', async () => {
+    query
+      .mockResolvedValueOnce([[row('error', '本期回顾暂不可用')]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[{ source_count: 0 }]]);
+
+    const result = await getCurrentWeeklyReviewSnapshot(user);
+
+    expect(result).toMatchObject({ status: 'no_data', notice: 'no_data' });
+    expect(result.reason).toBeUndefined();
+  });
+
+  it('returns no_provider when source data exists but no review provider is configured', async () => {
+    query
+      .mockResolvedValueOnce([[row('error', '本期回顾暂不可用')]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[{ source_count: 1 }]])
+      .mockResolvedValueOnce([[]]);
+
+    const result = await getCurrentWeeklyReviewSnapshot(user);
+
+    expect(result).toMatchObject({ status: 'no_provider', notice: 'no_provider' });
+    expect(result.reason).toBeUndefined();
+  });
+
+  it('treats a missing first snapshot with available data as preparing', async () => {
+    query
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[{ source_count: 1 }]])
+      .mockResolvedValueOnce([[{
+        value: JSON.stringify({ provider: 'openai', baseUrl: 'https://example.com/v1', model: 'safe-model', apiKey: 'safe-test-key' }),
+      }]]);
+
+    const result = await getCurrentWeeklyReviewSnapshot(user);
+
+    expect(result).toMatchObject({ status: 'missing', notice: 'preparing' });
+  });
+
+  it('treats a generating snapshot without fallback as preparing', async () => {
+    query
+      .mockResolvedValueOnce([[row('generating')]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[{ source_count: 1 }]])
+      .mockResolvedValueOnce([[{
+        value: JSON.stringify({ provider: 'openai', baseUrl: 'https://example.com/v1', model: 'safe-model', apiKey: 'safe-test-key' }),
+      }]]);
+
+    const result = await getCurrentWeeklyReviewSnapshot(user);
+
+    expect(result).toMatchObject({ status: 'generating', notice: 'preparing' });
   });
 
   it('marks a previous-ready response as updating while today is generating', async () => {

@@ -19,6 +19,15 @@ export function presentWeeklyReview(
     if (result.notice === 'not_updated') {
       return t('week.summary.not_updated', '本期回顾暂未更新');
     }
+    if (result.notice === 'no_data') {
+      return t('week.summary.no_data', '本期暂无足够记录');
+    }
+    if (result.notice === 'no_provider') {
+      return t('week.summary.no_provider', '尚未配置回顾模型');
+    }
+    if (result.notice === 'preparing') {
+      return t('week.summary.preparing', '本期回顾正在准备');
+    }
     return t('week.summary.unavailable', '本期回顾暂不可用');
   };
 

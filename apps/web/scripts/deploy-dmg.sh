@@ -24,7 +24,7 @@ STAGE_DIR="${SCRIPT_DIR}/../.electron-stage"
 PAGE_DIR="${SCRIPT_DIR}/download-page"
 DMG_DIR="${STAGE_DIR}/release"
 ANDROID_RELEASE_DIR="${SCRIPT_DIR}/../.android-release"
-VERSION="${PLAINLIST_VERSION:-2.3.1}"
+VERSION="${PLAINLIST_VERSION:-2.4.0}"
 
 SSH_OPTS=(-o BatchMode=yes -o PreferredAuthentications=publickey -o PasswordAuthentication=no -o StrictHostKeyChecking=accept-new -o ConnectTimeout=20)
 

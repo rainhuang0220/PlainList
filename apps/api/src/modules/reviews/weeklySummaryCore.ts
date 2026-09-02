@@ -36,6 +36,7 @@ export interface WeeklyEvidenceItem {
 export interface WeeklyEvidenceDay {
   date: string;
   diary: string | null;
+  chatgptJournal?: string | null;
   items: WeeklyEvidenceItem[];
 }
 
@@ -63,6 +64,12 @@ export interface WeeklyEvidencePayload {
   days: WeeklyEvidenceDay[];
   conflicts: WeeklyEvidenceConflict[];
   profile: WeeklyEvidenceProfile[];
+}
+
+export function reviewSourceDataCount(evidence: WeeklyEvidencePayload): number {
+  return evidence.days.reduce((count, day) => (
+    count + (day.diary ? 1 : 0) + (day.chatgptJournal ? 1 : 0) + day.items.filter((item) => item.done).length
+  ), 0);
 }
 
 function parseDateKey(dateKey: string): Date {
@@ -149,6 +156,7 @@ export function assembleWeeklyEvidence(input: {
   checks: ChecksByPlan;
   reviews: Record<string, string>;
   profile: UserProfileTraitRecord[];
+  chatgptJournals?: Record<string, string>;
 }): WeeklyEvidencePayload {
   const weekStart = normalizeWeekStart(input.weekStart);
   const range = weeklyLookbackRange(weekStart);
@@ -193,7 +201,8 @@ export function assembleWeeklyEvidence(input: {
       }
     }
 
-    days.push({ date, diary, items });
+    const chatgptJournal = input.chatgptJournals?.[date]?.trim() || null;
+    days.push({ date, diary, ...(chatgptJournal ? { chatgptJournal } : {}), items });
   }
 
   const profile = input.profile
@@ -238,6 +247,7 @@ export function assembleReviewSnapshotEvidence(input: {
   checks: ChecksByPlan;
   reviews: Record<string, string>;
   profile: UserProfileTraitRecord[];
+  chatgptJournals?: Record<string, string>;
 }): WeeklyEvidencePayload {
   const window = reviewWindowFor(input.reviewAsOfDate);
   const evidence = assembleWeeklyEvidence({
@@ -247,6 +257,7 @@ export function assembleReviewSnapshotEvidence(input: {
     checks: input.checks,
     reviews: input.reviews,
     profile: input.profile,
+    chatgptJournals: input.chatgptJournals,
   });
 
   return {
@@ -321,6 +332,7 @@ export function buildWeeklySummaryUserPrompt(evidence: WeeklyEvidencePayload): s
     '下面是已压缩、已排序的证据。只根据这些证据作答。',
     'conflicts 是日记与打卡的冲突提示，必须在 summary 或 concerns 中写明冲突，不能把未打卡写成未完成事实。',
     'days 覆盖本周以及用于比较的近 4 周。diary 为空表示该日没有日记，不表示该日荒废。',
+    'chatgptJournal 是本地 ChatGPT archive 派生的活动日志，不是用户手写日记，也不是 raw transcript。只把它当作辅助活动证据。',
     'profile 是既有用户画像证据，仅作辅助，不得升级成诊断。',
     '',
     JSON.stringify(evidence),

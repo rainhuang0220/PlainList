@@ -100,6 +100,26 @@ function buildLocalDigest(archive) {
   };
 }
 
+async function readStableJson(filePath, before, dependencies = {}) {
+  const read = dependencies.readFile || readFile;
+  const stat = dependencies.lstat || lstat;
+  let text;
+  try {
+    text = await read(filePath, 'utf8');
+    const after = await stat(filePath);
+    if (after.size !== before.size || after.mtimeMs !== before.mtimeMs) {
+      return { ok: false, code: 'file_changed_during_read' };
+    }
+  } catch {
+    return { ok: false, code: 'file_unavailable' };
+  }
+  try {
+    return { ok: true, value: JSON.parse(text) };
+  } catch {
+    return { ok: false, code: 'partial_json' };
+  }
+}
+
 async function scanArchiveDirectory(rootDirectory) {
   const archives = [];
   const issues = [];
@@ -137,15 +157,13 @@ async function scanArchiveDirectory(rootDirectory) {
         issues.push({ code: 'oversize_json', path: filePath, retryable: false });
         continue;
       }
-      let value;
-      try {
-        value = JSON.parse(await readFile(filePath, 'utf8'));
-      } catch {
-        issues.push({ code: 'partial_json', path: filePath, retryable: true });
+      const stableRead = await readStableJson(filePath, info);
+      if (!stableRead.ok) {
+        issues.push({ code: stableRead.code, path: filePath, retryable: true });
         continue;
       }
       try {
-        archives.push({ ...parseArchive(value), path: path.relative(rootDirectory, filePath) });
+        archives.push({ ...parseArchive(stableRead.value), path: path.relative(rootDirectory, filePath) });
       } catch (error) {
         issues.push({ code: error instanceof Error ? error.message : 'invalid_archive', path: filePath, retryable: false });
       }
@@ -163,7 +181,8 @@ function detectChangedArchives(archives, state = {}) {
   for (const archive of archives) {
     const previous = state[archive.conversationId] || {};
     const previousHash = previous.lastProcessedHash || previous.canonicalHash;
-    if (previousHash === archive.canonicalHash) unchanged.push(archive);
+    const requiresHistoricalBackfill = previous.processingStatus === 'bootstrap_skipped';
+    if (previousHash === archive.canonicalHash && !requiresHistoricalBackfill) unchanged.push(archive);
     else changed.push(archive);
     nextState[archive.conversationId] = {
       sourceType: SOURCE_TYPE,
@@ -172,11 +191,11 @@ function detectChangedArchives(archives, state = {}) {
       lastSeenUpdateTime: archive.updatedAt,
       lastProcessedHash: previous.lastProcessedHash || previous.canonicalHash || null,
       lastSuccessfulDigestAt: previous.lastSuccessfulDigestAt || null,
-      processingStatus: previousHash === archive.canonicalHash ? 'up_to_date' : 'pending',
+      processingStatus: previousHash === archive.canonicalHash && !requiresHistoricalBackfill ? 'up_to_date' : 'pending',
       safeErrorCode: null,
     };
   }
   return { changed, unchanged, nextState };
 }
 
-module.exports = { MAX_ARCHIVE_BYTES, SOURCE_TYPE, buildLocalDigest, canonicalHash, detectChangedArchives, parseArchive, scanArchiveDirectory };
+module.exports = { MAX_ARCHIVE_BYTES, SOURCE_TYPE, buildLocalDigest, canonicalHash, detectChangedArchives, parseArchive, readStableJson, scanArchiveDirectory };

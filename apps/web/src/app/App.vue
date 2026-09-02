@@ -11,6 +11,7 @@
       />
     </template>
     <template v-else>
+      <ChatgptActivitySyncAgent />
       <Transition name="loader-fade">
         <div v-if="isDashboardLoading" class="app-loader">
           <div class="app-loader-panel">
@@ -114,6 +115,7 @@ import ClockSection from '@/views/sections/ClockSection.vue';
 import PlansSection from '@/views/sections/PlansSection.vue';
 import TrackerSection from '@/views/sections/TrackerSection.vue';
 import WeekSection from '@/views/sections/WeekSection.vue';
+import ChatgptActivitySyncAgent from '@/components/chatgpt/ChatgptActivitySyncAgent.vue';
 
 const auth = useAuthStore();
 const plans = usePlansStore();
