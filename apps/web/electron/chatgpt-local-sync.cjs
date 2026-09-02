@@ -19,10 +19,24 @@ function archiveMeetsHistoricalStart(archive, startDate = DEFAULT_HISTORICAL_STA
   return dates.some((date) => date >= startDate);
 }
 
-function dateKey(iso) {
+function shanghaiDateKey(iso) {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return null;
-  return date.toISOString().slice(0, 10);
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const year = parts.find((part) => part.type === 'year')?.value;
+  const month = parts.find((part) => part.type === 'month')?.value;
+  const day = parts.find((part) => part.type === 'day')?.value;
+  if (!year || !month || !day) return null;
+  return `${year}-${month}-${day}`;
+}
+
+function dateKey(iso) {
+  return shanghaiDateKey(iso);
 }
 
 function canonicalHash(value) {
@@ -70,33 +84,70 @@ function activityKind(text) {
   return null;
 }
 
-function labelsFor(kind, completed) {
-  const label = {
-    engineering: '软件工程',
-    research: '研究',
-    learning: '学习',
-    planning: '规划',
-  }[kind];
-  return {
-    activity: kind === 'engineering' && completed
-      ? '排查并修复软件工程问题'
-      : completed ? `推进${label}工作` : `开展${label}工作`,
-    output: completed ? `完成${label}工作` : null,
-  };
+function sanitizeUserText(text) {
+  return String(text || '')
+    .replace(/忽略之前的?规则[^。；;\n]*/g, '')
+    .replace(/执行\s*shell[;；]?/gi, '')
+    .replace(/https?:\/\/\S+/g, '')
+    .replace(/\b[0-9a-f]{12,}\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function extractEventTitle(text, completed, kind) {
+  const cleaned = sanitizeUserText(text);
+  const names = cleaned.match(/PlainList|Foreshadow|chatgpt-local-sync|DashScope|qwen[\w.+-]*|DeepSeek[\w.+-]*|scheduler|titlebar|Web|Desktop|Android|iOS|v?\d+\.\d+(?:\.\d+)?|[\u4e00-\u9fff]{2,12}(?:论文|项目|周报|小记|画像)?/gi) || [];
+  const unique = [...new Set(names.map((name) => name.trim()).filter(Boolean))].slice(0, 4);
+  const verb = completed
+    ? '完成'
+    : /修复|排查|bug/i.test(cleaned) ? '修复'
+      : /研究|阅读|论文/.test(cleaned) ? '研究'
+        : /学习|课程/.test(cleaned) ? '学习'
+          : '推进';
+  if (unique.length) return `${verb}${unique.join(' ')}`.slice(0, 80);
+  const fallback = { engineering: '软件工程', research: '研究', learning: '学习', planning: '规划' }[kind] || '工作';
+  return completed ? `完成${fallback}` : `推进${fallback}`;
+}
+
+function normalizeFactKey(title) {
+  return title.toLowerCase().replace(/[\s，,、]/g, '').slice(0, 24);
+}
+
+function selectLocalFacts(candidates) {
+  const sorted = [...candidates].sort((left, right) => Number(right.completed) - Number(left.completed));
+  const facts = [];
+  const seen = new Set();
+  for (const candidate of sorted) {
+    const key = normalizeFactKey(candidate.title);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    facts.push({
+      dateKey: candidate.dateKey,
+      category: candidate.kind,
+      title: candidate.title,
+      completed: candidate.completed,
+    });
+    if (facts.length >= 3) break;
+  }
+  return facts;
 }
 
 function buildLocalDigest(archive) {
   const candidates = archive.messages
     .filter((message) => message.role === 'user')
-    .map((message) => ({ ...message, kind: activityKind(message.content) }))
-    .filter((message) => message.kind);
-  const lastByKind = new Map();
-  for (const candidate of candidates) lastByKind.set(candidate.kind, candidate);
-  const facts = [...lastByKind.values()].map((candidate) => {
-    const completed = /(已完成|完成|修复|解决|提交|发布|补了|写完)/.test(candidate.content);
-    const labels = labelsFor(candidate.kind, completed);
-    return { dateKey: candidate.dateKey, category: candidate.kind, title: labels.activity, completed };
-  });
+    .map((message) => {
+      const kind = activityKind(message.content);
+      if (!kind) return null;
+      const completed = /(已完成|完成|修复|解决|提交|发布|补了|写完)/.test(message.content);
+      return {
+        dateKey: message.dateKey,
+        kind,
+        completed,
+        title: extractEventTitle(message.content, completed, kind),
+      };
+    })
+    .filter(Boolean);
+  const facts = selectLocalFacts(candidates);
   const latest = facts.at(-1);
   return {
     sourceType: SOURCE_TYPE,
@@ -106,7 +157,7 @@ function buildLocalDigest(archive) {
     occurredAt: archive.updatedAt,
     summary: facts.length ? '从 ChatGPT 本地对话中提取到有意义的用户活动。' : '没有可提取的用户活动。',
     activities: facts.map((fact) => fact.title),
-    outputs: facts.filter((fact) => fact.completed).map((fact) => labelsFor(fact.category, true).output),
+    outputs: facts.filter((fact) => fact.completed).map((fact) => fact.title),
     learnings: [],
     decisions: [],
     unresolved: [],
@@ -219,8 +270,10 @@ module.exports = {
   archiveMeetsHistoricalStart,
   buildLocalDigest,
   canonicalHash,
+  dateKey,
   detectChangedArchives,
   parseArchive,
   readStableJson,
   scanArchiveDirectory,
+  shanghaiDateKey,
 };

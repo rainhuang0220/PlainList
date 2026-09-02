@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type {
   AuthenticatedUser,
   UserProfileAnalyzeResponse,
@@ -14,6 +15,7 @@ import {
 } from '@plainlist/shared';
 import { pool } from '../../db/pool';
 import { extractProfileEvidenceFromReviews, type ProfileEvidenceCandidate } from './extractor';
+import { composeUserPortrait, type ProfileFact } from './composer';
 
 function serviceError(status: number, message: string): Error & { status: number } {
   return Object.assign(new Error(message), { status });
@@ -210,9 +212,6 @@ export async function updateUserProfileTrait(
   params: unknown,
   payload: unknown,
 ): Promise<UserProfileTraitRecord> {
-  if (user.isAdmin) {
-    throw serviceError(403, 'admin account is read-only');
-  }
 
   const { id } = userProfileTraitIdParamSchema.parse(params);
   const input = userProfilePatchSchema.parse(payload);
@@ -263,37 +262,149 @@ export async function updateUserProfileTrait(
   return mapTrait(rows[0] as TraitRow, evidenceByTrait.get(id) ?? []);
 }
 
-function addDays(date: Date, days: number): Date {
-  const next = new Date(date);
-  next.setDate(next.getDate() + days);
-  return next;
-}
-
-function resolveAnalyzeRange(payload: unknown): { fromDate: string; toDate: string } {
-  const input = userProfileAnalyzeSchema.parse(payload ?? {});
-  const today = new Date();
-  const toDate = input.toDate ?? toDateKey(today);
-  const fromDate = input.fromDate ?? toDateKey(addDays(today, -(input.days ?? 60) + 1));
-  return { fromDate, toDate };
-}
-
-async function loadReviews(userId: number, fromDate: string, toDate: string): Promise<Array<{ reviewDate: string; content: string }>> {
-  const [rows] = await pool.query(
-    `SELECT review_date, content
-     FROM daily_reviews
-     WHERE user_id = ? AND review_date BETWEEN ? AND ?
-     ORDER BY review_date ASC`,
-    [userId, fromDate, toDate],
-  );
-  if (!Array.isArray(rows)) {
-    return [];
+function parseJson(value: unknown): unknown {
+  if (value == null) return null;
+  if (typeof value === 'object') return value;
+  if (typeof value !== 'string') return null;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
   }
-  return (rows as ReviewRow[])
-    .map((row) => ({
-      reviewDate: toLocalDateKey(row.review_date) ?? '',
-      content: row.content,
-    }))
-    .filter((row) => row.reviewDate && row.content.trim());
+}
+
+function asDateKey(value: unknown): string {
+  return toLocalDateKey(value as string | Date) ?? '';
+}
+
+function pushFact(facts: ProfileFact[], fact: ProfileFact) {
+  if (!fact.date || fact.text.trim().length < 4) return;
+  facts.push({ ...fact, text: fact.text.replace(/\s+/g, ' ').trim().slice(0, 240) });
+}
+
+export async function loadProfileCorpus(userId: number): Promise<ProfileFact[]> {
+  const facts: ProfileFact[] = [];
+
+  const [goalRows] = await pool.query(
+    `SELECT title, description, time_horizon, status, anti_goals, updated_at
+     FROM activity_goals WHERE user_id = ? AND status IN ('active','paused','achieved')`,
+    [userId],
+  );
+  for (const row of Array.isArray(goalRows) ? goalRows : []) {
+    const item = row as { title: string; description?: string | null; time_horizon?: string; anti_goals?: unknown; updated_at: string | Date };
+    pushFact(facts, {
+      date: asDateKey(item.updated_at),
+      kind: 'goal',
+      text: [item.title, item.description].filter(Boolean).join('：'),
+      explicit: true,
+      baseWeight: item.time_horizon === 'long_term' ? 0.96 : 0.88,
+    });
+    const anti = parseJson(item.anti_goals);
+    if (Array.isArray(anti)) {
+      for (const value of anti) {
+        pushFact(facts, {
+          date: asDateKey(item.updated_at),
+          kind: 'dislike',
+          text: String(value),
+          explicit: true,
+          baseWeight: 0.9,
+        });
+      }
+    }
+  }
+
+  const [planRows] = await pool.query(
+    `SELECT name, description, type, created_at FROM plans WHERE user_id = ?`,
+    [userId],
+  );
+  for (const row of Array.isArray(planRows) ? planRows : []) {
+    const item = row as { name: string; description?: string | null; type: string; created_at: string | Date };
+    pushFact(facts, {
+      date: asDateKey(item.created_at),
+      kind: item.type === 'habit' ? 'habit' : 'plan',
+      text: [item.name, item.description].filter(Boolean).join('：'),
+      baseWeight: item.type === 'habit' ? 0.8 : 0.72,
+    });
+  }
+
+  const [checkRows] = await pool.query(
+    `SELECT c.check_date, p.name
+     FROM checks c INNER JOIN plans p ON p.id = c.plan_id
+     WHERE p.user_id = ? AND c.done = 1`,
+    [userId],
+  );
+  for (const row of Array.isArray(checkRows) ? checkRows : []) {
+    const item = row as { check_date: string | Date; name: string };
+    pushFact(facts, {
+      date: asDateKey(item.check_date),
+      kind: 'check',
+      text: `完成${item.name}`,
+      baseWeight: 0.5,
+    });
+  }
+
+  const [reviewRows] = await pool.query(
+    `SELECT review_date, content FROM daily_reviews WHERE user_id = ? ORDER BY review_date ASC`,
+    [userId],
+  );
+  for (const row of Array.isArray(reviewRows) ? reviewRows : []) {
+    const item = row as ReviewRow;
+    pushFact(facts, {
+      date: asDateKey(item.review_date),
+      kind: 'diary',
+      text: String(item.content || '').slice(0, 240),
+      explicit: true,
+      baseWeight: 0.92,
+    });
+  }
+
+  const [factRows] = await pool.query(
+    `SELECT date_key, category, title, summary FROM activity_facts WHERE user_id = ?`,
+    [userId],
+  );
+  for (const row of Array.isArray(factRows) ? factRows : []) {
+    const item = row as { date_key: string | Date; category: string; title: string; summary?: string };
+    pushFact(facts, {
+      date: asDateKey(item.date_key),
+      kind: 'activity',
+      text: item.title || item.summary || '',
+      baseWeight: 0.58,
+    });
+  }
+
+  const [journalRows] = await pool.query(
+    `SELECT journal_date, summary_markdown FROM chatgpt_daily_journals
+     WHERE user_id = ? AND source_type = 'chatgpt-local-sync' AND status IN ('ready','final')`,
+    [userId],
+  );
+  for (const row of Array.isArray(journalRows) ? journalRows : []) {
+    const item = row as { journal_date: string | Date; summary_markdown: string };
+    pushFact(facts, {
+      date: asDateKey(item.journal_date),
+      kind: 'journal',
+      text: String(item.summary_markdown || '').replace(/[#*\-]/g, '').slice(0, 240),
+      baseWeight: 0.66,
+    });
+  }
+
+  const [weeklyRows] = await pool.query(
+    `SELECT window_start_date, content_json, status FROM weekly_review_snapshots
+     WHERE user_id = ? AND status = 'ready'`,
+    [userId],
+  );
+  for (const row of Array.isArray(weeklyRows) ? weeklyRows : []) {
+    const item = row as { window_start_date: string | Date; content_json: unknown };
+    const content = parseJson(item.content_json) as { summary?: string; narrativeMarkdown?: string } | null;
+    const text = content?.summary || content?.narrativeMarkdown || '';
+    pushFact(facts, {
+      date: asDateKey(item.window_start_date),
+      kind: 'weekly',
+      text: String(text).slice(0, 240),
+      baseWeight: 0.74,
+    });
+  }
+
+  return facts;
 }
 
 async function ensureTrait(userId: number, candidate: ProfileEvidenceCandidate): Promise<number> {
@@ -390,19 +501,33 @@ async function recordRun(
 }
 
 export async function analyzeUserProfile(user: AuthenticatedUser, payload: unknown): Promise<UserProfileAnalyzeResponse> {
-  if (user.isAdmin) {
-    throw serviceError(403, 'admin account is read-only');
-  }
-
-  const { fromDate, toDate } = resolveAnalyzeRange(payload);
-  const reviews = await loadReviews(user.id, fromDate, toDate);
+  userProfileAnalyzeSchema.parse(payload ?? {});
+  const today = toDateKey(new Date());
+  const corpus = await loadProfileCorpus(user.id);
+  const reviews = corpus
+    .filter((fact) => fact.kind === 'diary')
+    .map((fact) => ({ reviewDate: fact.date, content: fact.text }));
   const candidates = extractProfileEvidenceFromReviews(reviews);
+  const portrait = composeUserPortrait(corpus, today);
+  if (portrait.markdown) {
+    candidates.push({
+      traitKey: 'user_portrait',
+      title: '用户画像',
+      generatedSummary: portrait.markdown,
+      reviewDate: corpus.map((fact) => fact.date).sort().at(-1) || today,
+      excerpt: portrait.markdown.slice(0, 500),
+      observation: '由全部可用历史证据加权整理，近期活动权重更高。',
+      impactNote: '结合长期目标、重复项目与近期状态，不使用固定天数截断。',
+      weight: 0.9,
+      sourceHash: createHash('sha256').update(`portrait|${user.id}|${portrait.markdown}`).digest('hex'),
+    });
+  }
+  const dates = corpus.map((fact) => fact.date).filter(Boolean).sort();
+  const fromDate = dates[0] ?? today;
+  const toDate = dates.at(-1) ?? today;
 
   try {
-    await pool.query(
-      'DELETE FROM user_profile_evidence WHERE user_id = ? AND review_date BETWEEN ? AND ?',
-      [user.id, fromDate, toDate],
-    );
+    await pool.query('DELETE FROM user_profile_evidence WHERE user_id = ?', [user.id]);
     for (const candidate of candidates) {
       await insertEvidence(user.id, candidate);
     }

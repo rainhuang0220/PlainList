@@ -2,26 +2,20 @@
   <section class="activity-card">
     <div class="status-row">
       <span class="pulse" :class="card.variant" />
-      <div>
+      <div class="status-copy">
         <h3>{{ card.headline }}</h3>
-        <p>{{ card.body }}</p>
+        <p v-if="card.body">{{ card.body }}</p>
+        <p v-if="card.countLine" class="count-line">{{ card.countLine }}</p>
+        <p v-if="card.lastUpdated" class="meta">最后同步：{{ formatSync(card.lastUpdated) }}</p>
+        <p v-if="card.progressLine" class="meta">{{ card.progressLine }}</p>
       </div>
     </div>
 
-    <p v-if="card.todayLine" class="today-line">{{ card.todayLine }}</p>
-    <p v-if="card.lastUpdated" class="meta">最后更新：{{ formatTime(card.lastUpdated) }}</p>
-
     <div v-if="lastResult?.historicalBootstrap && !lastResult.bootstrapComplete" class="bootstrap-progress">
       <strong>正在建立历史活动记录</strong>
-      <span v-if="lastResult.dateFrom">发现 {{ lastResult.checked }} 个对话 · {{ lastResult.dateFrom }} → {{ lastResult.dateTo }}</span>
       <span>已处理 {{ lastResult.processed }} / {{ lastResult.changed }} · 已生成 {{ lastResult.journalDays }} 天记录</span>
       <progress :value="lastResult.processed" :max="Math.max(1, lastResult.changed)" />
     </div>
-
-    <p v-if="card.progressLine" class="meta">{{ card.progressLine }}</p>
-    <p v-if="connection.earliestJournalDate && connection.latestJournalDate" class="meta">
-      历史小记 {{ formatDay(connection.earliestJournalDate) }} → {{ formatDay(connection.latestJournalDate) }}
-    </p>
 
     <div v-if="hasActions" class="actions">
       <button v-if="isDesktop && !rootName" class="primary" type="button" @click="choose">连接本地资料库</button>
@@ -33,10 +27,10 @@
         target="_blank"
         rel="noreferrer"
       >下载 Desktop</a>
-      <button v-if="isDesktop && rootName" type="button" :disabled="status !== 'enabled'" @click="checkNow">立即检查</button>
-      <button v-if="isDesktop && rootName" type="button" @click="choose">重新选择资料库</button>
-      <button v-if="isDesktop && status === 'enabled'" type="button" @click="pause">暂停</button>
-      <button v-if="isDesktop && status === 'paused'" type="button" @click="resume">继续同步</button>
+      <button v-if="isDesktop && rootName" class="ghost" type="button" :disabled="status !== 'enabled'" @click="checkNow">立即检查</button>
+      <button v-if="isDesktop && rootName" class="ghost" type="button" @click="choose">重新选择资料库</button>
+      <button v-if="isDesktop && status === 'enabled'" class="ghost" type="button" @click="pause">暂停</button>
+      <button v-if="isDesktop && status === 'paused'" class="ghost" type="button" @click="resume">继续同步</button>
     </div>
     <p v-if="isDesktop && !rootName" class="hint">需要先安装并使用 chatgpt-local-sync。</p>
     <p v-if="error" class="sync-error">同步暂不可用，请稍后重试。</p>
@@ -83,14 +77,13 @@ const hasActions = computed(() => (
   || Boolean(isDesktop.value && rootName.value)
 ));
 
-function formatDay(date: string) {
-  const [, month, day] = date.split('-').map(Number);
-  return `${Number(month)} 月 ${Number(day)} 日`;
-}
-
-function formatTime(value: string) {
+function formatSync(value: string) {
   try {
-    return new Date(value).toLocaleString();
+    const date = new Date(value);
+    const now = new Date();
+    const time = date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
+    if (date.toDateString() === now.toDateString()) return `今天 ${time}`;
+    return `${date.getMonth() + 1}月${date.getDate()}日 ${time}`;
   } catch {
     return value;
   }
@@ -138,18 +131,21 @@ onUnmounted(() => {
 <style scoped>
 .activity-card {
   display: grid;
-  gap: 10px;
-  max-width: 520px;
+  gap: 12px;
+  max-width: 34rem;
 }
 .status-row {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: 10px;
+}
+.status-copy {
+  min-width: 0;
 }
 .pulse {
   width: 8px;
   height: 8px;
-  margin-top: 8px;
+  margin-top: 7px;
   border-radius: 50%;
   background: var(--muted);
   flex: 0 0 auto;
@@ -160,39 +156,39 @@ onUnmounted(() => {
 .pulse.web-waiting {
   background: #4d8064;
 }
-.pulse.web-empty {
-  background: #b0893a;
-}
+.pulse.web-empty,
 .pulse.desktop-paused {
   background: #b0893a;
 }
 h3 {
   margin: 0;
-  font-size: 16px;
-  line-height: 1.45;
+  font-size: 15px;
+  line-height: 1.4;
+  font-weight: 650;
 }
 p {
-  margin: 6px 0 0;
+  margin: 4px 0 0;
   color: var(--muted);
   font-size: 13px;
-  line-height: 1.7;
+  line-height: 1.55;
 }
-.today-line {
-  margin: 0;
-  font-weight: 600;
+.count-line {
+  margin: 6px 0 0;
   color: var(--dark);
+  font-size: 13px;
+  font-weight: 600;
 }
 .meta,
 .hint {
-  margin: 0;
+  margin: 2px 0 0;
   font-size: 12px;
   color: var(--muted);
 }
 .bootstrap-progress {
   display: grid;
-  gap: 8px;
-  padding: 14px;
-  border-radius: 12px;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 10px;
   background: color-mix(in srgb, #dcecdf 60%, var(--surface));
 }
 .bootstrap-progress span {
@@ -206,23 +202,43 @@ p {
 }
 .actions {
   display: flex;
-  gap: 8px;
+  align-items: center;
+  gap: 6px;
   flex-wrap: wrap;
 }
-.actions button {
-  padding: 9px 12px;
-  border: 1px solid var(--faint);
-  border-radius: 9px;
-  background: var(--surface);
+.actions button,
+.actions .link-btn {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
   cursor: pointer;
+}
+.actions button {
+  border: 1px solid var(--faint);
+  background: var(--surface);
+  color: var(--dark);
 }
 .actions .primary {
   background: var(--text);
   color: var(--surface);
+  border-color: var(--text);
+}
+.actions .ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--mid);
+  padding: 0 8px;
+}
+.actions .ghost:hover {
+  color: var(--dark);
+  background: var(--faint2);
 }
 .actions .link-btn {
-  display: inline-flex;
-  align-items: center;
   text-decoration: none;
 }
 .sync-error {

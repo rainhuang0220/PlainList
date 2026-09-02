@@ -11,6 +11,8 @@ describe('UserSettingsPanel AI journal entry', () => {
     expect(source).toContain("switchSection('ai-journal')");
     expect(source).toContain('us-modal--compact');
     expect(source).toContain('us-modal--reader');
+    expect(source).toContain('us-main-body--reader');
+    expect(source).toContain('us-main-body--compact');
     expect(source).toContain('aria-label="关闭"');
   });
 });

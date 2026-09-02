@@ -1,7 +1,5 @@
 <template>
   <section class="journal-shell">
-    <p class="journal-intro">查看由 PlainList 自动整理的每日活动记录与历史周回顾。</p>
-
     <div class="journal-tabs" role="tablist">
       <button type="button" role="tab" :aria-selected="tab === 'daily'" :class="{ active: tab === 'daily' }" @click="tab = 'daily'">每日小记</button>
       <button type="button" role="tab" :aria-selected="tab === 'weekly'" :class="{ active: tab === 'weekly' }" @click="tab = 'weekly'">每周回顾</button>
@@ -15,7 +13,7 @@
         <li v-for="entry in daily" :key="entry.date">
           <button type="button" :class="{ active: selectedDate === entry.date }" @click="selectedDate = entry.date">
             <strong>{{ presentJournalDate(entry.date, today).primary }}</strong>
-            <small>{{ entry.activityCount }} 条活动</small>
+            <small>{{ previewText(entry.summaryMarkdown) }}</small>
           </button>
         </li>
       </ul>
@@ -104,6 +102,11 @@ const emptyWeekly = computed(() => presentAiJournalEmpty(activity.connection.dis
   checked: activity.connection.checked,
 }));
 
+function previewText(markdown: string) {
+  const text = String(markdown || '').replace(/[#*_`>-]/g, '').replace(/\s+/g, ' ').trim();
+  return text ? text.slice(0, 28) : '';
+}
+
 function formatClock(value: string) {
   try {
     return new Date(value).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
@@ -130,19 +133,16 @@ onMounted(async () => {
 <style scoped>
 .journal-shell {
   display: grid;
-  gap: 14px;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 10px;
   min-width: 0;
-}
-.journal-intro {
-  margin: 0;
-  color: var(--muted);
-  font-size: 13px;
-  line-height: 1.6;
+  min-height: 0;
+  height: 100%;
 }
 .journal-tabs {
   display: inline-flex;
   width: fit-content;
-  padding: 3px;
+  padding: 2px;
   border: 1px solid var(--faint);
   border-radius: 999px;
   background: var(--faint2);
@@ -165,29 +165,31 @@ onMounted(async () => {
 }
 .journal-layout {
   display: grid;
-  grid-template-columns: 200px minmax(0, 1fr);
-  gap: 20px;
-  align-items: start;
+  grid-template-columns: 168px minmax(0, 1fr);
+  gap: 16px;
+  align-items: stretch;
   min-height: 0;
+  height: 100%;
 }
 .journal-index {
   display: grid;
-  gap: 2px;
+  align-content: start;
+  gap: 1px;
   margin: 0;
   padding: 0;
   list-style: none;
-  max-height: min(560px, calc(100vh - 260px));
   overflow: auto;
+  min-height: 0;
 }
 .journal-index button {
   width: 100%;
   display: grid;
-  gap: 2px;
+  gap: 1px;
   border: 0;
   background: transparent;
   color: var(--mid);
-  border-radius: 10px;
-  padding: 10px 12px;
+  border-radius: 8px;
+  padding: 7px 8px;
   text-align: left;
   cursor: pointer;
   font: inherit;
@@ -206,14 +208,16 @@ onMounted(async () => {
 }
 .journal-reader {
   min-width: 0;
+  min-height: 0;
+  overflow: auto;
 }
 .journal-reader-head h3 {
   margin: 0;
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 600;
 }
 .journal-meta {
-  margin: 6px 0 14px;
+  margin: 4px 0 10px;
   color: var(--muted);
   font-size: 12px;
 }

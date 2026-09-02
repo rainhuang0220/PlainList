@@ -40,7 +40,13 @@
             <span aria-hidden="true">×</span>
           </button>
         </header>
-        <div class="us-main-body">
+        <div
+          class="us-main-body"
+          :class="{
+            'us-main-body--compact': activeSection === 'chatgpt-local-sync',
+            'us-main-body--reader': activeSection === 'ai-journal',
+          }"
+        >
           <AiSettingsForm v-if="activeSection === 'ai'" :key="formKey" />
           <UserProfileSettings v-else-if="activeSection === 'profile'" :key="formKey" />
           <ThemeSettingsPanel v-else-if="activeSection === 'theme'" :key="formKey" />
@@ -114,7 +120,7 @@ const activeTitle = computed(() => {
     return t('settings.title_theme', '主题');
   }
   if (activeSection.value === 'profile') {
-    return t('profile.title', '可解释的排程画像');
+    return t('profile.title', '用户画像');
   }
   if (activeSection.value === 'chatgpt-local-sync') return 'ChatGPT 活动记录';
   if (activeSection.value === 'ai-journal') return 'AI 小记';
@@ -184,8 +190,8 @@ onUnmounted(() => {
 }
 
 .us-modal--reader {
-  width: min(1100px, calc(100vw - 48px));
-  height: min(860px, calc(100vh - 48px));
+  width: min(1180px, calc(100vw - 32px));
+  height: min(88vh, calc(100vh - 32px));
 }
 
 /* 左侧导航：固定 220px，永远在左 */
@@ -329,6 +335,22 @@ onUnmounted(() => {
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   padding: 18px 24px 24px;
+}
+
+.us-main-body--compact {
+  padding: 16px 20px 18px;
+}
+
+.us-main-body--reader {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 16px 14px;
+  overflow: hidden;
+}
+
+.us-main-body--reader > * {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 /* 账户面板 */

@@ -55,6 +55,10 @@ macOS 当前为 ad-hoc 签名，首次打开若提示「无法验证」，在「
   - widget 插件：`fishtime`（应用使用时长追踪）、`focus-bay`（YOLO26 手机监测）
 - **移动端（推荐日常入口）**：Capacitor Android APK；适合语音输入 → AI 速记结构化今日清单；后续画像优化也基于此链路
 - **安全**：JWT + bcrypt 密码加密；登录失败写入 fail2ban 兼容审计日志；CORS 白名单
+
+## 鸣谢 / Acknowledgements
+
+PlainList 的 ChatGPT 本地活动工作流与 [chatgpt-local-sync](https://github.com/zwmqcf/chatgpt-local-sync) 的 local-first incremental archive workflow 集成，感谢其作者与维护者。对话全文保留在用户本机资料库中；PlainList 只读取该归档并保存整理后的活动摘要。这不是官方集成，PlainList 也没有自己实现 ChatGPT 历史导出。
 ## 技术栈
 | 层 | 技术 |
 |---|---|
