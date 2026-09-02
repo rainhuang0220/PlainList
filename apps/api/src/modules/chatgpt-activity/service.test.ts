@@ -207,6 +207,24 @@ describe('ChatGPT activity journal service', () => {
     expect(generateCurrentWeeklyReviewSnapshot).not.toHaveBeenCalled();
   });
 
+  it('ignores keyword activity titles when composing Daily journals', async () => {
+    query
+      .mockResolvedValueOnce([[{ date_key: '2026-08-31' }]])
+      .mockResolvedValueOnce([[{
+        id: 1,
+        source_id: 10,
+        category: 'engineering',
+        title: '推进PlainList UI 历史 Daily',
+        summary: '推进PlainList UI 历史 Daily',
+        output_state: 'produced',
+      }]])
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
+
+    const result = await recomposeHistoricalDailyJournals(user, { tryModel: false });
+    expect(result.upgraded).toBe(0);
+    expect(query.mock.calls.some(([sql]) => /INSERT INTO chatgpt_daily_journals/i.test(String(sql)))).toBe(false);
+  });
+
   it('force-recomposes historical daily journals from compact facts and upgrades source_version', async () => {
     query
       .mockResolvedValueOnce([[{ date_key: '2026-08-31' }]])
