@@ -284,11 +284,38 @@ export function parseWeeklySummaryContent(text: string): WeeklySummaryContent | 
       positive: parsed.positive,
       concerns: parsed.concerns,
       nextFocus: parsed.nextFocus ?? parsed.next_focus,
+      narrativeMarkdown: parsed.narrativeMarkdown ?? parsed.narrative_markdown,
     });
     return result.success ? result.data : null;
   } catch {
     return null;
   }
+}
+
+export function composeDeterministicWeeklyContent(evidence: WeeklyEvidencePayload): WeeklySummaryContent | null {
+  const relevantDays = evidence.days.filter((day) => day.date >= evidence.weekStart && day.date <= evidence.weekEnd);
+  const bodies = relevantDays
+    .map((day) => day.chatgptJournal?.trim() || day.diary?.trim() || '')
+    .filter(Boolean);
+  const completed = relevantDays.flatMap((day) => day.items.filter((item) => item.done).map((item) => `${day.date} 完成了${item.name}`));
+  if (!bodies.length && !completed.length) {
+    return null;
+  }
+
+  const narrative = [
+    ...bodies,
+    completed.length ? `### 完成事项\n\n${completed.map((item) => `- ${item}`).join('\n')}` : '',
+  ].filter(Boolean).join('\n\n');
+
+  return {
+    overall: '周总结正在更新',
+    summary: narrative.slice(0, 1800) || '已有每日记录，周总结正在更新。',
+    comparison: '无法判断',
+    positive: '无法判断',
+    concerns: '无法判断',
+    nextFocus: ['等待周总结更新'],
+    narrativeMarkdown: narrative.slice(0, 4000),
+  };
 }
 
 export function buildWeeklySummarySystemPrompt(): string {
@@ -298,12 +325,17 @@ export function buildWeeklySummarySystemPrompt(): string {
     '',
     '输出约束（最高优先级）：',
     '- 只输出一个 JSON 对象。第一个字符必须是 {，最后一个字符必须是 }。',
-    '- 禁止输出分析过程、寒暄、标题或 Markdown。',
-    '- JSON 字段：overall, summary, comparison, positive, concerns, next_focus。',
+    '- 禁止输出分析过程、寒暄或 JSON 之外的文字。',
+    '- JSON 字段：overall, summary, comparison, positive, concerns, next_focus, narrative_markdown。',
     '- overall/summary/comparison/positive/concerns 均为非空中文字符串。',
     '- next_focus 为 1 到 3 条短建议，不要鸡汤 TODO 清单。',
+    '- narrative_markdown 是给用户阅读的周总结正文，中文约 400–600 字，默认约 500 字。',
+    '- narrative_markdown 使用 Markdown。章节按实际内容动态出现，不要每周固定输出同一套 7 个标题。',
+    '- 不要把 AI 建议写成用户已经完成。必须区分计划、讨论、尝试、推进、完成。',
     '',
-    '证据优先级：日记/日回顾 > 实际打卡 > 计划任务 > 记录缺失。',
+    '证据优先级：用户人工日记 > 完成的任务/打卡 > ChatGPT Daily Journals > Activity Facts > Goals/Plans。',
+    'ChatGPT 活动是增强来源，不是回顾的前提。没有 ChatGPT 记录时，仍必须根据日记、打卡和计划作答。',
+    'chatgptJournal 是本地 ChatGPT archive 派生的每日小记，不是用户手写日记，也不是 raw transcript。',
     '日记优先，但日记不是绝对正确。若日记与任务状态冲突，必须明确写出冲突，并说明更倾向的判断及其依据；不得偷偷选定一边当成事实。',
     '未打卡不等于未完成。没有记录只说明没有记录，不能证明事情没有发生。',
     '不得把娱乐或休息自动判定为低效或荒废。不评价单个行为的道德价值。评价的是行为是否与用户长期目标和近期计划形成一致趋势。',
@@ -323,7 +355,8 @@ export function buildWeeklySummarySystemPrompt(): string {
     '- comparison：与上周和近几周相比发生了什么变化。',
     '- positive：仅写有证据支持的变化。没有就写无法判断或没有足够证据。',
     '- concerns：值得注意的问题；没有则写无法判断或没有足够证据。',
-    '- next_focus：下周最值得关注的 1 到 3 件事。',
+    '- next_focus：下周最值得关注的 1 到 3 件事。只来自证据中的未完成事项、目标和明确意图，不要凭空猜测。',
+    '- narrative_markdown：可读的周总结。完整自然周约 500 字；进行中的当前周按已完成天数写滚动进展，有几天写几天。',
   ].join('\n');
 }
 
@@ -332,7 +365,7 @@ export function buildWeeklySummaryUserPrompt(evidence: WeeklyEvidencePayload): s
     '下面是已压缩、已排序的证据。只根据这些证据作答。',
     'conflicts 是日记与打卡的冲突提示，必须在 summary 或 concerns 中写明冲突，不能把未打卡写成未完成事实。',
     'days 覆盖本周以及用于比较的近 4 周。diary 为空表示该日没有日记，不表示该日荒废。',
-    'chatgptJournal 是本地 ChatGPT archive 派生的活动日志，不是用户手写日记，也不是 raw transcript。只把它当作辅助活动证据。',
+    'chatgptJournal 是本地 ChatGPT archive 派生的每日小记，不是用户手写日记，也不是 raw transcript。优先用它形成滚动周进展，但不要把它当成用户已经完成的唯一证据。',
     'profile 是既有用户画像证据，仅作辅助，不得升级成诊断。',
     '',
     JSON.stringify(evidence),

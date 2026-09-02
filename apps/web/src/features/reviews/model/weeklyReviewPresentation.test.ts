@@ -61,7 +61,7 @@ describe('weekly review presentation', () => {
       notice: 'no_data',
     }, t);
 
-    expect(result).toEqual({ status: 'unavailable', summary: null, message: '本期暂无足够记录' });
+    expect(result).toEqual({ status: 'unavailable', summary: null, message: '还没有可回顾的记录' });
   });
 
   it('gives an actionable provider configuration message', () => {

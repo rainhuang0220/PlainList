@@ -5,6 +5,7 @@ import {
 } from '@plainlist/shared';
 import { pool } from '../../db/pool';
 import { renderChatgptDailyJournal, type ChatgptJournalFact } from './journal';
+import { dirtyClosedWeekForJournalDate, generateCurrentWeeklyReviewSnapshot } from '../reviews/weeklyReviewSnapshot';
 
 function dateValue(value: unknown): string {
   if (value instanceof Date) {
@@ -62,6 +63,7 @@ export async function reconcileChatgptActivity(user: AuthenticatedUser, payload:
       [user.id, date, status, journal.summaryMarkdown, journal.activityCount, journal.conversationCount],
     );
     journals.push({ date, status, activityCount: journal.activityCount, conversationCount: journal.conversationCount });
+    await dirtyClosedWeekForJournalDate(user.id, date);
   }
 
   await pool.query(
@@ -72,6 +74,7 @@ export async function reconcileChatgptActivity(user: AuthenticatedUser, payload:
        checked_count = VALUES(checked_count), changed_count = VALUES(changed_count), skipped_count = VALUES(skipped_count)`,
     [user.id, input.checked, input.changed, input.skipped],
   );
+  await generateCurrentWeeklyReviewSnapshot(user).catch(() => undefined);
   return { journals };
 }
 

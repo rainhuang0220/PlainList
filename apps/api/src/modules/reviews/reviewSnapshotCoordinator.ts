@@ -28,10 +28,13 @@ export type ReviewSnapshotCompletion = Pick<ReviewSnapshot, 'content' | 'model' 
 export interface ReviewSnapshotRepository {
   ensure(input: Pick<ReviewSnapshot, 'userId' | 'reviewAsOfDate' | 'windowStartDate' | 'windowEndDate'>): Promise<ReviewSnapshot>;
   find(userId: number, reviewAsOfDate: string): Promise<ReviewSnapshot | null>;
+  findByWindow(userId: number, windowStartDate: string, windowEndDate: string): Promise<ReviewSnapshot | null>;
+  listClosedWeeks(userId: number, limit: number): Promise<ReviewSnapshot[]>;
   claim(userId: number, reviewAsOfDate: string): Promise<string | null>;
   complete(userId: number, reviewAsOfDate: string, claimToken: string, result: ReviewSnapshotCompletion): Promise<ReviewSnapshot>;
   fail(userId: number, reviewAsOfDate: string, claimToken: string, errorMessage: string): Promise<ReviewSnapshot>;
   latestReady(userId: number): Promise<ReviewSnapshot | null>;
+  markDirty(userId: number, reviewAsOfDate: string): Promise<void>;
   expireExhaustedLeases(): Promise<void>;
 }
 
@@ -40,7 +43,11 @@ export function createReviewSnapshotCoordinator(input: {
   generate: (user: AuthenticatedUser, snapshot: ReviewSnapshot) => Promise<Omit<ReviewSnapshotCompletion, 'generatedAt'>>;
   now: () => Date;
 }) {
-  async function generate(user: AuthenticatedUser, reviewAsOfDate: string): Promise<ReviewSnapshot | null> {
+  async function generate(
+    user: AuthenticatedUser,
+    reviewAsOfDate: string,
+    options: { force?: boolean } = {},
+  ): Promise<ReviewSnapshot | null> {
     const window = reviewWindowFor(reviewAsOfDate);
     const snapshot = await input.repository.ensure({
       userId: user.id,
@@ -48,8 +55,11 @@ export function createReviewSnapshotCoordinator(input: {
       windowStartDate: window.windowStartDate,
       windowEndDate: window.windowEndDate,
     });
-    if (snapshot.status === 'ready') {
+    if (snapshot.status === 'ready' && !options.force) {
       return snapshot;
+    }
+    if (snapshot.status === 'ready' && options.force) {
+      await input.repository.markDirty(user.id, reviewAsOfDate);
     }
 
     const claimToken = await input.repository.claim(user.id, reviewAsOfDate);

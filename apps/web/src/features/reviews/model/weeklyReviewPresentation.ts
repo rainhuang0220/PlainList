@@ -20,7 +20,7 @@ export function presentWeeklyReview(
       return t('week.summary.not_updated', '本期回顾暂未更新');
     }
     if (result.notice === 'no_data') {
-      return t('week.summary.no_data', '本期暂无足够记录');
+      return t('week.summary.no_data', '还没有可回顾的记录');
     }
     if (result.notice === 'no_provider') {
       return t('week.summary.no_provider', '尚未配置回顾模型');

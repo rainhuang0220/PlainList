@@ -50,6 +50,61 @@ export function reviewWindowFor(asOfDate: string): ReviewWindow {
   };
 }
 
+export interface WeeklyReviewPageWindow {
+  asOfDate: string;
+  isMonday: boolean;
+  currentWeekStart: string;
+  currentWeekEnd: string;
+  currentCompletedStart: string | null;
+  currentCompletedEnd: string | null;
+  previousClosedStart: string;
+  previousClosedEnd: string;
+  completedDays: string[];
+}
+
+export function iterateDateKeys(from: string, to: string): string[] {
+  if (!from || !to || from > to) return [];
+  const keys: string[] = [];
+  let current = from;
+  while (current <= to) {
+    keys.push(current);
+    current = shiftCalendarDate(current, 1);
+  }
+  return keys;
+}
+
+export function weeklyReviewPageFor(asOfDate: string): WeeklyReviewPageWindow {
+  const currentWeekStart = mondayFor(asOfDate);
+  const currentWeekEnd = shiftCalendarDate(currentWeekStart, 6);
+  const isMonday = currentWeekStart === asOfDate;
+  const previousClosedStart = shiftCalendarDate(currentWeekStart, -7);
+  const previousClosedEnd = shiftCalendarDate(currentWeekStart, -1);
+  const currentCompletedEnd = isMonday ? null : shiftCalendarDate(asOfDate, -1);
+  const currentCompletedStart = isMonday ? null : currentWeekStart;
+
+  return {
+    asOfDate,
+    isMonday,
+    currentWeekStart,
+    currentWeekEnd,
+    currentCompletedStart,
+    currentCompletedEnd,
+    previousClosedStart,
+    previousClosedEnd,
+    completedDays: currentCompletedStart && currentCompletedEnd
+      ? iterateDateKeys(currentCompletedStart, currentCompletedEnd)
+      : [],
+  };
+}
+
+export function isFullClosedWeek(windowStart: string, windowEnd: string): boolean {
+  return shiftCalendarDate(windowStart, 6) === windowEnd;
+}
+
+export function closedWeekReviewAsOf(windowEnd: string): string {
+  return shiftCalendarDate(windowEnd, 1);
+}
+
 export function createReviewClock(options: ReviewClockOptions) {
   const now = options.now ?? (() => new Date());
   const formatter = new Intl.DateTimeFormat('en-CA', {

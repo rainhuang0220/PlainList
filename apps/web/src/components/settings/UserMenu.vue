@@ -27,6 +27,9 @@
         <button type="button" class="user-menu-item" @click="openSettings('account')">
           {{ t('settings.menu_account', '账户信息') }}
         </button>
+        <button type="button" class="user-menu-item" @click="openSettings('ai-journal')">
+          AI 小记
+        </button>
         <div class="user-menu-divider" />
         <button type="button" class="user-menu-item user-menu-item-danger" @click="emit('logout')">
           {{ t('nav.lock', '锁定') }}
@@ -46,7 +49,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   logout: [];
-  openSettings: [section: 'account' | 'ai' | 'profile'];
+  openSettings: [section: 'account' | 'ai' | 'profile' | 'ai-journal'];
 }>();
 
 const i18n = useI18nStore();
@@ -67,7 +70,7 @@ function closeMenu() {
   menuOpen.value = false;
 }
 
-function openSettings(section: 'account' | 'ai' | 'profile') {
+function openSettings(section: 'account' | 'ai' | 'profile' | 'ai-journal') {
   closeMenu();
   emit('openSettings', section);
 }

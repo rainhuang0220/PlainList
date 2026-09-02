@@ -8,6 +8,7 @@ import {
   isWeeklySummaryCacheFresh,
   normalizeWeekStart,
   parseWeeklySummaryContent,
+  composeDeterministicWeeklyContent,
   sourceHash,
   reviewSourceDataCount,
   weeklyLookbackRange,
@@ -308,7 +309,7 @@ describe('cache freshness', () => {
     expect(isWeeklySummaryCacheFresh(cache, {
       weekStart: '2026-08-24',
       sourceHash: 'abc',
-      promptVersion: 'weekly-summary-v2',
+      promptVersion: 'weekly-summary-v3',
     })).toBe(false);
   });
 });
@@ -327,6 +328,14 @@ describe('parseWeeklySummaryContent', () => {
     const parsed = parseWeeklySummaryContent(JSON.stringify(valid));
     expect(parsed?.nextFocus).toEqual(['先补上论文实验的可验证进度']);
     expect(parsed?.overall).toBe(valid.overall);
+  });
+
+  it('keeps an optional narrative markdown body for the readable weekly summary', () => {
+    const parsed = parseWeeklySummaryContent(JSON.stringify({
+      ...valid,
+      narrative_markdown: '## 本周\n\n继续推进 PlainList 2.4.0，并把每日小记收成一篇可读的周总结。',
+    }));
+    expect(parsed?.narrativeMarkdown).toContain('每日小记');
   });
 
   it('extracts JSON after model preamble', () => {
@@ -354,11 +363,33 @@ describe('parseWeeklySummaryContent', () => {
   });
 });
 
+describe('composeDeterministicWeeklyContent', () => {
+  it('keeps the week readable from daily journals when the model is unavailable', () => {
+    const evidence = assembleReviewSnapshotEvidence({
+      reviewAsOfDate: '2026-09-10',
+      plans: [],
+      checks: {},
+      reviews: {},
+      profile: [],
+      chatgptJournals: {
+        '2026-09-07': '## 9 月 7 日\n\n推进了周模型。',
+        '2026-09-08': '## 9 月 8 日\n\n修复了设置页空白。',
+        '2026-09-09': '## 9 月 9 日\n\n整理了 AI 小记。',
+      },
+    });
+    const content = composeDeterministicWeeklyContent(evidence);
+    expect(content?.overall).toBe('周总结正在更新');
+    expect(content?.narrativeMarkdown).toContain('9 月 7 日');
+    expect(content?.narrativeMarkdown).toContain('9 月 9 日');
+  });
+});
+
 describe('system prompt constraints', () => {
   it('encodes observer rules rather than a generic summarize request', () => {
     const prompt = buildWeeklySummarySystemPrompt();
     expect(prompt).toContain('第三方观察者');
-    expect(prompt).toContain('weekly-summary-v1');
+    expect(prompt).toContain('weekly-summary-v2');
+    expect(prompt).toContain('narrative_markdown');
     expect(prompt).not.toMatch(/请根据以下数据总结本周表现/);
     expect(prompt).toContain('未打卡不等于未完成');
     expect(prompt).toContain('日记优先');

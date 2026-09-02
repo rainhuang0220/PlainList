@@ -88,6 +88,17 @@ describe('MySQL review snapshot repository', () => {
     expect(query.mock.calls[0]?.[1]).toContain('expired-claim-token');
   });
 
+  it('marks a ready closed week dirty so late Sunday journals can regenerate once', async () => {
+    const query = vi.fn().mockResolvedValue([{ affectedRows: 1 }]);
+    const repository = createMysqlReviewSnapshotRepository(query);
+
+    await repository.markDirty(7, '2026-09-07');
+
+    expect(query.mock.calls[0]?.[0]).toContain("SET status = 'pending', attempt_count = 0");
+    expect(query.mock.calls[0]?.[0]).toContain("status IN ('ready', 'error')");
+    expect(query.mock.calls[0]?.[1]).toEqual([7, '2026-09-07']);
+  });
+
   it('expires an exhausted stale lease instead of leaving it generating forever', async () => {
     const query = vi.fn().mockResolvedValue([{ affectedRows: 1 }]);
     const repository = createMysqlReviewSnapshotRepository(query);

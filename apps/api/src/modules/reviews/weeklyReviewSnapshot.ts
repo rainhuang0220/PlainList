@@ -1,7 +1,13 @@
 import {
+  closedWeekReviewAsOf,
   createReviewClock,
+  reviewWindowFor,
+  weeklyReviewPageFor,
   type AuthenticatedUser,
   type PlanRecord,
+  type WeeklyReviewDailyEntry,
+  type WeeklyReviewPlanItem,
+  type WeeklyReviewRuntime,
   type WeeklySummaryResponse,
   WEEKLY_SUMMARY_PROMPT_VERSION,
 } from '@plainlist/shared';
@@ -15,11 +21,13 @@ import {
   assembleReviewSnapshotEvidence,
   buildWeeklySummarySystemPrompt,
   buildWeeklySummaryUserPrompt,
+  composeDeterministicWeeklyContent,
   parseWeeklySummaryContent,
   reviewSourceDataCount,
   sourceHash,
   weeklyLookbackRange,
 } from './weeklySummaryCore';
+import { buildWeeklyReviewPage, sectionFromSnapshot } from './weeklyReviewPage';
 import { createReviewSnapshotCoordinator, type ReviewSnapshot } from './reviewSnapshotCoordinator';
 import { createMysqlReviewSnapshotRepository } from './reviewSnapshotRepository';
 import { listReviews } from './service';
@@ -106,27 +114,43 @@ const coordinator = createReviewSnapshotCoordinator({
     if (reviewSourceDataCount(evidence) === 0) {
       throw new Error('NO_SOURCE_DATA');
     }
-    const config = await resolveAiConfigForUser(user.id);
-    if (!config || !aiProviderConfigured(config)) throw new Error('NO_PROVIDER');
-    const result = await chatComplete(config, {
-      system: buildWeeklySummarySystemPrompt(),
-      user: buildWeeklySummaryUserPrompt(evidence),
-      temperature: 0.2,
-      maxTokens: 2500,
-      jsonResponse: false,
-      thinkingMode: 'disabled',
-      timeoutMs: Math.max(config.timeoutMs, 60_000),
-    });
-    const content = parseWeeklySummaryContent(result.text);
-    if (!content) throw new Error('本期回顾暂不可用');
-    return {
-      content,
-      model: result.model,
-      provider: result.provider,
-      evidence,
-      evidenceHash: sourceHash(evidence),
-      promptVersion: WEEKLY_SUMMARY_PROMPT_VERSION,
+    const fallback = () => {
+      const content = composeDeterministicWeeklyContent(evidence);
+      if (!content) throw new Error('NO_SOURCE_DATA');
+      return {
+        content,
+        model: null,
+        provider: 'deterministic',
+        evidence,
+        evidenceHash: sourceHash(evidence),
+        promptVersion: WEEKLY_SUMMARY_PROMPT_VERSION,
+      };
     };
+    const config = await resolveAiConfigForUser(user.id);
+    if (!config || !aiProviderConfigured(config)) return fallback();
+    try {
+      const result = await chatComplete(config, {
+        system: buildWeeklySummarySystemPrompt(),
+        user: buildWeeklySummaryUserPrompt(evidence),
+        temperature: 0.2,
+        maxTokens: 2500,
+        jsonResponse: false,
+        thinkingMode: 'disabled',
+        timeoutMs: Math.max(config.timeoutMs, 60_000),
+      });
+      const content = parseWeeklySummaryContent(result.text);
+      if (!content) return fallback();
+      return {
+        content,
+        model: result.model,
+        provider: result.provider,
+        evidence,
+        evidenceHash: sourceHash(evidence),
+        promptVersion: WEEKLY_SUMMARY_PROMPT_VERSION,
+      };
+    } catch {
+      return fallback();
+    }
   },
 });
 
@@ -228,11 +252,222 @@ export async function getCurrentWeeklyReviewSnapshot(user: AuthenticatedUser): P
   };
 }
 
-export async function generateCurrentWeeklyReviewSnapshot(user: AuthenticatedUser) {
-  const window = clock.reviewWindow();
+async function generateWindowIfPossible(user: AuthenticatedUser, reviewAsOfDate: string, force = false) {
+  const window = reviewWindowFor(reviewAsOfDate);
   const availability = await currentReviewAvailability(user, window.windowStartDate, window.windowEndDate);
-  if (availability !== 'available') return null;
-  return coordinator.generate(user, clock.currentDateKey());
+  if (availability === 'no_data') return null;
+  return coordinator.generate(user, reviewAsOfDate, { force });
+}
+
+export async function generateCurrentWeeklyReviewSnapshot(user: AuthenticatedUser) {
+  const asOf = clock.currentDateKey();
+  const page = weeklyReviewPageFor(asOf);
+  const closed = await generateWindowIfPossible(user, page.currentWeekStart);
+  if (page.isMonday) return closed;
+  return generateWindowIfPossible(user, asOf);
+}
+
+export async function dirtyClosedWeekForJournalDate(userId: number, journalDate: string): Promise<void> {
+  const asOf = clock.currentDateKey();
+  const journalWeek = weeklyReviewPageFor(journalDate);
+  const closeMonday = closedWeekReviewAsOf(journalWeek.currentWeekEnd);
+  if (asOf >= closeMonday) {
+    await repository.markDirty(userId, closeMonday);
+    return;
+  }
+  const current = weeklyReviewPageFor(asOf);
+  if (current.completedDays.includes(journalDate)) {
+    await repository.markDirty(userId, asOf);
+  }
+}
+
+function publicHost(baseUrl: string | null | undefined): string | null {
+  if (!baseUrl) return null;
+  try {
+    return new URL(baseUrl).host || null;
+  } catch {
+    return null;
+  }
+}
+
+async function loadRuntime(userId: number): Promise<WeeklyReviewRuntime> {
+  const config = await resolveAiConfigForUser(userId);
+  return {
+    weeklyProvider: config?.provider ?? null,
+    weeklyModel: config?.model ?? null,
+    weeklySource: config?.source ?? 'none',
+    weeklyHost: publicHost(config?.baseUrl),
+    activityMethod: 'deterministic_local',
+  };
+}
+
+async function loadJournals(userId: number, from: string, to: string): Promise<WeeklyReviewDailyEntry[]> {
+  if (!from || !to || from > to) return [];
+  const [rows] = await pool.query(
+    `SELECT journal_date, summary_markdown, activity_count, conversation_count
+     FROM chatgpt_daily_journals
+     WHERE user_id = ? AND source_type = 'chatgpt-local-sync' AND status IN ('ready', 'final')
+       AND journal_date BETWEEN ? AND ?
+     ORDER BY journal_date ASC`,
+    [userId, from, to],
+  );
+  return (Array.isArray(rows) ? rows : []).map((row) => ({
+    date: localDateKey((row as { journal_date: string }).journal_date) ?? '',
+    summaryMarkdown: String((row as { summary_markdown: string }).summary_markdown),
+    activityCount: Number((row as { activity_count: number }).activity_count),
+    conversationCount: Number((row as { conversation_count: number }).conversation_count),
+  })).filter((row) => row.date);
+}
+
+async function loadCurrentPlans(user: AuthenticatedUser, weekStart: string, weekEnd: string): Promise<WeeklyReviewPlanItem[]> {
+  const [plans, checks] = await Promise.all([
+    loadPlans(user.id),
+    listChecks(user, { from: weekStart, to: weekEnd }),
+  ]);
+  return plans
+    .filter((plan) => plan.type === 'todo' && plan.scheduledDate && plan.scheduledDate >= weekStart && plan.scheduledDate <= weekEnd)
+    .filter((plan) => !checks[String(plan.id)]?.[plan.scheduledDate ?? '']?.done)
+    .slice(0, 8)
+    .map((plan) => ({ kind: 'task' as const, text: plan.name }));
+}
+
+async function hasAnyReviewHistory(userId: number): Promise<boolean> {
+  const [rows] = await pool.query(
+    `SELECT
+       (SELECT COUNT(*) FROM weekly_review_snapshots WHERE user_id = ? AND status = 'ready')
+       + (SELECT COUNT(*) FROM chatgpt_daily_journals WHERE user_id = ? AND status IN ('ready', 'final'))
+       + (SELECT COUNT(*) FROM daily_reviews WHERE user_id = ? AND TRIM(content) <> '')
+       + (SELECT COUNT(*) FROM checks c INNER JOIN plans p ON p.id = c.plan_id WHERE p.user_id = ? AND c.done = 1)
+       AS history_count`,
+    [userId, userId, userId, userId],
+  );
+  if (!Array.isArray(rows) || !rows[0]) return false;
+  return Number((rows[0] as { history_count?: number }).history_count ?? 0) > 0;
+}
+
+function snapshotSection(snapshot: ReviewSnapshot | null) {
+  if (!snapshot) return null;
+  return sectionFromSnapshot({
+    weekStart: snapshot.windowStartDate,
+    weekEnd: snapshot.windowEndDate,
+    status: snapshot.status === 'ready' ? 'ready' : snapshot.status,
+    content: snapshot.content,
+    model: snapshot.model,
+    provider: snapshot.provider,
+    generatedAt: snapshot.generatedAt,
+  });
+}
+
+export async function attachWeeklyReviewPage(
+  user: AuthenticatedUser,
+  base: WeeklySummaryResponse,
+): Promise<WeeklySummaryResponse> {
+  const asOf = base.reviewAsOfDate || clock.currentDateKey();
+  const pageWindow = weeklyReviewPageFor(asOf);
+  const [previousClosed, currentSnapshot, journals, plans, history, runtime] = await Promise.all([
+    repository.findByWindow(user.id, pageWindow.previousClosedStart, pageWindow.previousClosedEnd)
+      .then((row) => row ?? repository.find(user.id, pageWindow.currentWeekStart)),
+    pageWindow.isMonday ? Promise.resolve(null) : coordinator.read(user.id, asOf),
+    loadJournals(
+      user.id,
+      pageWindow.currentCompletedStart ?? pageWindow.currentWeekStart,
+      pageWindow.currentCompletedEnd ?? pageWindow.currentWeekStart,
+    ).then((rows) => (pageWindow.isMonday ? [] : rows)),
+    loadCurrentPlans(user, pageWindow.currentWeekStart, pageWindow.currentWeekEnd),
+    hasAnyReviewHistory(user.id),
+    loadRuntime(user.id),
+  ]);
+
+  const currentSection = snapshotSection(currentSnapshot);
+  const previousSection = snapshotSection(previousClosed && previousClosed.windowStartDate === pageWindow.previousClosedStart
+    ? previousClosed
+    : null);
+
+  const page = buildWeeklyReviewPage({
+    asOfDate: asOf,
+    previousClosed: previousSection,
+    current: currentSection,
+    currentDailyJournals: journals,
+    currentPlans: plans,
+    hasHistory: history || Boolean(previousSection?.content) || journals.length > 0 || plans.length > 0,
+    runtime,
+  });
+
+  return { ...base, page };
+}
+
+export async function listClosedWeeklyHistory(user: AuthenticatedUser, limit = 24) {
+  const snapshots = await repository.listClosedWeeks(user.id, limit);
+  const [journalRows] = await pool.query(
+    `SELECT journal_date, summary_markdown, activity_count, conversation_count, status, generated_at, updated_at
+     FROM chatgpt_daily_journals
+     WHERE user_id = ? AND source_type = 'chatgpt-local-sync' AND status IN ('ready', 'final')
+     ORDER BY journal_date DESC
+     LIMIT 400`,
+    [user.id],
+  );
+  const daily = (Array.isArray(journalRows) ? journalRows : []).map((row) => ({
+    date: localDateKey((row as { journal_date: string }).journal_date) ?? '',
+    summaryMarkdown: String((row as { summary_markdown: string }).summary_markdown),
+    activityCount: Number((row as { activity_count: number }).activity_count),
+    conversationCount: Number((row as { conversation_count: number }).conversation_count),
+    status: String((row as { status: string }).status),
+    generatedAt: (row as { generated_at?: string }).generated_at ? new Date(String((row as { generated_at: string }).generated_at)).toISOString() : null,
+    updatedAt: new Date(String((row as { updated_at: string }).updated_at)).toISOString(),
+  })).filter((row) => row.date);
+
+  const weekly = snapshots.map((snapshot) => ({
+    weekStart: snapshot.windowStartDate,
+    weekEnd: snapshot.windowEndDate,
+    reviewAsOfDate: snapshot.reviewAsOfDate,
+    status: snapshot.status,
+    content: snapshot.content,
+    narrativeMarkdown: snapshot.content ? sectionFromSnapshot({
+      weekStart: snapshot.windowStartDate,
+      weekEnd: snapshot.windowEndDate,
+      status: 'ready',
+      content: snapshot.content,
+      provider: snapshot.provider,
+      model: snapshot.model,
+      generatedAt: snapshot.generatedAt,
+    }).narrativeMarkdown : undefined,
+    model: snapshot.model,
+    provider: snapshot.provider,
+    generatedAt: snapshot.generatedAt,
+  }));
+
+  const snapshotWeeks = new Set(weekly.map((item) => item.weekStart));
+  const asOf = clock.currentDateKey();
+  for (const entry of daily) {
+    const page = weeklyReviewPageFor(entry.date);
+    if (snapshotWeeks.has(page.currentWeekStart)) continue;
+    if (asOf < closedWeekReviewAsOf(page.currentWeekEnd)) continue;
+    const weekDays = daily.filter((item) => weeklyReviewPageFor(item.date).currentWeekStart === page.currentWeekStart);
+    if (!weekDays.length) continue;
+    snapshotWeeks.add(page.currentWeekStart);
+    weekly.push({
+      weekStart: page.currentWeekStart,
+      weekEnd: page.currentWeekEnd,
+      reviewAsOfDate: closedWeekReviewAsOf(page.currentWeekEnd),
+      status: 'ready',
+      content: {
+        overall: '由每日小记整理',
+        summary: weekDays.map((item) => item.summaryMarkdown).join('\n\n').slice(0, 1800),
+        comparison: '无法判断',
+        positive: '无法判断',
+        concerns: '无法判断',
+        nextFocus: ['查看每日小记'],
+        narrativeMarkdown: weekDays.map((item) => item.summaryMarkdown).join('\n\n').slice(0, 4000),
+      },
+      narrativeMarkdown: weekDays.map((item) => item.summaryMarkdown).join('\n\n').slice(0, 4000),
+      model: null,
+      provider: 'deterministic',
+      generatedAt: null,
+    });
+  }
+
+  weekly.sort((left, right) => right.weekStart.localeCompare(left.weekStart));
+  return { daily, weekly: weekly.slice(0, limit) };
 }
 
 export async function catchUpWeeklyReviewSnapshots(): Promise<boolean> {

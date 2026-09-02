@@ -34,7 +34,8 @@
           <AiSettingsForm v-if="activeSection === 'ai'" :key="formKey" />
           <UserProfileSettings v-else-if="activeSection === 'profile'" :key="formKey" />
           <ThemeSettingsPanel v-else-if="activeSection === 'theme'" :key="formKey" />
-          <ChatgptLocalSyncPanel v-else-if="activeSection === 'chatgpt-local-sync'" />
+          <ChatgptLocalSyncPanel v-else-if="activeSection === 'chatgpt-local-sync'" @open-ai-journal="switchSection('ai-journal')" />
+          <AiJournalHistoryPanel v-else-if="activeSection === 'ai-journal'" />
           <div v-else class="us-account">
             <div class="us-account-card">
               <div class="us-account-row">
@@ -65,8 +66,9 @@ import AiSettingsForm from '@/components/settings/AiSettingsForm.vue';
 import ThemeSettingsPanel from '@/components/settings/ThemeSettingsPanel.vue';
 import UserProfileSettings from '@/components/settings/UserProfileSettings.vue';
 import ChatgptLocalSyncPanel from '@/components/settings/ChatgptLocalSyncPanel.vue';
+import AiJournalHistoryPanel from '@/components/settings/AiJournalHistoryPanel.vue';
 
-type SettingsSection = 'account' | 'ai' | 'profile' | 'theme' | 'chatgpt-local-sync';
+type SettingsSection = 'account' | 'ai' | 'profile' | 'theme' | 'chatgpt-local-sync' | 'ai-journal';
 
 const props = defineProps<{
   username: string;
@@ -91,6 +93,7 @@ const navItems = computed(() => [
   { id: 'ai' as const, label: t('settings.nav_ai', 'AI 速记') },
   { id: 'profile' as const, label: t('settings.nav_profile', 'AI 画像') },
   { id: 'chatgpt-local-sync' as const, label: 'ChatGPT 活动记录' },
+  { id: 'ai-journal' as const, label: 'AI 小记' },
 ]);
 
 const activeTitle = computed(() => {
@@ -104,6 +107,7 @@ const activeTitle = computed(() => {
     return t('profile.title', '可解释的排程画像');
   }
   if (activeSection.value === 'chatgpt-local-sync') return 'ChatGPT 活动记录';
+  if (activeSection.value === 'ai-journal') return 'AI 小记';
   return t('intake.settings_title', '大模型设置');
 });
 
@@ -371,7 +375,7 @@ onUnmounted(() => {
 
   .us-side-body {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 0;
     padding: 0;
     overflow: hidden;
