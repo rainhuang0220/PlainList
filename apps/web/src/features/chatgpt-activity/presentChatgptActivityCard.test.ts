@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { presentChatgptActivityCard } from './presentChatgptActivityCard';
 
 describe('presentChatgptActivityCard', () => {
-  it('does not show a four-row technical ledger when desktop is disconnected', () => {
+  it('keeps desktop disconnected as a short source explanation', () => {
     const card = presentChatgptActivityCard({
       isDesktop: true,
       localStatus: 'disabled',
@@ -12,7 +12,9 @@ describe('presentChatgptActivityCard', () => {
     });
     expect(card.variant).toBe('desktop-disconnected');
     expect(card.connected).toBe(false);
-    expect(card.body).toContain('本机');
+    expect(card.headline).toBe('尚未连接本地资料库。');
+    expect(card.body).toContain('形成每日小记');
+    expect(card.showDesktopDownload).toBe(false);
   });
 
   it('shows a compact connected state with conversation counts', () => {
@@ -25,9 +27,9 @@ describe('presentChatgptActivityCard', () => {
     });
     expect(card.variant).toBe('desktop-connected');
     expect(card.headline).toBe('自动记录中');
-    expect(card.countLine).toContain('105 个对话');
-    expect(card.countLine).toContain('已处理 76');
+    expect(card.countLine).toBe('105 个对话 · 已处理 76');
     expect(card.todayLine).toBeNull();
+    expect(card.body).toBe('');
   });
 
   it('explains that web cannot pick a local archive when disconnected', () => {
@@ -39,8 +41,8 @@ describe('presentChatgptActivityCard', () => {
       lastResult: null,
     });
     expect(card.variant).toBe('web-disconnected');
-    expect(card.headline).toBe('尚未连接桌面资料库');
-    expect(card.body).toContain('PlainList Desktop');
+    expect(card.headline).toBe('尚未连接桌面资料库。');
+    expect(card.body).toContain('请在 PlainList Desktop 中完成一次连接');
     expect(card.showDesktopDownload).toBe(true);
   });
 

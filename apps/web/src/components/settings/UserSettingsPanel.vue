@@ -3,8 +3,7 @@
     <div
       class="us-modal"
       :class="{
-        'us-modal--compact': activeSection === 'chatgpt-local-sync',
-        'us-modal--reader': activeSection === 'ai-journal',
+        'us-modal--compact': activeSection === 'chatgpt-local-sync' || activeSection === 'ai-journal',
       }"
       role="dialog"
       aria-label="用户设置"
@@ -43,8 +42,7 @@
         <div
           class="us-main-body"
           :class="{
-            'us-main-body--compact': activeSection === 'chatgpt-local-sync',
-            'us-main-body--reader': activeSection === 'ai-journal',
+            'us-main-body--compact': activeSection === 'chatgpt-local-sync' || activeSection === 'ai-journal',
           }"
         >
           <AiSettingsForm v-if="activeSection === 'ai'" :key="formKey" />
@@ -187,11 +185,6 @@ onUnmounted(() => {
 .us-modal--compact .us-main-body {
   flex: 0 0 auto;
   overflow: visible;
-}
-
-.us-modal--reader {
-  width: min(1180px, calc(100vw - 32px));
-  height: min(88vh, calc(100vh - 32px));
 }
 
 /* 左侧导航：固定 220px，永远在左 */
@@ -339,18 +332,6 @@ onUnmounted(() => {
 
 .us-main-body--compact {
   padding: 16px 20px 18px;
-}
-
-.us-main-body--reader {
-  display: flex;
-  flex-direction: column;
-  padding: 12px 16px 14px;
-  overflow: hidden;
-}
-
-.us-main-body--reader > * {
-  flex: 1 1 auto;
-  min-height: 0;
 }
 
 /* 账户面板 */

@@ -1,6 +1,6 @@
 <template>
-  <section class="journal-shell">
-    <div class="journal-tabs" role="tablist">
+  <section class="ai-journal">
+    <div class="tabs" role="tablist">
       <button type="button" role="tab" :aria-selected="tab === 'daily'" :class="{ active: tab === 'daily' }" @click="tab = 'daily'">每日小记</button>
       <button type="button" role="tab" :aria-selected="tab === 'weekly'" :class="{ active: tab === 'weekly' }" @click="tab = 'weekly'">每周回顾</button>
     </div>
@@ -8,56 +8,46 @@
     <p v-if="loading" class="muted">正在读取 AI 小记…</p>
     <p v-else-if="error" class="muted">暂时无法读取历史记录，请稍后重试。</p>
 
-    <div v-else-if="tab === 'daily'" class="journal-layout">
-      <ul v-if="daily.length" class="journal-index">
+    <div v-else-if="tab === 'daily'" class="layout">
+      <ul v-if="daily.length" class="index">
         <li v-for="entry in daily" :key="entry.date">
           <button type="button" :class="{ active: selectedDate === entry.date }" @click="selectedDate = entry.date">
-            <strong>{{ presentJournalDate(entry.date, today).primary }}</strong>
-            <small>{{ previewText(entry.summaryMarkdown) }}</small>
+            {{ presentJournalDate(entry.date, today).primary }}
           </button>
         </li>
       </ul>
-      <div class="journal-reader">
+      <article class="reader">
         <template v-if="selectedDaily">
-          <header class="journal-reader-head">
-            <h3>{{ presentJournalDate(selectedDaily.date, today).primary }}</h3>
-            <p class="journal-meta">
-              ChatGPT 活动 · {{ selectedDaily.activityCount }} 条
-              <span v-if="selectedDaily.updatedAt"> · 最后更新 {{ formatClock(selectedDaily.updatedAt) }}</span>
-            </p>
-          </header>
+          <h3>{{ presentJournalDate(selectedDaily.date, today).primary }}</h3>
           <!-- eslint-disable-next-line vue/no-v-html -->
-          <div class="journal-prose" v-html="renderSafeMarkdown(selectedDaily.summaryMarkdown)" />
+          <div class="prose" v-html="renderSafeMarkdown(selectedDaily.summaryMarkdown)" />
         </template>
-        <div v-else class="journal-empty">
-          <p class="journal-empty-title">{{ emptyDaily.title }}</p>
-          <p v-if="emptyDaily.body">{{ emptyDaily.body }}</p>
+        <div v-else>
+          <p class="muted">{{ emptyDaily.title }}</p>
+          <p v-if="emptyDaily.body" class="muted">{{ emptyDaily.body }}</p>
         </div>
-      </div>
+      </article>
     </div>
 
-    <div v-else class="journal-layout">
-      <ul v-if="weekly.length" class="journal-index">
+    <div v-else class="layout">
+      <ul v-if="weekly.length" class="index">
         <li v-for="week in weekly" :key="week.weekStart">
           <button type="button" :class="{ active: selectedWeek === week.weekStart }" @click="selectedWeek = week.weekStart">
-            <strong>{{ presentWeekRange(week.weekStart, week.weekEnd) }}</strong>
+            {{ presentWeekRange(week.weekStart, week.weekEnd) }}
           </button>
         </li>
       </ul>
-      <div class="journal-reader">
+      <article class="reader">
         <template v-if="selectedWeekly">
-          <header class="journal-reader-head">
-            <h3>{{ presentWeekRange(selectedWeekly.weekStart, selectedWeekly.weekEnd) }}</h3>
-            <p class="journal-meta">已结束的一周</p>
-          </header>
+          <h3>{{ presentWeekRange(selectedWeekly.weekStart, selectedWeekly.weekEnd) }}</h3>
           <!-- eslint-disable-next-line vue/no-v-html -->
-          <div class="journal-prose" v-html="renderSafeMarkdown(selectedWeekly.narrativeMarkdown || selectedWeekly.content?.summary || '')" />
+          <div class="prose" v-html="renderSafeMarkdown(selectedWeekly.narrativeMarkdown || selectedWeekly.content?.summary || '')" />
         </template>
-        <div v-else class="journal-empty">
-          <p class="journal-empty-title">{{ emptyWeekly.title }}</p>
-          <p v-if="emptyWeekly.body">{{ emptyWeekly.body }}</p>
+        <div v-else>
+          <p class="muted">{{ emptyWeekly.title }}</p>
+          <p v-if="emptyWeekly.body" class="muted">{{ emptyWeekly.body }}</p>
         </div>
-      </div>
+      </article>
     </div>
   </section>
 </template>
@@ -102,19 +92,6 @@ const emptyWeekly = computed(() => presentAiJournalEmpty(activity.connection.dis
   checked: activity.connection.checked,
 }));
 
-function previewText(markdown: string) {
-  const text = String(markdown || '').replace(/[#*_`>-]/g, '').replace(/\s+/g, ' ').trim();
-  return text ? text.slice(0, 28) : '';
-}
-
-function formatClock(value: string) {
-  try {
-    return new Date(value).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
-  } catch {
-    return '';
-  }
-}
-
 onMounted(async () => {
   try {
     await activity.fetchConnection().catch(() => {});
@@ -131,145 +108,117 @@ onMounted(async () => {
 });
 </script>
 <style scoped>
-.journal-shell {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  gap: 10px;
-  min-width: 0;
-  min-height: 0;
-  height: 100%;
+.ai-journal {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
-.journal-tabs {
-  display: inline-flex;
-  width: fit-content;
-  padding: 2px;
+.tabs {
+  display: flex;
+  gap: 8px;
+}
+.tabs button {
   border: 1px solid var(--faint);
-  border-radius: 999px;
-  background: var(--faint2);
-  gap: 0;
-}
-.journal-tabs button {
-  border: 0;
   background: transparent;
   color: var(--mid);
-  border-radius: 999px;
-  padding: 7px 14px;
+  padding: 8px 14px;
+  font-size: 12px;
+  letter-spacing: 0.06em;
   cursor: pointer;
-  font: inherit;
+  border-radius: var(--r);
+  font-family: inherit;
 }
-.journal-tabs button.active {
-  background: var(--surface);
-  color: var(--dark);
-  font-weight: 600;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+.tabs button.active {
+  background: var(--dark);
+  color: var(--surface);
+  border-color: var(--dark);
 }
-.journal-layout {
+.layout {
   display: grid;
-  grid-template-columns: 168px minmax(0, 1fr);
-  gap: 16px;
-  align-items: stretch;
-  min-height: 0;
-  height: 100%;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
 }
-.journal-index {
-  display: grid;
-  align-content: start;
-  gap: 1px;
+.index {
   margin: 0;
   padding: 0;
   list-style: none;
-  overflow: auto;
-  min-height: 0;
 }
-.journal-index button {
+.index button {
   width: 100%;
-  display: grid;
-  gap: 1px;
+  padding: 11px 0;
   border: 0;
+  border-bottom: 1px solid var(--faint);
   background: transparent;
-  color: var(--mid);
-  border-radius: 8px;
-  padding: 7px 8px;
+  color: var(--dark);
   text-align: left;
   cursor: pointer;
   font: inherit;
-}
-.journal-index button strong {
   font-size: 13px;
+  line-height: 1.5;
+}
+.index button.active {
+  font-weight: 600;
+}
+.reader h3 {
+  margin: 0 0 12px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--dark);
 }
-.journal-index button small {
-  color: var(--muted);
-  font-size: 11px;
-}
-.journal-index button.active {
-  background: var(--faint2);
-}
-.journal-reader {
-  min-width: 0;
-  min-height: 0;
-  overflow: auto;
-}
-.journal-reader-head h3 {
-  margin: 0;
-  font-size: 17px;
-  font-weight: 600;
-}
-.journal-meta {
-  margin: 4px 0 10px;
-  color: var(--muted);
-  font-size: 12px;
-}
-.journal-empty {
-  padding: 8px 0;
-}
-.journal-empty-title,
-.muted {
-  margin: 0;
-  color: var(--muted);
-  font-size: 13px;
-  line-height: 1.6;
-}
-.journal-empty p + p,
-.journal-empty-title + p {
-  margin: 6px 0 0;
-}
-.journal-prose :deep(> :first-child) {
+.prose :deep(> :first-child) {
   margin-top: 0;
 }
-.journal-prose :deep(> :last-child) {
-  margin-bottom: 0;
-}
-.journal-prose :deep(h2),
-.journal-prose :deep(h3) {
-  margin: 1rem 0 .4rem;
-  font-size: 15px;
-}
-.journal-prose :deep(p),
-.journal-prose :deep(li) {
+.prose :deep(p),
+.prose :deep(li) {
+  margin: 0 0 8px;
   font-size: 14px;
-  line-height: 1.75;
+  line-height: 1.7;
   color: var(--dark);
 }
+.prose :deep(h2),
+.prose :deep(h3) {
+  margin: 16px 0 8px;
+  font-size: 14px;
+}
+.prose :deep(ul) {
+  padding-left: 18px;
+}
+.muted {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+.muted + .muted {
+  margin-top: 8px;
+}
 @media (max-width: 768px) {
-  .journal-layout {
+  .layout {
     grid-template-columns: 1fr;
+    gap: 12px;
   }
-  .journal-index {
+  .index {
     display: flex;
     gap: 8px;
-    max-height: none;
     overflow-x: auto;
   }
-  .journal-index li {
+  .index li {
     flex: 0 0 auto;
   }
-  .journal-index button {
-    white-space: nowrap;
+  .index button {
+    width: auto;
+    padding: 8px 14px;
     border: 1px solid var(--faint);
-    border-radius: 999px;
-    padding: 7px 12px;
+    border-radius: var(--r);
+    border-bottom-color: var(--faint);
+    white-space: nowrap;
+    font-size: 12px;
+  }
+  .index button.active {
+    background: var(--dark);
+    color: var(--surface);
+    border-color: var(--dark);
   }
 }
 </style>
