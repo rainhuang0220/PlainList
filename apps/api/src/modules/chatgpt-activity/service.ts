@@ -121,28 +121,24 @@ function categoryFor(status: SemanticFactPayload['status']): string {
   return 'engineering';
 }
 
-function factsFromSourceRows(rows: unknown[], date: string): ChatgptJournalFact[] {
+function semanticFactsFromPayloads(rows: unknown[], date: string): ChatgptJournalFact[] {
   const facts: ChatgptJournalFact[] = [];
-  const semanticSources = new Set<number>();
+  const seen = new Set<string>();
   for (const raw of rows) {
-    const row = raw as {
-      id: number;
-      source_id: number;
-      compact_payload?: unknown;
-    };
-    const sourceId = Number(row.source_id);
-    if (semanticSources.has(sourceId)) continue;
+    const row = raw as { id: number; compact_payload?: unknown };
+    const sourceId = Number(row.id);
     const payload = parseCompactPayload(row.compact_payload);
     const semantic = (payload.dailySemanticFacts || []).filter((item) => (
       item.summary
       && isCompleteSemanticFact(item.summary)
       && (!item.dateKey || item.dateKey === date)
     ));
-    if (!semantic.length) continue;
-    semanticSources.add(sourceId);
     semantic.forEach((item, index) => {
+      const key = item.summary.replace(/\s+/g, '').slice(0, 48);
+      if (!key || seen.has(key)) return;
+      seen.add(key);
       facts.push({
-        id: Number(row.id) * 100 + index,
+        id: sourceId * 100 + index,
         sourceId,
         category: categoryFor(item.status),
         title: String(item.summary),
@@ -155,17 +151,28 @@ function factsFromSourceRows(rows: unknown[], date: string): ChatgptJournalFact[
   return facts;
 }
 
-async function factsForDate(userId: number, date: string): Promise<ChatgptJournalFact[]> {
+function semanticDatesFromPayloads(rows: unknown[]): string[] {
+  const dates = new Set<string>();
+  for (const raw of rows) {
+    const payload = parseCompactPayload((raw as { compact_payload?: unknown }).compact_payload);
+    for (const item of payload.dailySemanticFacts || []) {
+      if (item.dateKey) dates.add(item.dateKey);
+    }
+  }
+  return [...dates].sort();
+}
+
+async function chatgptSourcePayloads(userId: number) {
   const [rows] = await pool.query(
-    `SELECT f.id, f.source_id, f.category, f.title, f.summary, f.output_state, s.compact_payload
-     FROM activity_facts f
-     INNER JOIN activity_sources s ON s.id = f.source_id
-     WHERE f.user_id = ? AND f.date_key = ?
-       AND s.user_id = ? AND s.source_type = 'chatgpt-local-sync' AND s.status = 'active'
-     ORDER BY f.category, f.id`,
-    [userId, date, userId],
+    `SELECT id, compact_payload FROM activity_sources
+     WHERE user_id = ? AND source_type = 'chatgpt-local-sync' AND status = 'active'`,
+    [userId],
   );
-  return factsFromSourceRows(Array.isArray(rows) ? rows : [], date);
+  return Array.isArray(rows) ? rows : [];
+}
+
+async function factsForDate(userId: number, date: string): Promise<ChatgptJournalFact[]> {
+  return semanticFactsFromPayloads(await chatgptSourcePayloads(userId), date);
 }
 
 async function composeMarkdown(userId: number, date: string, facts: ChatgptJournalFact[], tryModel: boolean) {
@@ -245,6 +252,11 @@ export async function recomposeHistoricalDailyJournals(user: AuthenticatedUser, 
      ORDER BY f.date_key`,
     [user.id, user.id, DEFAULT_HISTORICAL_START_DATE],
   );
+  const payloads = await chatgptSourcePayloads(user.id);
+  const dates = new Set<string>([
+    ...(Array.isArray(dateRows) ? dateRows.map((row) => dateValue((row as { date_key: string }).date_key)) : []),
+    ...semanticDatesFromPayloads(payloads),
+  ]);
   let upgraded = 0;
   let failed = 0;
   const compositionMode = { model: 0, fallback: 0 };
@@ -257,8 +269,7 @@ export async function recomposeHistoricalDailyJournals(user: AuthenticatedUser, 
     empty_output: 0,
     other: 0,
   };
-  for (const row of Array.isArray(dateRows) ? dateRows : []) {
-    const date = dateValue((row as { date_key: string }).date_key);
+  for (const date of [...dates].sort()) {
     if (date < DEFAULT_HISTORICAL_START_DATE) continue;
     try {
       const written = await persistDailyJournal(user, date, {
