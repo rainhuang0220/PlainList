@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createMysqlReviewSnapshotRepository } from './reviewSnapshotRepository';
+import { createMysqlReviewSnapshotRepository, mysqlDateTime } from './reviewSnapshotRepository';
 
 const row = {
   user_id: 7,
@@ -50,6 +50,19 @@ describe('MySQL review snapshot repository', () => {
       windowStartDate: '2026-08-24',
       windowEndDate: '2026-08-30',
     });
+  });
+
+  it('writes generated_at as a MySQL DATETIME instead of an ISO UTC string', async () => {
+    expect(mysqlDateTime('2026-09-02T05:57:59.241Z')).toBe('2026-09-02 05:57:59.241');
+    const query = vi.fn().mockResolvedValueOnce([{ affectedRows: 1 }]).mockResolvedValueOnce([[row]]);
+    const repository = createMysqlReviewSnapshotRepository(query);
+    await repository.complete(7, '2026-09-01', 'claim', {
+      content: JSON.parse(row.content_json),
+      model: 'demo',
+      provider: 'openai',
+      generatedAt: '2026-09-02T05:57:59.241Z',
+    });
+    expect(query.mock.calls[0]?.[1]?.[4]).toBe('2026-09-02 05:57:59.241');
   });
 
   it('atomically claims retryable or expired generating work but never overwrites a ready snapshot', async () => {

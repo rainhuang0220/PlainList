@@ -275,8 +275,25 @@ export async function generateCurrentWeeklyReviewSnapshot(user: AuthenticatedUse
   const asOf = clock.currentDateKey();
   const page = weeklyReviewPageFor(asOf);
   const closed = await generateWindowIfPossible(user, page.currentWeekStart);
-  if (page.isMonday) return closed;
-  return generateWindowIfPossible(user, asOf);
+  if (page.isMonday) {
+    return closed ? response(closed) : {
+      status: 'no_data' as const,
+      weekStart: page.previousClosedStart,
+      weekEnd: page.previousClosedEnd,
+      reviewAsOfDate: asOf,
+      promptVersion: WEEKLY_SUMMARY_PROMPT_VERSION,
+      notice: 'no_data' as const,
+    };
+  }
+  const current = await generateWindowIfPossible(user, asOf);
+  return current ? response(current) : {
+    status: 'no_data' as const,
+    weekStart: page.currentCompletedStart ?? page.currentWeekStart,
+    weekEnd: page.currentCompletedEnd ?? page.currentWeekEnd,
+    reviewAsOfDate: asOf,
+    promptVersion: WEEKLY_SUMMARY_PROMPT_VERSION,
+    notice: 'no_data' as const,
+  };
 }
 
 export async function dirtyClosedWeekForJournalDate(userId: number, journalDate: string): Promise<void> {
@@ -671,11 +688,16 @@ export async function catchUpWeeklyReviewSnapshots(): Promise<boolean> {
       username: String((row as { username: string }).username),
       isAdmin: Boolean((row as { is_admin: number }).is_admin),
     };
-    const current = await generateCurrentWeeklyReviewSnapshot(user);
-    if (current.status === 'error') shouldRetry = true;
-    if (!user.isAdmin) {
-      const closed = await backfillClosedWeeklyReviews(user);
-      if (closed?.status === 'error' && (closed.attemptCount ?? 0) < 2) shouldRetry = true;
+    try {
+      const current = await generateCurrentWeeklyReviewSnapshot(user);
+      if (current?.status === 'error') shouldRetry = true;
+      if (!user.isAdmin) {
+        const closed = await backfillClosedWeeklyReviews(user);
+        if (closed?.status === 'error' && (closed.attemptCount ?? 0) < 2) shouldRetry = true;
+      }
+    } catch (error) {
+      console.error('[weekly-review] catch-up skipped a user', error instanceof Error ? error.message : 'unknown');
+      shouldRetry = true;
     }
   }
   return shouldRetry;
