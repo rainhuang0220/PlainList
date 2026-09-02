@@ -196,6 +196,7 @@ export async function recomposeStaleChatgptDailyJournals(user: AuthenticatedUser
 
 export async function reconcileChatgptActivity(user: AuthenticatedUser, payload: unknown) {
   const input = chatgptActivityReconcileSchema.parse(payload);
+  await recomposeStaleChatgptDailyJournals(user);
   const dates = new Set(input.affectedDates.filter((date) => date >= DEFAULT_HISTORICAL_START_DATE));
   if (input.historicalBootstrap) {
     const [historicalRows] = await pool.query(
@@ -232,7 +233,6 @@ export async function listChatgptDailyJournals(user: AuthenticatedUser, rawFrom:
   const from = dateKeySchema.parse(rawFrom);
   const to = dateKeySchema.parse(rawTo);
   if (from > to) throw Object.assign(new Error('invalid journal range'), { status: 400 });
-  await recomposeStaleChatgptDailyJournals(user);
   const [rows] = await pool.query(
     `SELECT journal_date, summary_markdown, activity_count, conversation_count, status, generated_at, updated_at
      FROM chatgpt_daily_journals

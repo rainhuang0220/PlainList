@@ -19,6 +19,7 @@ import {
   getChatgptActivityConnection,
   listChatgptDailyJournals,
   reconcileChatgptActivity,
+  recomposeStaleChatgptDailyJournals,
 } from './service';
 import { DAILY_JOURNAL_SOURCE_VERSION } from './journal';
 import { dirtyClosedWeekForJournalDate, generateCurrentWeeklyReviewSnapshot } from '../reviews/weeklyReviewSnapshot';
@@ -34,6 +35,7 @@ describe('ChatGPT activity journal service', () => {
 
   it('persists one derived journal for multiple same-day conversations without raw transcript fields', async () => {
     query
+      .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([[
         { id: 1, source_id: 10, category: 'engineering', title: '排查登录问题', output_state: 'partial' },
         { id: 2, source_id: 11, category: 'research', title: '完成资料整理', output_state: 'produced' },
@@ -60,20 +62,21 @@ describe('ChatGPT activity journal service', () => {
   });
 
   it('lists server-derived journals for web and mobile without source payloads', async () => {
-    query
-      .mockResolvedValueOnce([[]])
-      .mockResolvedValueOnce([[
-        { journal_date: '2026-09-01', summary_markdown: '今天主要完成了登录回归测试。', activity_count: 2, conversation_count: 2, status: 'final', generated_at: '2026-09-01T16:00:00.000Z', updated_at: '2026-09-01T16:00:00.000Z' },
-      ]]);
+    query.mockResolvedValueOnce([[
+      { journal_date: '2026-09-01', summary_markdown: '今天主要完成了登录回归测试。', activity_count: 2, conversation_count: 2, status: 'final', generated_at: '2026-09-01T16:00:00.000Z', updated_at: '2026-09-01T16:00:00.000Z' },
+    ]]);
 
     const result = await listChatgptDailyJournals(user, '2026-09-01', '2026-09-01');
 
     expect(result[0]).toMatchObject({ date: '2026-09-01', summaryMarkdown: '今天主要完成了登录回归测试。', activityCount: 2, conversationCount: 2, status: 'final' });
     expect(JSON.stringify(result)).not.toMatch(/compact_payload|messages|transcript/i);
+    expect(query.mock.calls.every(([sql]) => /^\s*SELECT\b/i.test(String(sql)))).toBe(true);
+    expect(query.mock.calls.some(([sql]) => /\b(INSERT|UPDATE|DELETE|REPLACE)\b/i.test(String(sql)))).toBe(false);
   });
 
   it('reconciles every historical fact date during first bootstrap and finalizes past days', async () => {
     query
+      .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([[{ date_key: '2026-08-30' }, { date_key: '2026-08-31' }]])
       .mockResolvedValueOnce([[{ id: 1, source_id: 10, category: 'engineering', title: '推进工程工作', output_state: 'partial' }]])
       .mockResolvedValueOnce([{ affectedRows: 1 }])
@@ -93,6 +96,7 @@ describe('ChatGPT activity journal service', () => {
 
   it('does not materialize journals before the 2026-08-01 historical floor', async () => {
     query
+      .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([[{ id: 1, source_id: 10, category: 'engineering', title: '推进工程工作', output_state: 'partial' }]])
       .mockResolvedValueOnce([{ affectedRows: 1 }])
       .mockResolvedValueOnce([{ affectedRows: 1 }]);
@@ -129,6 +133,7 @@ describe('ChatGPT activity journal service', () => {
   it('lets an admin persist their own journals and never writes another user id', async () => {
     const admin = { id: 2, username: 'owner', isAdmin: true };
     query
+      .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([[{ id: 1, source_id: 10, category: 'engineering', title: '推进工程工作', output_state: 'partial' }]])
       .mockResolvedValueOnce([{ affectedRows: 1 }])
       .mockResolvedValueOnce([{ affectedRows: 1 }]);
@@ -152,6 +157,7 @@ describe('ChatGPT activity journal service', () => {
 
   it('recompose presentation without dirtying closed weekly summaries', async () => {
     query
+      .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([[{ id: 1, source_id: 10, category: 'engineering', title: '修复周回顾空状态', summary: '修复周回顾空状态', output_state: 'produced' }]])
       .mockResolvedValueOnce([{ affectedRows: 1 }])
       .mockResolvedValueOnce([{ affectedRows: 1 }]);
@@ -175,20 +181,11 @@ describe('ChatGPT activity journal service', () => {
       .mockResolvedValueOnce([[{ stale: 1 }]])
       .mockResolvedValueOnce([[{ date_key: '2026-08-31' }]])
       .mockResolvedValueOnce([[{ id: 1, source_id: 10, category: 'engineering', title: '完成 PlainList 桌面同步验收', output_state: 'produced' }]])
-      .mockResolvedValueOnce([{ affectedRows: 1 }])
-      .mockResolvedValueOnce([[{
-        journal_date: '2026-08-31',
-        summary_markdown: '今天主要完成了PlainList的桌面同步验收。',
-        activity_count: 1,
-        conversation_count: 1,
-        status: 'final',
-        generated_at: '2026-08-31T16:00:00.000Z',
-        updated_at: '2026-08-31T16:00:00.000Z',
-      }]]);
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
 
-    const result = await listChatgptDailyJournals(user, '2026-08-31', '2026-08-31');
+    const result = await recomposeStaleChatgptDailyJournals(user);
 
-    expect(result[0]?.summaryMarkdown).toContain('完成了');
+    expect(result.updated).toBe(1);
     expect(query.mock.calls.some(([sql, values]) => (
       /INSERT INTO chatgpt_daily_journals/i.test(String(sql)) && Array.isArray(values) && values.includes(DAILY_JOURNAL_SOURCE_VERSION)
     ))).toBe(true);
