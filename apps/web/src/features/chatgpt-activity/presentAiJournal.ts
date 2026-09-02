@@ -1,7 +1,5 @@
 import type { ChatgptConnectionDisplayState } from '@plainlist/shared';
 
-const WEEKDAYS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
-
 export function shiftIsoDate(date: string, days: number): string {
   const [year, month, day] = date.split('-').map(Number);
   const next = new Date(Date.UTC(year, month - 1, day + days));
@@ -10,19 +8,16 @@ export function shiftIsoDate(date: string, days: number): string {
 
 export function presentJournalDate(date: string, today: string): { primary: string; secondary: string } {
   const [, month, day] = date.split('-').map(Number);
-  const weekday = WEEKDAYS[new Date(`${date}T00:00:00`).getDay()];
-  if (date === today) return { primary: '今天', secondary: `${Number(month)} 月 ${Number(day)} 日 · ${weekday}` };
-  if (date === shiftIsoDate(today, -1)) return { primary: '昨天', secondary: `${Number(month)} 月 ${Number(day)} 日 · ${weekday}` };
-  return {
-    primary: `${Number(month)} 月 ${Number(day)} 日 · ${weekday}`,
-    secondary: date.slice(0, 4),
-  };
+  const label = `${Number(month)} 月 ${Number(day)} 日`;
+  if (date === today) return { primary: '今天', secondary: label };
+  if (date === shiftIsoDate(today, -1)) return { primary: '昨天', secondary: label };
+  return { primary: label, secondary: date.slice(0, 4) };
 }
 
 export function presentWeekRange(start: string, end: string): string {
   const [, startMonth, startDay] = start.split('-').map(Number);
   const [, endMonth, endDay] = end.split('-').map(Number);
-  return `${Number(startMonth)}月${Number(startDay)}日–${Number(endMonth)}月${Number(endDay)}日`;
+  return `${Number(startMonth)} 月 ${Number(startDay)} 日–${Number(endMonth)} 月 ${Number(endDay)} 日`;
 }
 
 export function presentAiJournalEmpty(

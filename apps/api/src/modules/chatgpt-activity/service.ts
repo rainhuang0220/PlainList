@@ -8,7 +8,14 @@ import {
   type ChatgptConnectionDisplayState,
 } from '@plainlist/shared';
 import { pool } from '../../db/pool';
-import { renderChatgptDailyJournal, type ChatgptJournalFact } from './journal';
+import { resolveAiConfigForUser } from '../ai-intake/settings';
+import { aiProviderConfigured, chatComplete } from '../ai-shared/llm';
+import {
+  DAILY_JOURNAL_SOURCE_VERSION,
+  composeDailyJournalWithModel,
+  renderChatgptDailyJournal,
+  type ChatgptJournalFact,
+} from './journal';
 import { dirtyClosedWeekForJournalDate, generateCurrentWeeklyReviewSnapshot } from '../reviews/weeklyReviewSnapshot';
 
 function dateValue(value: unknown): string {
@@ -82,8 +89,114 @@ export async function reportChatgptActivityProgress(user: AuthenticatedUser, pay
   return getChatgptActivityConnection(user);
 }
 
+async function factsForDate(userId: number, date: string): Promise<ChatgptJournalFact[]> {
+  const [rows] = await pool.query(
+    `SELECT f.id, f.source_id, f.category, f.title, f.summary, f.output_state
+     FROM activity_facts f
+     INNER JOIN activity_sources s ON s.id = f.source_id
+     WHERE f.user_id = ? AND f.date_key = ?
+       AND s.user_id = ? AND s.source_type = 'chatgpt-local-sync' AND s.status = 'active'
+     ORDER BY f.category, f.id`,
+    [userId, date, userId],
+  );
+  return (Array.isArray(rows) ? rows : []).map((row) => ({
+    id: Number((row as { id: number }).id),
+    sourceId: Number((row as { source_id: number }).source_id),
+    category: String((row as { category: string }).category),
+    title: String((row as { title: string }).title),
+    summary: String((row as { summary?: string }).summary || ''),
+    outputState: String((row as { output_state: string }).output_state),
+  }));
+}
+
+async function composeMarkdown(userId: number, facts: ChatgptJournalFact[], fallback: string, tryModel: boolean): Promise<string> {
+  if (!tryModel) return fallback;
+  try {
+    const config = await resolveAiConfigForUser(userId);
+    if (!aiProviderConfigured(config)) return fallback;
+    return await composeDailyJournalWithModel(facts, async (request) => {
+      const result = await chatComplete(config, {
+        system: request.system,
+        user: request.user,
+        temperature: 0.2,
+        maxTokens: 400,
+      });
+      return result.text;
+    });
+  } catch {
+    return fallback;
+  }
+}
+
+async function persistDailyJournal(
+  user: AuthenticatedUser,
+  date: string,
+  options: { status: 'ready' | 'final'; presentationOnly: boolean; tryModel: boolean },
+) {
+  const facts = await factsForDate(user.id, date);
+  const journal = renderChatgptDailyJournal(date, facts);
+  if (!journal.activityCount) {
+    await pool.query(
+      'DELETE FROM chatgpt_daily_journals WHERE user_id = ? AND journal_date = ? AND source_type = ?',
+      [user.id, date, 'chatgpt-local-sync'],
+    );
+    return null;
+  }
+  const summaryMarkdown = await composeMarkdown(user.id, facts, journal.summaryMarkdown, options.tryModel);
+  await pool.query(
+    `INSERT INTO chatgpt_daily_journals
+      (user_id, journal_date, source_type, status, summary_markdown, activity_count, conversation_count, source_version, generated_at)
+     VALUES (?, ?, 'chatgpt-local-sync', ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+     ON DUPLICATE KEY UPDATE status = VALUES(status), summary_markdown = VALUES(summary_markdown),
+       activity_count = VALUES(activity_count), conversation_count = VALUES(conversation_count),
+       source_version = VALUES(source_version), generated_at = CURRENT_TIMESTAMP`,
+    [user.id, date, options.status, summaryMarkdown, journal.activityCount, journal.conversationCount, DAILY_JOURNAL_SOURCE_VERSION],
+  );
+  if (!options.presentationOnly) {
+    await dirtyClosedWeekForJournalDate(user.id, date);
+  }
+  return {
+    date,
+    status: options.status,
+    activityCount: journal.activityCount,
+    conversationCount: journal.conversationCount,
+  };
+}
+
+export async function recomposeStaleChatgptDailyJournals(user: AuthenticatedUser) {
+  const [stale] = await pool.query(
+    `SELECT 1 AS stale FROM chatgpt_daily_journals
+     WHERE user_id = ? AND source_type = 'chatgpt-local-sync' AND source_version <> ?
+     LIMIT 1`,
+    [user.id, DAILY_JOURNAL_SOURCE_VERSION],
+  );
+  if (!Array.isArray(stale) || stale.length === 0) return { updated: 0 };
+
+  const [dateRows] = await pool.query(
+    `SELECT DISTINCT f.date_key FROM activity_facts f
+     INNER JOIN activity_sources s ON s.id = f.source_id
+     WHERE f.user_id = ? AND s.user_id = ? AND s.source_type = 'chatgpt-local-sync' AND s.status = 'active'
+       AND f.date_key >= ?
+     ORDER BY f.date_key`,
+    [user.id, user.id, DEFAULT_HISTORICAL_START_DATE],
+  );
+  let updated = 0;
+  for (const row of Array.isArray(dateRows) ? dateRows : []) {
+    const date = dateValue((row as { date_key: string }).date_key);
+    if (date < DEFAULT_HISTORICAL_START_DATE) continue;
+    const written = await persistDailyJournal(user, date, {
+      status: 'final',
+      presentationOnly: true,
+      tryModel: false,
+    });
+    if (written) updated += 1;
+  }
+  return { updated };
+}
+
 export async function reconcileChatgptActivity(user: AuthenticatedUser, payload: unknown) {
   const input = chatgptActivityReconcileSchema.parse(payload);
+  await recomposeStaleChatgptDailyJournals(user);
   const dates = new Set(input.affectedDates.filter((date) => date >= DEFAULT_HISTORICAL_START_DATE));
   if (input.historicalBootstrap) {
     const [historicalRows] = await pool.query(
@@ -97,45 +210,16 @@ export async function reconcileChatgptActivity(user: AuthenticatedUser, payload:
     for (const row of Array.isArray(historicalRows) ? historicalRows : []) dates.add(dateValue((row as any).date_key));
   }
   const journals: Array<{ date: string; status: 'ready' | 'final'; activityCount: number; conversationCount: number }> = [];
+  const tryModel = !input.presentationOnly && dates.size <= 7;
 
   for (const date of [...dates].sort()) {
     if (date < DEFAULT_HISTORICAL_START_DATE) continue;
-    const [rows] = await pool.query(
-      `SELECT f.id, f.source_id, f.category, f.title, f.summary, f.output_state
-       FROM activity_facts f
-       INNER JOIN activity_sources s ON s.id = f.source_id
-       WHERE f.user_id = ? AND f.date_key = ?
-         AND s.user_id = ? AND s.source_type = 'chatgpt-local-sync' AND s.status = 'active'
-       ORDER BY f.category, f.id`,
-      [user.id, date, user.id],
-    );
-    const facts = (Array.isArray(rows) ? rows : []).map((row) => ({
-      id: Number((row as any).id),
-      sourceId: Number((row as any).source_id),
-      category: String((row as any).category),
-      title: String((row as any).title),
-      summary: String((row as any).summary || ''),
-      outputState: String((row as any).output_state),
-    })) satisfies ChatgptJournalFact[];
-    const journal = renderChatgptDailyJournal(date, facts);
-    if (!journal.activityCount) {
-      await pool.query('DELETE FROM chatgpt_daily_journals WHERE user_id = ? AND journal_date = ? AND source_type = ?', [user.id, date, 'chatgpt-local-sync']);
-      continue;
-    }
-    const status = input.finalizeThrough && date <= input.finalizeThrough ? 'final' : 'ready';
-    await pool.query(
-      `INSERT INTO chatgpt_daily_journals
-        (user_id, journal_date, source_type, status, summary_markdown, activity_count, conversation_count, source_version, generated_at)
-       VALUES (?, ?, 'chatgpt-local-sync', ?, ?, ?, ?, 'journal-v2', CURRENT_TIMESTAMP)
-       ON DUPLICATE KEY UPDATE status = VALUES(status), summary_markdown = VALUES(summary_markdown),
-         activity_count = VALUES(activity_count), conversation_count = VALUES(conversation_count),
-         source_version = VALUES(source_version), generated_at = CURRENT_TIMESTAMP`,
-      [user.id, date, status, journal.summaryMarkdown, journal.activityCount, journal.conversationCount],
-    );
-    journals.push({ date, status, activityCount: journal.activityCount, conversationCount: journal.conversationCount });
-    if (!input.presentationOnly) {
-      await dirtyClosedWeekForJournalDate(user.id, date);
-    }
+    const written = await persistDailyJournal(user, date, {
+      status: input.finalizeThrough && date <= input.finalizeThrough ? 'final' : 'ready',
+      presentationOnly: Boolean(input.presentationOnly),
+      tryModel,
+    });
+    if (written) journals.push(written);
   }
 
   await upsertConnection(user.id, input);

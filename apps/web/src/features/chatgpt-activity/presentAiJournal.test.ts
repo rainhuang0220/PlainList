@@ -14,7 +14,7 @@ describe('presentJournalDate', () => {
   it('uses today/yesterday labels instead of a raw date input', () => {
     expect(presentJournalDate('2026-09-02', '2026-09-02').primary).toBe('今天');
     expect(presentJournalDate('2026-09-01', '2026-09-02').primary).toBe('昨天');
-    expect(presentJournalDate('2026-08-30', '2026-09-02').primary).toContain('8 月 30 日');
-    expect(presentWeekRange('2026-08-24', '2026-08-30')).toBe('8月24日–8月30日');
+    expect(presentJournalDate('2026-08-30', '2026-09-02').primary).toBe('8 月 30 日');
+    expect(presentWeekRange('2026-08-24', '2026-08-30')).toBe('8 月 24 日–8 月 30 日');
   });
 });
