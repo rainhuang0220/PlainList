@@ -1,6 +1,6 @@
 <template>
   <section class="ai-journal">
-    <p v-if="loading" class="muted">正在读取过去历周的 Weekly Summary…</p>
+    <p v-if="loading" class="muted">正在读取周度洞察…</p>
     <p v-else-if="error" class="muted">暂时无法读取历史记录，请稍后重试。</p>
 
     <div v-else class="layout" :class="{ 'has-index': weekly.length }">
@@ -79,7 +79,7 @@ onMounted(async () => {
   flex: 1 1 auto;
 }
 .layout.has-index {
-  grid-template-columns: 148px minmax(0, 1fr);
+  grid-template-columns: max-content minmax(0, 1fr);
 }
 .index {
   margin: 0;
@@ -90,7 +90,7 @@ onMounted(async () => {
 }
 .index button {
   width: 100%;
-  padding: 10px 12px;
+  padding: 8px 10px;
   border: 0;
   border-bottom: 1px solid var(--faint);
   background: transparent;
@@ -98,9 +98,10 @@ onMounted(async () => {
   text-align: left;
   cursor: pointer;
   font: inherit;
-  font-size: 13px;
-  line-height: 1.5;
+  font-size: 12px;
+  line-height: 1.45;
   border-radius: var(--r);
+  white-space: nowrap;
 }
 .index button.active {
   font-weight: 600;

@@ -11,7 +11,7 @@
 
     <div class="actions">
       <button v-if="isDesktop && !rootName" type="button" class="settings-btn-primary" @click="choose">连接本地资料库</button>
-      <button v-if="card.connected" type="button" class="settings-btn-primary" @click="emit('openAiJournal')">查看 AI 小记</button>
+      <button v-if="card.connected" type="button" class="settings-btn-primary" @click="emit('openAiJournal')">查看周度洞察</button>
       <a
         v-if="card.showDesktopDownload"
         class="text-link"
@@ -114,6 +114,9 @@ onUnmounted(() => {
 });
 </script>
 <style scoped>
+.chatgpt-source {
+  display: block;
+}
 .status {
   display: flex;
   align-items: center;

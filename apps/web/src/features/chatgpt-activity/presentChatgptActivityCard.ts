@@ -83,7 +83,7 @@ export function presentChatgptActivityCard(input: {
       variant: 'desktop-disconnected',
       connected: false,
       headline: '尚未连接本地资料库。',
-      body: '连接后，PlainList 会自动整理 ChatGPT 中有意义的活动，并形成周回顾。',
+      body: '连接后，PlainList 会自动整理 ChatGPT 中有意义的活动，并形成周度洞察。',
       lastUpdated: null,
       todayLine: null,
       progressLine: null,

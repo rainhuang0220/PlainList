@@ -28,21 +28,21 @@ export function presentAiJournalEmpty(
     const progressLine = progress?.checked
       ? `已处理 ${progress.processed ?? 0} / ${progress.checked} 个对话。`
       : '';
-    return { title: '正在建立历史周回顾', body: progressLine || 'Desktop 正在回填历史活动记录。' };
+    return { title: '正在建立周度洞察', body: progressLine || 'Desktop 正在回填历史活动记录。' };
   }
   if (displayState === 'waiting_archive') {
     return { title: '等待 ChatGPT 本地资料库同步历史记录', body: '连接已建立，正在等待本机资料库完成历史导出。' };
   }
   if (displayState === 'no_activity' || displayState === 'ready') {
     return {
-      title: '还没有已结束的周回顾。',
+      title: '还没有可阅读的周度洞察。',
       body: displayState === 'no_activity'
-        ? '已连接 Desktop。自然周结束后，这里会出现 Weekly Summary。'
+        ? '已连接 Desktop。自然周结束后，这里会出现周度洞察。'
         : '',
     };
   }
   return {
     title: '尚未连接 ChatGPT 本地资料库',
-    body: '连接 PlainList Desktop 后，过去历周的 Weekly Summary 会自动出现在这里。',
+    body: '连接 PlainList Desktop 后，过去历周的周度洞察会自动出现在这里。',
   };
 }
