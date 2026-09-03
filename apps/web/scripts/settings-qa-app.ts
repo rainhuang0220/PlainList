@@ -60,6 +60,10 @@ reviews.fetchWeeklyHistory = async () => ({
     { weekStart: '2026-08-11', weekEnd: '2026-08-17', narrativeMarkdown: `## 8 月 11 日\n\n${longProse}` },
     { weekStart: '2026-08-04', weekEnd: '2026-08-10', narrativeMarkdown: `## 8 月 4 日\n\n${longProse}` },
     { weekStart: '2026-07-28', weekEnd: '2026-08-03', narrativeMarkdown: `## 7 月 28 日\n\n${longProse}` },
+    { weekStart: '2026-07-21', weekEnd: '2026-07-27', narrativeMarkdown: `## 7 月 21 日\n\n${longProse}` },
+    { weekStart: '2026-07-14', weekEnd: '2026-07-20', narrativeMarkdown: `## 7 月 14 日\n\n${longProse}` },
+    { weekStart: '2026-07-07', weekEnd: '2026-07-13', narrativeMarkdown: `## 7 月 7 日\n\n${longProse}` },
+    { weekStart: '2026-06-30', weekEnd: '2026-07-06', narrativeMarkdown: `## 6 月 30 日\n\n${longProse}` },
   ],
 });
 

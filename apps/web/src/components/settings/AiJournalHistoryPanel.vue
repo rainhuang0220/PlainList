@@ -34,6 +34,7 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { renderSafeMarkdown } from '@/features/chatgpt-activity/safeMarkdown';
 import { presentAiJournalEmpty, presentWeekRange } from '@/features/chatgpt-activity/presentAiJournal';
 import { applyWeeklyReaderScrollReset } from '@/features/chatgpt-activity/resetWeeklyReaderScroll';
+import { selectVisibleClosedWeeks } from '@/features/chatgpt-activity/selectVisibleClosedWeeks';
 import { useChatgptActivityStore } from '@/features/chatgpt-activity/useChatgptActivityStore';
 import { useReviewsStore } from '@/features/reviews/model/useReviewsStore';
 
@@ -66,7 +67,7 @@ onMounted(async () => {
   try {
     await activity.fetchConnection().catch(() => {});
     const result = await reviews.fetchWeeklyHistory();
-    weekly.value = result.weekly ?? [];
+    weekly.value = selectVisibleClosedWeeks(result.weekly ?? []);
     if (weekly.value[0]) selectedWeek.value = weekly.value[0].weekStart;
   } catch {
     error.value = 'unavailable';
@@ -99,6 +100,7 @@ onMounted(async () => {
   min-height: 0;
   overflow: auto;
   padding-right: 12px;
+  margin-left: -15px;
   margin-right: 16px;
   border-right: 1px solid var(--faint);
 }

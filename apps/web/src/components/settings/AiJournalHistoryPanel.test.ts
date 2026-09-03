@@ -30,6 +30,18 @@ describe('AiJournalHistoryPanel reader', () => {
     expect(source).not.toContain('window.scrollTo');
   });
 
+  it('limits the visible history rail to the newest 7 closed weeks at read time', () => {
+    expect(source).toContain('selectVisibleClosedWeeks');
+    expect(source).not.toContain('DELETE');
+    expect(source).not.toContain('limit=7');
+  });
+
+  it('shifts the week rail left inside the existing content pane', () => {
+    expect(source).toContain('margin-left: -15px');
+    expect(source).not.toContain('us-modal--reader');
+    expect(source).not.toContain('width: min(1020px');
+  });
+
   it('fills the settings body with a week rail and a stretching article', () => {
     expect(source).not.toContain('<section');
     expect(source).not.toContain('<nav');
