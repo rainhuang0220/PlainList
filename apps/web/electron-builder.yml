@@ -19,7 +19,7 @@ mac:
       arch:
         - arm64
         - x64
-  artifactName: ${productName}-${version}-${arch}.${ext}
+  artifactName: ${productName}-${version}-macos-${arch}.${ext}
   # Do not auto-pick the local self-signed "PlainList Local Signing"
   # cert (Gatekeeper treats it worse than ad-hoc). electron-builder
   # leaves the app unsigned; scripts/sign-adhoc.sh then applies ad-hoc

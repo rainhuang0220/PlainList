@@ -9,6 +9,7 @@
         v-else
         @terminal="authMode = 'terminal'"
       />
+      <a class="auth-download" :href="downloadHref">下载 PlainList</a>
     </template>
     <template v-else>
       <ChatgptActivitySyncAgent />
@@ -103,6 +104,7 @@ import { useMarketplaceStore } from '@/features/plugins/model/useMarketplaceStor
 import { useApi } from '@/shared/api/useApi';
 import { useI18nStore } from '@/shared/i18n/useI18nStore';
 import { getNotificationScheduler } from '@/shared/notifications';
+import { productDownloadHref } from '@/features/download/recommendPlatform';
 import { isNativePlatform } from '@/shared/platform';
 import UserMenu from '@/components/settings/UserMenu.vue';
 import UserSettingsPanel from '@/components/settings/UserSettingsPanel.vue';
@@ -117,6 +119,7 @@ import TrackerSection from '@/views/sections/TrackerSection.vue';
 import WeekSection from '@/views/sections/WeekSection.vue';
 import ChatgptActivitySyncAgent from '@/components/chatgpt/ChatgptActivitySyncAgent.vue';
 
+const downloadHref = productDownloadHref();
 const auth = useAuthStore();
 const plans = usePlansStore();
 const checks = useChecksStore();
@@ -284,3 +287,19 @@ onUnmounted(() => {
   window.removeEventListener('scroll', onScroll);
 });
 </script>
+
+<style scoped>
+.auth-download {
+  position: fixed;
+  left: 50%;
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 2;
+  font-size: 13px;
+  color: var(--muted);
+  text-decoration: none;
+}
+.auth-download:hover {
+  color: var(--dark);
+}
+</style>
