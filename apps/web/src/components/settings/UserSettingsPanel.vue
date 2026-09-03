@@ -2,6 +2,10 @@
   <div class="us-overlay" @click.self="emit('close')">
     <div
       class="us-modal"
+      :class="{
+        'us-modal--reader': activeSection === 'ai-journal',
+        'us-modal--activity': activeSection === 'chatgpt-local-sync',
+      }"
       role="dialog"
       aria-label="用户设置"
     >
@@ -102,7 +106,7 @@ const navItems = computed(() => [
   { id: 'ai' as const, label: t('settings.nav_ai', 'AI 速记') },
   { id: 'profile' as const, label: t('settings.nav_profile', 'AI 画像') },
   { id: 'chatgpt-local-sync' as const, label: 'ChatGPT 活动记录' },
-  { id: 'ai-journal' as const, label: 'AI 小记' },
+  { id: 'ai-journal' as const, label: '周度洞察' },
 ]);
 
 const activeTitle = computed(() => {
@@ -116,7 +120,7 @@ const activeTitle = computed(() => {
     return t('profile.title', '用户画像');
   }
   if (activeSection.value === 'chatgpt-local-sync') return 'ChatGPT 活动记录';
-  if (activeSection.value === 'ai-journal') return 'AI 小记';
+  if (activeSection.value === 'ai-journal') return '周度洞察';
   return t('intake.settings_title', '大模型设置');
 });
 
@@ -166,9 +170,28 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
+.us-modal--reader {
+  width: min(1020px, calc(100vw - 48px));
+}
+
+.us-modal--activity {
+  height: auto;
+  align-items: flex-start;
+}
+
+.us-modal--activity .us-side-body {
+  flex: 0 1 auto;
+}
+
+.us-modal--activity .us-main-body {
+  flex: 0 0 auto;
+  overflow: visible;
+}
+
 .us-main-body--journal {
   display: flex;
   flex-direction: column;
+  padding: 12px 16px 16px;
 }
 
 .us-main-body--journal > * {
@@ -467,6 +490,20 @@ onUnmounted(() => {
     flex-direction: column;
     align-items: flex-start;
     gap: 6px;
+  }
+
+  .us-modal--reader {
+    width: 100%;
+  }
+
+  .us-modal--activity {
+    height: 100%;
+    align-items: stretch;
+  }
+
+  .us-modal--activity .us-main-body {
+    flex: 1 1 auto;
+    overflow-y: auto;
   }
 }
 </style>

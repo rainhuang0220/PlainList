@@ -5,9 +5,10 @@ describe('presentAiJournalEmpty', () => {
   it('does not use a single empty copy for every connection state', () => {
     expect(presentAiJournalEmpty('not_connected').title).toContain('尚未连接');
     expect(presentAiJournalEmpty('bootstrapping', { processed: 3, checked: 10 }).body).toContain('3 / 10');
-    expect(presentAiJournalEmpty('no_activity').title).toContain('还没有已结束的周回顾');
-    expect(presentAiJournalEmpty('ready').title).toBe('还没有已结束的周回顾。');
+    expect(presentAiJournalEmpty('no_activity').title).toContain('周度洞察');
+    expect(presentAiJournalEmpty('ready').title).toContain('周度洞察');
     expect(presentAiJournalEmpty('ready').title).not.toContain('每日小记');
+    expect(presentAiJournalEmpty('ready').title).not.toContain('AI 小记');
   });
 });
 

@@ -28,7 +28,7 @@
           {{ t('settings.menu_account', '账户信息') }}
         </button>
         <button type="button" class="user-menu-item" @click="openSettings('ai-journal')">
-          AI 小记
+          周度洞察
         </button>
         <div class="user-menu-divider" />
         <button type="button" class="user-menu-item user-menu-item-danger" @click="emit('logout')">
