@@ -12,37 +12,13 @@ PlainList 是一个前后端分离的单仓库 TypeScript 项目。围绕「时�
 | Untitled | 🔨幻想中 (0%) | 网盘 |
 | docxEditor(TBD) | 🔨进行中 (25%) | 文档编辑器 |
 
-## 下载客户端
+## 使用
 
-官网下载页：**[http://175.24.134.228/](http://175.24.134.228/)** · GitHub Release：**[Releases](https://github.com/rainhuang0220/PlainList/releases)**
+- Web：https://plainlist.space
+- 下载：https://plainlist.space/download
+- GitHub Release：https://github.com/rainhuang0220/PlainList/releases
 
-### 推荐：Android（语音 + AI 速记）
-
-移动端是当前更推荐的日常入口：手机更常随身，系统语音输入可以把口语直接丢给 **AI 速记**，自动结构化并排布今日任务；后续的 **AI 画像** 优化也建立在这条链路上。
-
-| 平台 | 下载 |
-|------|------|
-| **Android APK（推荐）** | [PlainList-2.1.1.apk](http://175.24.134.228/downloads/PlainList-2.1.1.apk) · [GitHub Release](https://github.com/rainhuang0220/PlainList/releases/tag/v2.1.1) |
-
-Android 为侧载 APK：下载后需在系统设置中允许「未知来源」或「安装未知应用」，再打开安装包。Release 签名 keystore 须离线备份，详见 [apps/web/android-signing/README.md](apps/web/android-signing/README.md)。
-
-演示账号：`rainhuang` / `rainhuang`。
-
-### macOS 桌面端
-
-```bash
-# 终端一键安装（Apple Silicon / Intel 自动识别）
-curl -fsSL http://175.24.134.228/downloads/install.sh | bash
-```
-
-| 架构 | 下载 |
-|------|------|
-| Apple Silicon (arm64) | [PlainList-2.1.1-arm64.dmg](http://175.24.134.228/downloads/PlainList-2.1.1-arm64.dmg) · [GitHub](https://github.com/rainhuang0220/PlainList/releases/tag/v2.1.1) |
-| Intel (x64) | [PlainList-2.1.1-x64.dmg](http://175.24.134.228/downloads/PlainList-2.1.1-x64.dmg) · [GitHub](https://github.com/rainhuang0220/PlainList/releases/tag/v2.1.1) |
-
-macOS 当前为 ad-hoc 签名，首次打开若提示「无法验证」，在「隐私与安全性」点一次「仍要打开」即可。
-
-桌面端 FishTime 为本机前台应用监测（Chrome / 微信等会实时累计）；Focus Bay 需摄像头权限。
+Android 为侧载 APK：下载后需允许安装未知应用。macOS 当前为 ad-hoc 签名，首次打开若提示无法验证，在「隐私与安全性」点一次「仍要打开」。Release 签名 keystore 须离线备份，详见 [apps/web/android-signing/README.md](apps/web/android-signing/README.md)。
 
 ## 核心特性
 - **多尺度时间视图**：当下时钟 · 今日计划 · 周回顾 · 月度追踪 · 年度日历，滚动切换
@@ -227,8 +203,8 @@ npm run mobile:android   # 构建并打开 Android Studio
 npm run mobile:ios       # 构建并打开 Xcode
 
 # Android release APK（需先配置 apps/web/android-signing/keystore.properties）
-VITE_API_BASE_URL=http://175.24.134.228 npm run mobile:android:release
-SSHPASS=… npm run deploy:android -w @plainlist/web
+npm run mobile:android:release
+npm run deploy:android -w @plainlist/web
 ```
 `apps/web/src/app/main.ts` 在原生平台会异步加载 SplashScreen / StatusBar / Keyboard 插件；CORS 已自动放行 `capacitor://localhost` 与 `localhost` 来源。详见 [apps/web/capacitor.config.ts](apps/web/capacitor.config.ts)。
 

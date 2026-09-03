@@ -33,8 +33,10 @@ ssh "${SSH_OPTS[@]}" "$SERVER" \
 cat > "${WORK}/patch.conf" <<'PATCH_EOF'
     # ── PlainList download page (inserted by deploy-dmg.sh) ─────────
     location = / {
-        root /www/wwwroot/175.24.134.228;
-        try_files /index.html =404;
+        return 308 https://plainlist.space/download;
+    }
+    location = /index.html {
+        return 308 https://plainlist.space/download;
     }
     location ^~ /downloads/ {
         root /www/wwwroot/175.24.134.228;

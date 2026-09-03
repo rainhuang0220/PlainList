@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>下载 PlainList</title>
+  <link rel="icon" href="/favicon.ico">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #F7F7F7;
+      --surface: #FFFFFF;
+      --dark: #111111;
+      --mid: #555555;
+      --muted: #999999;
+      --faint: #E4E4E4;
+      --faint2: #EFEFEF;
+      --font: Inter, system-ui, -apple-system, "PingFang SC", "Hiragino Sans GB", sans-serif;
+      --mono: "JetBrains Mono", "Courier New", monospace;
+      --r: 6px;
+    }
+    html, body { min-height: 100%; overflow-x: hidden; }
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--dark);
+      font-size: 15px;
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: inherit; }
+    .wrap {
+      width: min(720px, calc(100% - 40px));
+      margin: 0 auto;
+      padding: 36px 0 72px;
+    }
+    .nav {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 40px;
+    }
+    .brand {
+      font-family: var(--mono);
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      text-decoration: none;
+    }
+    .nav-link {
+      font-size: 13px;
+      color: var(--muted);
+      text-decoration: none;
+    }
+    .nav-link:hover { color: var(--dark); }
+    h1 {
+      font-size: 28px;
+      font-weight: 600;
+      letter-spacing: -0.03em;
+      margin-bottom: 8px;
+    }
+    .lede {
+      color: var(--mid);
+      margin-bottom: 28px;
+    }
+    .installed {
+      display: none;
+      margin-bottom: 20px;
+      padding: 12px 14px;
+      border: 1px solid var(--faint);
+      border-radius: var(--r);
+      background: var(--surface);
+      font-size: 13px;
+      color: var(--mid);
+    }
+    .installed.show { display: block; }
+    .kicker {
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+    .hero {
+      border: 1px solid var(--faint);
+      background: var(--surface);
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 28px;
+    }
+    .hero-title { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+    .hero-meta { font-size: 13px; color: var(--muted); margin-bottom: 16px; }
+    .hero-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 36px;
+      padding: 8px 14px;
+      border-radius: var(--r);
+      font: inherit;
+      font-size: 13px;
+      text-decoration: none;
+      cursor: pointer;
+      border: 1px solid var(--dark);
+    }
+    .btn-primary { background: var(--dark); color: var(--surface); }
+    .btn-secondary { background: transparent; color: var(--dark); border-color: var(--faint); }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+    .card {
+      border: 1px solid var(--faint);
+      background: var(--surface);
+      border-radius: 10px;
+      padding: 16px;
+    }
+    .card h3 { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+    .card p { font-size: 12px; color: var(--muted); margin-bottom: 12px; }
+    .card .btn { width: 100%; }
+    .muted { color: var(--muted); font-size: 13px; }
+    .meta {
+      border-top: 1px solid var(--faint);
+      padding-top: 18px;
+      font-size: 13px;
+      color: var(--mid);
+    }
+    .meta a { color: var(--dark); }
+    details.checksums {
+      margin-top: 12px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    details.checksums summary { cursor: pointer; color: var(--mid); }
+    details.checksums code {
+      display: block;
+      margin-top: 8px;
+      font-family: var(--mono);
+      font-size: 11px;
+      word-break: break-all;
+      color: var(--dark);
+    }
+    .win { margin-top: 8px; font-size: 13px; color: var(--muted); }
+    .error { color: #b42318; font-size: 13px; }
+    @media (max-width: 768px) {
+      .wrap { width: calc(100% - 28px); padding: 24px 0 56px; }
+      h1 { font-size: 24px; }
+      .grid { grid-template-columns: 1fr; }
+      .hero-actions { flex-direction: column; }
+      .hero-actions .btn { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="nav">
+      <a class="brand" href="https://plainlist.space">PlainList</a>
+      <a class="nav-link" href="https://plainlist.space">打开 Web 版</a>
+    </div>
+    <h1>下载 PlainList</h1>
+    <p class="lede">在你常用的设备上继续使用 PlainList。</p>
+    <p id="installed" class="installed"></p>
+    <div id="hero"></div>
+    <p class="kicker">其他版本</p>
+    <div id="grid" class="grid"></div>
+    <p class="win">Windows — 暂未提供</p>
+    <div id="meta" class="meta"></div>
+  </div>
+  <script>
+    const MANIFEST_URL = '/releases/latest.json';
+
+    function recommend(ua) {
+      if (/Android/i.test(ua)) return 'android';
+      if (/iPhone|iPad|iPod/i.test(ua)) return 'unknown';
+      if (/Mac OS X|Macintosh/i.test(ua) && !/Mobile/i.test(ua)) return 'macos';
+      return 'unknown';
+    }
+
+    function href(item) {
+      return item.mirrorUrl || item.url;
+    }
+
+    function find(manifest, platform, arch) {
+      return manifest.artifacts.find((item) => item.platform === platform && (!arch || item.arch === arch));
+    }
+
+    function button(item, label, primary) {
+      if (!item) return '';
+      const cls = primary ? 'btn btn-primary' : 'btn btn-secondary';
+      return '<a class="' + cls + '" href="' + href(item) + '">' + label + '</a>';
+    }
+
+    const params = new URLSearchParams(location.search);
+    const installed = params.get('client') === 'desktop'
+      || params.get('client') === 'android'
+      || Boolean(window.plainlistDesktop);
+    if (installed) {
+      const el = document.getElementById('installed');
+      el.textContent = params.get('client') === 'android'
+        ? '当前设备已安装 PlainList。仍可查看其他版本。'
+        : '你正在使用 PlainList Desktop。仍可查看其他版本。';
+      el.classList.add('show');
+    }
+
+    fetch(MANIFEST_URL, { cache: 'no-store' })
+      .then((res) => {
+        if (!res.ok) throw new Error('manifest unavailable');
+        return res.json();
+      })
+      .then((manifest) => {
+        const rec = recommend(navigator.userAgent);
+        const arm = find(manifest, 'macos', 'arm64');
+        const intel = find(manifest, 'macos', 'x64');
+        const android = find(manifest, 'android');
+        const hero = document.getElementById('hero');
+        if (rec === 'android' && android) {
+          hero.innerHTML = '<p class="kicker">适合这台设备</p><div class="hero"><div class="hero-title">Android</div><p class="hero-meta">APK</p><div class="hero-actions">' + button(android, '下载', true) + '</div></div>';
+        } else if (rec === 'macos') {
+          hero.innerHTML = '<p class="kicker">适合这台设备</p><div class="hero"><div class="hero-title">macOS</div><p class="hero-meta">无法从浏览器可靠区分芯片，请按电脑选择。</p><div class="hero-actions">' + button(arm, 'Apple Silicon · M1 / M2 / M3 / M4 等', true) + button(intel, 'Intel Mac', false) + '</div></div>';
+        } else {
+          hero.innerHTML = '<p class="kicker">适合这台设备</p><div class="hero"><div class="hero-title">打开 Web 版</div><p class="hero-meta">浏览器即可使用。需要安装包时选择下方版本。</p><div class="hero-actions"><a class="btn btn-primary" href="https://plainlist.space">打开 PlainList</a></div></div>';
+        }
+
+        document.getElementById('grid').innerHTML = [
+          '<div class="card"><h3>macOS · Apple Silicon</h3><p>M1 / M2 / M3 / M4 等</p>' + button(arm, '下载', true) + '</div>',
+          '<div class="card"><h3>macOS · Intel</h3><p>Intel Mac</p>' + button(intel, '下载', true) + '</div>',
+          '<div class="card"><h3>Android</h3><p>APK</p>' + button(android, '下载', true) + '</div>',
+          '<div class="card"><h3>Web</h3><p>浏览器</p><a class="btn btn-primary" href="https://plainlist.space">打开 PlainList</a></div>',
+        ].join('');
+
+        const sums = (manifest.artifacts || []).map((item) => item.sha256 + '  ' + item.filename).join('\n');
+        document.getElementById('meta').innerHTML =
+          '当前版本 v' + manifest.version +
+          (manifest.publishedAt ? ' · ' + String(manifest.publishedAt).slice(0, 10) : '') +
+          '<br><a href="' + manifest.githubRelease + '">GitHub Release</a>' +
+          '<details class="checksums"><summary>查看校验值</summary><code>' + sums.replace(/</g, '') + '</code></details>';
+      })
+      .catch(() => {
+        document.getElementById('hero').innerHTML = '<p class="error">暂时无法读取版本信息，请稍后重试，或前往 GitHub Release。</p>';
+        document.getElementById('grid').innerHTML = '<div class="card"><h3>Web</h3><p>浏览器</p><a class="btn btn-primary" href="https://plainlist.space">打开 PlainList</a></div>';
+      });
+  </script>
+</body>
+</html>

@@ -8,7 +8,7 @@ const deploymentScripts = [
   fileURLToPath(new URL('../../scripts/deploy-dmg.sh', import.meta.url)),
   fileURLToPath(new URL('../../scripts/deploy-android.sh', import.meta.url)),
 ];
-const downloadPage = fileURLToPath(new URL('../../scripts/download-page/index.html', import.meta.url));
+const downloadPage = fileURLToPath(new URL('../../public/download/index.html', import.meta.url));
 
 describe('production deployment credentials', () => {
   it.each(deploymentScripts)('%s uses key-only SSH without embedded passwords', (scriptPath) => {
@@ -25,12 +25,13 @@ describe('production deployment credentials', () => {
     expect(syntaxCheck.status).toBe(0);
   });
 
-  it('publishes links for the current release', () => {
+  it('publishes a public download page that consumes the release manifest', () => {
     const page = readFileSync(downloadPage, 'utf8');
 
-    expect(page).toContain('/downloads/PlainList-2.4.0.apk');
-    expect(page).toContain('/downloads/PlainList-2.4.0-arm64.dmg');
-    expect(page).toContain('/downloads/PlainList-2.4.0-x64.dmg');
-    expect(page).not.toContain('PlainList-2.3.');
+    expect(page).toContain('下载 PlainList');
+    expect(page).toContain('/releases/latest.json');
+    expect(page).not.toContain('175.24.134.228');
+    expect(page).not.toContain('PlainList-2.4.0');
+    expect(page).not.toContain('客户端下载中心');
   });
 });

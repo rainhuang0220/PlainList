@@ -1,6 +1,6 @@
 {
   "name": "plainlist",
-  "version": "2.4.7",
+  "version": "2.5.0",
   "private": true,
   "workspaces": [
     "apps/*",
@@ -29,7 +29,8 @@
     "desktop:dist:mac": "npm run desktop:dist:mac -w @plainlist/web",
     "desktop:dist:mac:arm64": "npm run desktop:dist:mac:arm64 -w @plainlist/web",
     "desktop:dist:mac:x64": "npm run desktop:dist:mac:x64 -w @plainlist/web",
-    "dev:reset": "./scripts/dev-reset.sh"
+    "dev:reset": "./scripts/dev-reset.sh",
+    "release:verify": "node scripts/release.mjs verify"
   },
   "devDependencies": {
     "@types/node": "^24.6.0",

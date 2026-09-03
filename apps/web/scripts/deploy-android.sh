@@ -1,26 +1,23 @@
 #!/usr/bin/env bash
-# Deploy PlainList Android APK + download page to 175.24.134.228.
+# Mirror the versioned Android APK to the production download directory.
 #
 # Layout on the server:
-#   /www/wwwroot/175.24.134.228/
-#     index.html              # download page
-#     downloads/
-#       PlainList-2.0.0.apk
-#       PlainList-2.0.0-*.dmg   # (existing macOS builds)
-#       SHA256SUMS.txt
+#   /www/wwwroot/plainlist-downloads/
+#     PlainList-<version>-android.apk
+#
+# Canonical download page is https://plainlist.space/download.
 #
 # Requires: SSH key access and passwordless sudo for the deployment account.
 
 set -euo pipefail
 
 SERVER="${PLAINLIST_SERVER:-ubuntu@175.24.134.228}"
-REMOTE_ROOT="/www/wwwroot/175.24.134.228"
+REMOTE_ROOT="/www/wwwroot/plainlist-downloads"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 WEB_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
-PAGE_DIR="${SCRIPT_DIR}/download-page"
-VERSION="${PLAINLIST_VERSION:-2.4.0}"
-APK="${WEB_DIR}/.android-release/PlainList-${VERSION}.apk"
-GUIDE="${WEB_DIR}/public/guide.html"
+ROOT_DIR="$(cd "${WEB_DIR}/../.." && pwd)"
+VERSION="${PLAINLIST_VERSION:-$(node "${ROOT_DIR}/scripts/read-product-version.cjs")}"
+APK="${WEB_DIR}/.android-release/PlainList-${VERSION}-android.apk"
 
 SSH_OPTS=(
   -o BatchMode=yes
@@ -33,24 +30,16 @@ SSH_OPTS=(
 [[ -f "$APK" ]] || { echo "missing $APK — run mobile:android:release first"; exit 1; }
 
 ssh "${SSH_OPTS[@]}" "$SERVER" \
-  "sudo -n mkdir -p '${REMOTE_ROOT}/downloads' && \
+  "sudo -n mkdir -p '${REMOTE_ROOT}' && \
    sudo -n chown -R www:www '${REMOTE_ROOT}'"
 
-DST_NAME="PlainList-${VERSION}.apk"
+DST_NAME="PlainList-${VERSION}-android.apk"
 scp "${SSH_OPTS[@]}" "$APK" "$SERVER:/tmp/$DST_NAME"
 ssh "${SSH_OPTS[@]}" "$SERVER" \
-  "sudo -n mv '/tmp/$DST_NAME' '${REMOTE_ROOT}/downloads/$DST_NAME' && \
-   sudo -n chown www:www '${REMOTE_ROOT}/downloads/$DST_NAME'"
+  "sudo -n mv '/tmp/$DST_NAME' '${REMOTE_ROOT}/$DST_NAME' && \
+   sudo -n chown www:www '${REMOTE_ROOT}/$DST_NAME'"
 
-# Rebuild SUMS on server for all PlainList artifacts
 ssh "${SSH_OPTS[@]}" "$SERVER" \
-  "cd '${REMOTE_ROOT}/downloads' && sudo -n bash -lc 'shasum -a 256 PlainList-*.dmg PlainList-*.apk > SHA256SUMS.txt && chown www:www SHA256SUMS.txt'"
+  "cd '${REMOTE_ROOT}' && sudo -n bash -lc 'shasum -a 256 PlainList-*.dmg PlainList-*.apk > SHA256SUMS.txt && chown www:www SHA256SUMS.txt'"
 
-scp "${SSH_OPTS[@]}" "${PAGE_DIR}/index.html" "$SERVER:/tmp/plainlist-index.html"
-scp "${SSH_OPTS[@]}" "$GUIDE" "$SERVER:/tmp/plainlist-guide.html"
-ssh "${SSH_OPTS[@]}" "$SERVER" \
-  "sudo -n mv /tmp/plainlist-index.html '${REMOTE_ROOT}/index.html' && \
-   sudo -n mv /tmp/plainlist-guide.html '${REMOTE_ROOT}/guide.html' && \
-   sudo -n chown www:www '${REMOTE_ROOT}/index.html' '${REMOTE_ROOT}/guide.html'"
-
-echo "[deploy-android] done → http://175.24.134.228/"
+echo "[deploy-android] done → https://plainlist.space/download"

@@ -30,6 +30,7 @@
         <button type="button" class="user-menu-item" @click="openSettings('ai-journal')">
           周度洞察
         </button>
+        <a class="user-menu-item" :href="downloadHref">下载</a>
         <div class="user-menu-divider" />
         <button type="button" class="user-menu-item user-menu-item-danger" @click="emit('logout')">
           {{ t('nav.lock', '锁定') }}
@@ -41,6 +42,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { productDownloadHref } from '@/features/download/recommendPlatform';
 import { useI18nStore } from '@/shared/i18n/useI18nStore';
 
 const props = defineProps<{
@@ -57,6 +59,7 @@ const menuOpen = ref(false);
 const rootEl = ref<HTMLElement | null>(null);
 
 const avatarLetter = computed(() => (props.username?.[0] ?? '?').toUpperCase());
+const downloadHref = computed(() => productDownloadHref());
 
 function t(key: string, fallback: string) {
   return i18n.t(key, fallback);
@@ -206,6 +209,7 @@ onUnmounted(() => {
   font-size: 13px;
   color: var(--dark);
   cursor: pointer;
+  text-decoration: none;
 }
 
 .user-menu-item:hover {

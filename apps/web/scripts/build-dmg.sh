@@ -8,12 +8,13 @@
 set -euo pipefail
 
 ARCH="${1:-arm64}"
-STAGE_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-STAGE_DIR="${STAGE_DIR}/.electron-stage"
+WEB_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT_DIR="$(cd "${WEB_DIR}/../.." && pwd)"
+STAGE_DIR="${WEB_DIR}/.electron-stage"
 RELEASE_DIR="${STAGE_DIR}/release"
 APP_NAME="PlainList"
-VERSION="${PLAINLIST_VERSION:-2.4.0}"
-DMG_NAME="${APP_NAME}-${VERSION}-${ARCH}.dmg"
+VERSION="${PLAINLIST_VERSION:-$(node "${ROOT_DIR}/scripts/read-product-version.cjs")}"
+DMG_NAME="${APP_NAME}-${VERSION}-macos-${ARCH}.dmg"
 
 case "$ARCH" in
   arm64) APP_DIR="${RELEASE_DIR}/mac-arm64" ;;
