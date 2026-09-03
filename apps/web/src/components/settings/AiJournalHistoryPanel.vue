@@ -1,33 +1,7 @@
 <template>
   <section class="ai-journal">
-    <div class="tabs" role="tablist">
-      <button type="button" role="tab" :aria-selected="tab === 'daily'" :class="{ active: tab === 'daily' }" @click="tab = 'daily'">每日小记</button>
-      <button type="button" role="tab" :aria-selected="tab === 'weekly'" :class="{ active: tab === 'weekly' }" @click="tab = 'weekly'">每周回顾</button>
-    </div>
-
-    <p v-if="loading" class="muted">正在读取 AI 小记…</p>
+    <p v-if="loading" class="muted">正在读取过去历周的 Weekly Summary…</p>
     <p v-else-if="error" class="muted">暂时无法读取历史记录，请稍后重试。</p>
-
-    <div v-else-if="tab === 'daily'" class="layout" :class="{ 'has-index': daily.length }">
-      <ul v-if="daily.length" class="index">
-        <li v-for="entry in daily" :key="entry.date">
-          <button type="button" :class="{ active: selectedDate === entry.date }" @click="selectedDate = entry.date">
-            {{ presentJournalDate(entry.date, today).primary }}
-          </button>
-        </li>
-      </ul>
-      <article class="reader">
-        <template v-if="selectedDaily">
-          <h3>{{ presentJournalDate(selectedDaily.date, today).primary }}</h3>
-          <!-- eslint-disable-next-line vue/no-v-html -->
-          <div class="prose" v-html="renderSafeMarkdown(selectedDaily.summaryMarkdown)" />
-        </template>
-        <div v-else>
-          <p class="muted">{{ emptyDaily.title }}</p>
-          <p v-if="emptyDaily.body" class="muted">{{ emptyDaily.body }}</p>
-        </div>
-      </article>
-    </div>
 
     <div v-else class="layout" :class="{ 'has-index': weekly.length }">
       <ul v-if="weekly.length" class="index">
@@ -54,26 +28,15 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { renderSafeMarkdown } from '@/features/chatgpt-activity/safeMarkdown';
-import { presentAiJournalEmpty, presentJournalDate, presentWeekRange } from '@/features/chatgpt-activity/presentAiJournal';
+import { presentAiJournalEmpty, presentWeekRange } from '@/features/chatgpt-activity/presentAiJournal';
 import { useChatgptActivityStore } from '@/features/chatgpt-activity/useChatgptActivityStore';
 import { useReviewsStore } from '@/features/reviews/model/useReviewsStore';
 
 const reviews = useReviewsStore();
 const activity = useChatgptActivityStore();
-const tab = ref<'daily' | 'weekly'>('daily');
 const loading = ref(true);
 const error = ref('');
-const now = new Date();
-const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-const selectedDate = ref(today);
 const selectedWeek = ref('');
-const daily = ref<Array<{
-  date: string;
-  summaryMarkdown: string;
-  activityCount: number;
-  conversationCount: number;
-  updatedAt?: string;
-}>>([]);
 const weekly = ref<Array<{
   weekStart: string;
   weekEnd: string;
@@ -81,13 +44,8 @@ const weekly = ref<Array<{
   content?: { summary?: string };
 }>>([]);
 
-const selectedDaily = computed(() => daily.value.find((item) => item.date === selectedDate.value) ?? daily.value[0] ?? null);
 const selectedWeekly = computed(() => weekly.value.find((item) => item.weekStart === selectedWeek.value) ?? weekly.value[0] ?? null);
-const emptyDaily = computed(() => presentAiJournalEmpty(activity.connection.displayState, 'daily', {
-  processed: activity.connection.processed,
-  checked: activity.connection.checked,
-}));
-const emptyWeekly = computed(() => presentAiJournalEmpty(activity.connection.displayState, 'weekly', {
+const emptyWeekly = computed(() => presentAiJournalEmpty(activity.connection.displayState, {
   processed: activity.connection.processed,
   checked: activity.connection.checked,
 }));
@@ -96,9 +54,7 @@ onMounted(async () => {
   try {
     await activity.fetchConnection().catch(() => {});
     const result = await reviews.fetchWeeklyHistory();
-    daily.value = result.daily ?? [];
     weekly.value = result.weekly ?? [];
-    if (daily.value[0]) selectedDate.value = daily.value[0].date;
     if (weekly.value[0]) selectedWeek.value = weekly.value[0].weekStart;
   } catch {
     error.value = 'unavailable';
@@ -114,27 +70,6 @@ onMounted(async () => {
   gap: 12px;
   min-height: 0;
   height: 100%;
-}
-.tabs {
-  display: flex;
-  gap: 8px;
-  flex: 0 0 auto;
-}
-.tabs button {
-  border: 1px solid var(--faint);
-  background: transparent;
-  color: var(--mid);
-  padding: 8px 14px;
-  font-size: 12px;
-  letter-spacing: 0.06em;
-  cursor: pointer;
-  border-radius: var(--r);
-  font-family: inherit;
-}
-.tabs button.active {
-  background: var(--dark);
-  color: var(--surface);
-  border-color: var(--dark);
 }
 .layout {
   display: grid;

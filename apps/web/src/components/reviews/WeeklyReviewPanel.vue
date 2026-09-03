@@ -26,26 +26,10 @@
         <p v-else-if="isMonday" class="weekly-muted">
           {{ t('week.page.monday_open', '本周刚开始。完成的一天会从明天起出现在这里。') }}
         </p>
-        <p v-else-if="dailyJournals.length" class="weekly-muted">
-          {{ t('week.page.current_from_daily', '周总结正在更新，下面是已经形成的每日小记。') }}
-        </p>
         <p v-else class="weekly-muted">
           {{ t('week.page.current_waiting', '本周已完成的日子会逐渐出现在这里。') }}
         </p>
       </article>
-
-      <details v-if="dailyJournals.length" class="weekly-fold">
-        <summary>{{ t('week.page.dailies', '本周每日记录') }}</summary>
-        <details
-          v-for="entry in dailyJournals"
-          :key="entry.date"
-          class="weekly-day"
-        >
-          <summary>{{ formatDay(entry.date) }}</summary>
-          <!-- eslint-disable-next-line vue/no-v-html -->
-          <div class="weekly-prose" v-html="renderSafeMarkdown(entry.summaryMarkdown)" />
-        </details>
-      </details>
 
       <article v-if="plans.length || nextFocus.length" class="weekly-block">
         <h3>{{ t('week.page.plans', '本周计划 / 下一步') }}</h3>
@@ -103,7 +87,6 @@ const trueEmpty = computed(() => (
   page.value ? Boolean(page.value.trueEmpty) : Boolean(props.result && !props.result.content && props.result.notice === 'no_data')
 ));
 const isMonday = computed(() => Boolean(page.value?.isMonday));
-const dailyJournals = computed(() => page.value?.currentDailyJournals ?? []);
 const plans = computed(() => page.value?.currentPlans ?? []);
 const previous = computed(() => page.value?.previousClosedWeek ?? null);
 const current = computed(() => page.value?.currentWeek ?? (
@@ -152,9 +135,7 @@ const previousMissingCopy = computed(() => {
 });
 const currentRange = computed(() => {
   if (isMonday.value) return '';
-  const start = current.value?.weekStart || page.value?.currentDailyJournals[0]?.date;
-  const end = current.value?.weekEnd || page.value?.currentDailyJournals.at(-1)?.date;
-  return formatRange(start, end);
+  return formatRange(current.value?.weekStart, current.value?.weekEnd);
 });
 
 const updatingNotice = computed(() => {
@@ -163,11 +144,6 @@ const updatingNotice = computed(() => {
   }
   return '';
 });
-
-function formatDay(date: string) {
-  const [, month, day] = date.split('-').map(Number);
-  return i18n.locale === 'zh-CN' ? `${month} 月 ${day} 日` : date;
-}
 
 const runtimeLabel = computed(() => {
   const runtime = page.value?.runtime;

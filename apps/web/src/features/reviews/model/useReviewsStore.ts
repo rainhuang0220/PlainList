@@ -39,7 +39,6 @@ export const useReviewsStore = defineStore('reviews', () => {
 
   async function fetchWeeklyHistory() {
     return get<{
-      daily: Array<{ date: string; summaryMarkdown: string; activityCount: number; conversationCount: number }>;
       weekly: Array<{
         weekStart: string;
         weekEnd: string;

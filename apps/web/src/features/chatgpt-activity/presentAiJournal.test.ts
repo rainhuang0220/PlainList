@@ -3,10 +3,11 @@ import { presentAiJournalEmpty, presentJournalDate, presentWeekRange } from './p
 
 describe('presentAiJournalEmpty', () => {
   it('does not use a single empty copy for every connection state', () => {
-    expect(presentAiJournalEmpty('not_connected', 'daily').title).toContain('尚未连接');
-    expect(presentAiJournalEmpty('bootstrapping', 'daily', { processed: 3, checked: 10 }).body).toContain('3 / 10');
-    expect(presentAiJournalEmpty('no_activity', 'daily').title).toContain('没有需要记录');
-    expect(presentAiJournalEmpty('ready', 'daily').title).not.toBe('还没有每日小记。连接 ChatGPT 活动记录后，这里会按天出现。');
+    expect(presentAiJournalEmpty('not_connected').title).toContain('尚未连接');
+    expect(presentAiJournalEmpty('bootstrapping', { processed: 3, checked: 10 }).body).toContain('3 / 10');
+    expect(presentAiJournalEmpty('no_activity').title).toContain('还没有已结束的周回顾');
+    expect(presentAiJournalEmpty('ready').title).toBe('还没有已结束的周回顾。');
+    expect(presentAiJournalEmpty('ready').title).not.toContain('每日小记');
   });
 });
 

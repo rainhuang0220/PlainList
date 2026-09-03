@@ -204,7 +204,6 @@
             {{ saveStatusLabel }}
           </span>
         </div>
-        <ChatgptDailyJournal :date="editingDate" />
       </div>
     </aside>
   </section>
@@ -219,7 +218,6 @@ import { useChecksStore } from '@/features/checks/model/useChecksStore'
 import { useAuthStore } from '@/features/auth/model/useAuthStore'
 import { useReviewsStore } from '@/features/reviews/model/useReviewsStore'
 import { createDailyReviewSession } from '@/features/reviews/model/dailyReviewSession'
-import ChatgptDailyJournal from '@/components/chatgpt/ChatgptDailyJournal.vue'
 import { getAppDayClock } from '@/shared/clock/localDayClock'
 import { useI18nStore } from '@/shared/i18n/useI18nStore'
 import DayScheduleAxis from '@/components/plans/DayScheduleAxis.vue'

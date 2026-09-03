@@ -5,9 +5,13 @@ import { describe, expect, it } from 'vitest';
 const source = readFileSync(resolve(__dirname, 'AiJournalHistoryPanel.vue'), 'utf8');
 
 describe('AiJournalHistoryPanel reader', () => {
-  it('is a history reader rather than a settings form or date picker', () => {
-    expect(source).toContain('每日小记');
-    expect(source).toContain('每周回顾');
+  it('is a closed-week Weekly Summary reader, not a daily journal', () => {
+    expect(source).not.toContain('每日小记');
+    expect(source).not.toContain("tab === 'daily'");
+    expect(source).not.toContain('selectedDaily');
+    expect(source).not.toContain('result.daily');
+    expect(source).toContain('weekly');
+    expect(source).toContain('presentWeekRange');
     expect(source).not.toContain('type="date"');
     expect(source).not.toContain('journal-intro');
     expect(source).not.toContain('AUTOMATIC SOURCE');
@@ -18,8 +22,8 @@ describe('AiJournalHistoryPanel reader', () => {
     expect(source).toContain('renderSafeMarkdown');
   });
 
-  it('uses a date list beside the reader only when history exists', () => {
-    expect(source).toContain("class=\"layout\" :class=\"{ 'has-index': daily.length }\"");
+  it('uses a week list beside the reader only when closed weeks exist', () => {
+    expect(source).toContain("class=\"layout\" :class=\"{ 'has-index': weekly.length }\"");
     expect(source).toContain('grid-template-columns: 148px minmax(0, 1fr)');
     expect(source).not.toContain('journal-shell');
     expect(source).not.toContain('!important');
