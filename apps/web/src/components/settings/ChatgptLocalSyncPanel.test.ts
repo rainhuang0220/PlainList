@@ -6,6 +6,7 @@ const source = readFileSync(resolve(__dirname, 'ChatgptLocalSyncPanel.vue'), 'ut
 
 describe('ChatgptLocalSyncPanel layout', () => {
   it('is a compact source status section, not a dashboard', () => {
+    expect(source).not.toContain('<section');
     expect(source).not.toContain('AUTOMATIC SOURCE');
     expect(source).not.toContain('source-ledger');
     expect(source).not.toContain('activity-source-card');
@@ -13,8 +14,16 @@ describe('ChatgptLocalSyncPanel layout', () => {
     expect(source).not.toContain('<h3>ChatGPT 活动记录</h3>');
     expect(source).not.toContain('height: 32px');
     expect(source).not.toContain('min-height');
+    expect(source).not.toContain('flex: 1');
     expect(source).not.toContain('!important');
     expect(source).not.toContain('max-width: 520px');
+    expect(source).not.toContain('us-modal--compact');
+    expect(source).not.toContain('us-modal--reader');
+    expect(source).not.toContain('us-modal--activity');
+    expect(source).not.toContain('height: calc');
+    expect(source).toContain('class="sync-block"');
+    expect(source).toContain('display: block');
+    expect(source).toMatch(/<div class="sync-block">[\s\S]*<div class="actions">/);
   });
 
   it('keeps a living connected state and an AI journal entry', () => {

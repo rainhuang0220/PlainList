@@ -2,10 +2,6 @@
   <div class="us-overlay" @click.self="emit('close')">
     <div
       class="us-modal"
-      :class="{
-        'us-modal--reader': activeSection === 'ai-journal',
-        'us-modal--activity': activeSection === 'chatgpt-local-sync',
-      }"
       role="dialog"
       aria-label="用户设置"
     >
@@ -170,28 +166,9 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
-.us-modal--reader {
-  width: min(1020px, calc(100vw - 48px));
-}
-
-.us-modal--activity {
-  height: auto;
-  align-items: flex-start;
-}
-
-.us-modal--activity .us-side-body {
-  flex: 0 1 auto;
-}
-
-.us-modal--activity .us-main-body {
-  flex: 0 0 auto;
-  overflow: visible;
-}
-
 .us-main-body--journal {
   display: flex;
   flex-direction: column;
-  padding: 12px 16px 16px;
 }
 
 .us-main-body--journal > * {
@@ -490,20 +467,6 @@ onUnmounted(() => {
     flex-direction: column;
     align-items: flex-start;
     gap: 6px;
-  }
-
-  .us-modal--reader {
-    width: 100%;
-  }
-
-  .us-modal--activity {
-    height: 100%;
-    align-items: stretch;
-  }
-
-  .us-modal--activity .us-main-body {
-    flex: 1 1 auto;
-    overflow-y: auto;
   }
 }
 </style>
