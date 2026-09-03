@@ -1,17 +1,21 @@
 <template>
-  <section class="ai-journal">
+  <section class="weekly-insight">
     <p v-if="loading" class="muted">正在读取周度洞察…</p>
     <p v-else-if="error" class="muted">暂时无法读取历史记录，请稍后重试。</p>
 
-    <div v-else class="layout" :class="{ 'has-index': weekly.length }">
-      <ul v-if="weekly.length" class="index">
-        <li v-for="week in weekly" :key="week.weekStart">
-          <button type="button" :class="{ active: selectedWeek === week.weekStart }" @click="selectedWeek = week.weekStart">
-            {{ presentWeekRange(week.weekStart, week.weekEnd) }}
-          </button>
-        </li>
-      </ul>
-      <article class="reader">
+    <div v-else class="frame">
+      <nav v-if="weekly.length" class="weeks" aria-label="历史周">
+        <button
+          v-for="week in weekly"
+          :key="week.weekStart"
+          type="button"
+          :class="{ active: selectedWeek === week.weekStart }"
+          @click="selectedWeek = week.weekStart"
+        >
+          {{ presentWeekRange(week.weekStart, week.weekEnd) }}
+        </button>
+      </nav>
+      <article class="article">
         <template v-if="selectedWeekly">
           <h3>{{ presentWeekRange(selectedWeekly.weekStart, selectedWeekly.weekEnd) }}</h3>
           <!-- eslint-disable-next-line vue/no-v-html -->
@@ -64,35 +68,35 @@ onMounted(async () => {
 });
 </script>
 <style scoped>
-.ai-journal {
+.weekly-insight {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  min-width: 0;
   min-height: 0;
   height: 100%;
 }
-.layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 16px;
-  min-height: 0;
+.frame {
+  display: flex;
   flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
 }
-.layout.has-index {
-  grid-template-columns: max-content minmax(0, 1fr);
-}
-.index {
-  margin: 0;
-  padding: 0;
-  list-style: none;
+.weeks {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   min-height: 0;
   overflow: auto;
+  padding-right: 12px;
+  margin-right: 16px;
+  border-right: 1px solid var(--faint);
 }
-.index button {
+.weeks button {
+  display: block;
   width: 100%;
   padding: 8px 10px;
   border: 0;
-  border-bottom: 1px solid var(--faint);
   background: transparent;
   color: var(--dark);
   text-align: left;
@@ -103,15 +107,17 @@ onMounted(async () => {
   border-radius: var(--r);
   white-space: nowrap;
 }
-.index button.active {
+.weeks button.active {
   font-weight: 600;
-  background: var(--surface);
+  background: var(--faint2);
 }
-.reader {
+.article {
+  flex: 1 1 auto;
+  min-width: 0;
   min-height: 0;
   overflow: auto;
 }
-.reader h3 {
+.article h3 {
   margin: 0 0 12px;
   font-size: 14px;
   font-weight: 600;
@@ -145,27 +151,25 @@ onMounted(async () => {
   margin-top: 8px;
 }
 @media (max-width: 768px) {
-  .layout,
-  .layout.has-index {
-    grid-template-columns: 1fr;
-    gap: 12px;
+  .frame {
+    flex-direction: column;
   }
-  .index {
-    display: flex;
+  .weeks {
+    flex-direction: row;
     gap: 8px;
     overflow-x: auto;
+    overflow-y: hidden;
+    padding: 0 0 12px;
+    margin: 0 0 12px;
+    border-right: 0;
+    border-bottom: 1px solid var(--faint);
   }
-  .index li {
-    flex: 0 0 auto;
-  }
-  .index button {
+  .weeks button {
     width: auto;
     padding: 8px 14px;
     border: 1px solid var(--faint);
-    white-space: nowrap;
-    font-size: 12px;
   }
-  .index button.active {
+  .weeks button.active {
     background: var(--dark);
     color: var(--surface);
     border-color: var(--dark);

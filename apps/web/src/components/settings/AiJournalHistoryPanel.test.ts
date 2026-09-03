@@ -22,12 +22,17 @@ describe('AiJournalHistoryPanel reader', () => {
     expect(source).toContain('renderSafeMarkdown');
   });
 
-  it('uses a week list beside the reader only when closed weeks exist', () => {
-    expect(source).toContain("class=\"layout\" :class=\"{ 'has-index': weekly.length }\"");
-    expect(source).toContain('grid-template-columns: max-content minmax(0, 1fr)');
-    expect(source).toContain('white-space: nowrap');
-    expect(source).not.toContain('7.5rem');
+  it('fills the settings body with a week rail and a stretching article', () => {
+    expect(source).toContain('class="weekly-insight"');
+    expect(source).toContain('class="frame"');
+    expect(source).toContain('class="weeks"');
+    expect(source).toContain('class="article"');
+    expect(source).toContain('flex: 1 1 auto');
+    expect(source).toContain('min-width: 0');
+    expect(source).not.toMatch(/\.article \{[^}]*max-width/s);
+    expect(source).not.toMatch(/\.prose \{[^}]*max-width/s);
     expect(source).not.toContain('148px');
+    expect(source).not.toContain('7.5rem');
     expect(source).not.toContain('journal-shell');
     expect(source).not.toContain('!important');
     expect(source).not.toContain('height: calc');

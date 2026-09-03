@@ -1,13 +1,15 @@
 <template>
   <section class="chatgpt-source">
-    <p class="status">
-      <span class="dot" :class="card.variant" />
-      <span>{{ card.headline }}</span>
-    </p>
-    <p v-if="card.body" class="copy">{{ card.body }}</p>
-    <p v-if="card.countLine" class="meta">{{ card.countLine }}</p>
-    <p v-if="card.lastUpdated" class="meta">最后同步：{{ formatSync(card.lastUpdated) }}</p>
-    <p v-if="card.progressLine" class="meta">{{ card.progressLine }}</p>
+    <div class="sync-block">
+      <p class="status">
+        <span class="dot" :class="card.variant" />
+        <span>{{ card.headline }}</span>
+      </p>
+      <p v-if="card.body" class="copy">{{ card.body }}</p>
+      <p v-if="card.countLine" class="meta">{{ card.countLine }}</p>
+      <p v-if="card.lastUpdated" class="meta">最后同步：{{ formatSync(card.lastUpdated) }}</p>
+      <p v-if="card.progressLine" class="meta">{{ card.progressLine }}</p>
+    </div>
 
     <div class="actions">
       <button v-if="isDesktop && !rootName" type="button" class="settings-btn-primary" @click="choose">连接本地资料库</button>
@@ -116,6 +118,13 @@ onUnmounted(() => {
 <style scoped>
 .chatgpt-source {
   display: block;
+  width: 100%;
+}
+.sync-block {
+  border: 1px solid var(--faint);
+  border-radius: var(--r);
+  background: var(--surface);
+  padding: 14px 16px;
 }
 .status {
   display: flex;

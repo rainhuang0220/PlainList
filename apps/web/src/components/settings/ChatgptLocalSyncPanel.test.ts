@@ -13,8 +13,11 @@ describe('ChatgptLocalSyncPanel layout', () => {
     expect(source).not.toContain('<h3>ChatGPT 活动记录</h3>');
     expect(source).not.toContain('height: 32px');
     expect(source).not.toContain('min-height');
+    expect(source).not.toContain('flex: 1');
     expect(source).not.toContain('!important');
     expect(source).not.toContain('max-width: 520px');
+    expect(source).toContain('class="sync-block"');
+    expect(source).toContain('display: block');
   });
 
   it('keeps a living connected state and an AI journal entry', () => {

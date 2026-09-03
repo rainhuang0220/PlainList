@@ -16,18 +16,10 @@ describe('UserSettingsPanel AI journal entry', () => {
   it('keeps ChatGPT and weekly insight on the same settings modal as Account', () => {
     expect(source).not.toContain('us-modal--compact');
     expect(source).not.toContain('us-main-body--compact');
+    expect(source).not.toContain('us-modal--reader');
+    expect(source).not.toContain('us-modal--activity');
     expect(source).toContain('width: 860px');
     expect(source).toContain('height: 640px');
     expect(source).toContain('us-main-body--journal');
-    expect(source).toContain('us-modal--reader');
-    expect(source).toContain('us-modal--activity');
-  });
-
-  it('widens the weekly reader and lets the activity card hug its content', () => {
-    expect(source).toContain('width: min(1020px, calc(100vw - 48px))');
-    expect(source).toContain('padding: 12px 16px 16px');
-    expect(source).toContain('.us-modal--activity {\n  height: auto;\n  align-items: flex-start;\n}');
-    expect(source).toContain('.us-modal--activity .us-main-body {\n  flex: 0 0 auto;\n  overflow: visible;\n}');
-    expect(source).not.toContain('us-modal--compact');
   });
 });
