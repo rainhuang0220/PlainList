@@ -18,4 +18,11 @@ describe('WeeklyReviewPanel first-week copy', () => {
     expect(source).not.toMatch(/t\('week\.page\.previous',\s*'本周回顾'\)/);
     expect(source).not.toMatch(/<h3>\{\{\s*t\('week\.page\.previous'[^}]*本周回顾/);
   });
+
+  it('does not present Daily AI journals on the Week page', () => {
+    expect(source).not.toContain('本周每日记录');
+    expect(source).not.toContain('current_from_daily');
+    expect(source).not.toContain('dailyJournals');
+    expect(source).not.toContain('currentDailyJournals');
+  });
 });

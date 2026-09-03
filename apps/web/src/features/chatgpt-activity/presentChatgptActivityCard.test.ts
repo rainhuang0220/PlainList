@@ -13,7 +13,8 @@ describe('presentChatgptActivityCard', () => {
     expect(card.variant).toBe('desktop-disconnected');
     expect(card.connected).toBe(false);
     expect(card.headline).toBe('尚未连接本地资料库。');
-    expect(card.body).toContain('形成每日小记');
+    expect(card.body).toContain('周回顾');
+    expect(card.body).not.toContain('每日小记');
     expect(card.showDesktopDownload).toBe(false);
   });
 

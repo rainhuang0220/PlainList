@@ -547,16 +547,7 @@ function groupDatesByClosedWeek(dates: string[]) {
 export async function listClosedWeeklyHistory(user: AuthenticatedUser, limit = 24) {
   const asOf = clock.currentDateKey();
   const snapshots = await repository.listClosedWeeks(user.id, limit);
-  const [journalRows, diaryRows, cacheRows] = await Promise.all([
-    pool.query(
-      `SELECT journal_date, summary_markdown, activity_count, conversation_count, status, generated_at, updated_at
-       FROM chatgpt_daily_journals
-       WHERE user_id = ? AND source_type = 'chatgpt-local-sync' AND status IN ('ready', 'final')
-         AND journal_date >= ?
-       ORDER BY journal_date DESC
-       LIMIT 400`,
-      [user.id, DEFAULT_HISTORICAL_START_DATE],
-    ),
+  const [diaryRows, cacheRows] = await Promise.all([
     pool.query(
       `SELECT review_date FROM daily_reviews
        WHERE user_id = ? AND TRIM(content) <> '' AND review_date >= ?
@@ -569,16 +560,6 @@ export async function listClosedWeeklyHistory(user: AuthenticatedUser, limit = 2
       [user.id],
     ),
   ]);
-
-  const daily = (Array.isArray(journalRows[0]) ? journalRows[0] : []).map((row) => ({
-    date: localDateKey((row as { journal_date: string }).journal_date) ?? '',
-    summaryMarkdown: String((row as { summary_markdown: string }).summary_markdown),
-    activityCount: Number((row as { activity_count: number }).activity_count),
-    conversationCount: Number((row as { conversation_count: number }).conversation_count),
-    status: String((row as { status: string }).status),
-    generatedAt: (row as { generated_at?: string }).generated_at ? new Date(String((row as { generated_at: string }).generated_at)).toISOString() : null,
-    updatedAt: new Date(String((row as { updated_at: string }).updated_at)).toISOString(),
-  })).filter((row) => row.date);
 
   const snapshotWeeks = snapshots
     .map((snapshot) => snapshotSection(snapshot))
@@ -609,31 +590,6 @@ export async function listClosedWeeklyHistory(user: AuthenticatedUser, limit = 2
     }
   }
 
-  const fromJournals: ClosedHistoryWeek[] = [];
-  for (const group of groupDatesByClosedWeek(daily.map((item) => item.date))) {
-    const weekDays = daily.filter((item) => group.dates.includes(item.date));
-    const narrative = weekDays.map((item) => item.summaryMarkdown).join('\n\n').slice(0, 4000);
-    fromJournals.push({
-      weekStart: group.weekStart,
-      weekEnd: group.weekEnd,
-      reviewAsOfDate: closedWeekReviewAsOf(group.weekEnd),
-      status: 'ready',
-      content: {
-        overall: '由每日小记整理',
-        summary: narrative.slice(0, 1800),
-        comparison: '无法判断',
-        positive: '无法判断',
-        concerns: '无法判断',
-        nextFocus: ['查看每日小记'],
-        narrativeMarkdown: narrative,
-      },
-      narrativeMarkdown: narrative,
-      model: null,
-      provider: 'deterministic',
-      generatedAt: null,
-    });
-  }
-
   const diaryDates = (Array.isArray(diaryRows[0]) ? diaryRows[0] : [])
     .map((row) => localDateKey((row as { review_date: string }).review_date))
     .filter((date): date is string => Boolean(date));
@@ -649,11 +605,10 @@ export async function listClosedWeeklyHistory(user: AuthenticatedUser, limit = 2
     limit,
     snapshots: snapshotWeeks,
     cached: cachedWeeks,
-    fromJournals,
     fromDiaries,
   });
 
-  return { daily, weekly };
+  return { weekly };
 }
 
 const MAX_CLOSED_BACKFILL = 6;
