@@ -194,8 +194,20 @@ try {
         fail.push(`${vp.name}/${name} internal gap ${m.maxInternalGap}`);
       }
       if (name === 'journal') {
-        if (Math.abs(m.titleAlignmentDelta) > 2) fail.push(`${vp.name}/journal title delta ${m.titleAlignmentDelta}`);
+        const weekCount = await page.locator('.us-modal .weeks button').count();
+        report.scenes[`${vp.name}-${name}`].weekCount = weekCount;
+        if (weekCount !== 7) fail.push(`${vp.name}/journal week count ${weekCount}`);
+        if (await page.locator('.us-modal .weeks button', { hasText: '6 月 30 日' }).count()) {
+          fail.push(`${vp.name}/journal showed an 8th week`);
+        }
+        const railShift = Math.round((m.weekRailX ?? 0) - (m.contentLeft ?? 0));
+        report.scenes[`${vp.name}-${name}`].railShift = railShift;
+        if (Math.abs(railShift - (-15)) > 2) fail.push(`${vp.name}/journal rail shift ${railShift}`);
         if (Math.abs(m.rightEdgeDelta) > 2) fail.push(`${vp.name}/journal right delta ${m.rightEdgeDelta}`);
+        const readerWidth = Math.round(m.readerWidth ?? 0);
+        const readerGain = readerWidth - 341;
+        report.scenes[`${vp.name}-${name}`].readerGain = readerGain;
+        if (Math.abs(readerGain - 15) > 2) fail.push(`${vp.name}/journal reader gain ${readerGain}`);
       }
     }
 
