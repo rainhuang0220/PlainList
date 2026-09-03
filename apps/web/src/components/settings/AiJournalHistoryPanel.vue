@@ -1,10 +1,10 @@
 <template>
-  <section class="weekly-insight">
+  <div class="weekly-insight">
     <p v-if="loading" class="muted">正在读取周度洞察…</p>
     <p v-else-if="error" class="muted">暂时无法读取历史记录，请稍后重试。</p>
 
     <div v-else class="frame">
-      <nav v-if="weekly.length" class="weeks" aria-label="历史周">
+      <div v-if="weekly.length" class="weeks" role="navigation" aria-label="历史周">
         <button
           v-for="week in weekly"
           :key="week.weekStart"
@@ -14,8 +14,8 @@
         >
           {{ presentWeekRange(week.weekStart, week.weekEnd) }}
         </button>
-      </nav>
-      <article class="article">
+      </div>
+      <article ref="readerRef" class="article">
         <template v-if="selectedWeekly">
           <h3>{{ presentWeekRange(selectedWeekly.weekStart, selectedWeekly.weekEnd) }}</h3>
           <!-- eslint-disable-next-line vue/no-v-html -->
@@ -27,12 +27,13 @@
         </div>
       </article>
     </div>
-  </section>
+  </div>
 </template>
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { renderSafeMarkdown } from '@/features/chatgpt-activity/safeMarkdown';
 import { presentAiJournalEmpty, presentWeekRange } from '@/features/chatgpt-activity/presentAiJournal';
+import { applyWeeklyReaderScrollReset } from '@/features/chatgpt-activity/resetWeeklyReaderScroll';
 import { useChatgptActivityStore } from '@/features/chatgpt-activity/useChatgptActivityStore';
 import { useReviewsStore } from '@/features/reviews/model/useReviewsStore';
 
@@ -41,6 +42,7 @@ const activity = useChatgptActivityStore();
 const loading = ref(true);
 const error = ref('');
 const selectedWeek = ref('');
+const readerRef = ref<HTMLElement | null>(null);
 const weekly = ref<Array<{
   weekStart: string;
   weekEnd: string;
@@ -53,6 +55,12 @@ const emptyWeekly = computed(() => presentAiJournalEmpty(activity.connection.dis
   processed: activity.connection.processed,
   checked: activity.connection.checked,
 }));
+
+watch(selectedWeek, async (week, prev) => {
+  if (!week || week === prev) return;
+  await nextTick();
+  applyWeeklyReaderScrollReset(readerRef.value, week, prev);
+});
 
 onMounted(async () => {
   try {
@@ -71,6 +79,7 @@ onMounted(async () => {
 .weekly-insight {
   display: flex;
   flex-direction: column;
+  width: 100%;
   min-width: 0;
   min-height: 0;
   height: 100%;
@@ -78,6 +87,7 @@ onMounted(async () => {
 .frame {
   display: flex;
   flex: 1 1 auto;
+  width: 100%;
   min-width: 0;
   min-height: 0;
 }

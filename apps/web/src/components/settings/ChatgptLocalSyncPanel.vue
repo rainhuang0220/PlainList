@@ -1,5 +1,5 @@
 <template>
-  <section class="chatgpt-source">
+  <div class="chatgpt-source">
     <div class="sync-block">
       <p class="status">
         <span class="dot" :class="card.variant" />
@@ -9,25 +9,24 @@
       <p v-if="card.countLine" class="meta">{{ card.countLine }}</p>
       <p v-if="card.lastUpdated" class="meta">最后同步：{{ formatSync(card.lastUpdated) }}</p>
       <p v-if="card.progressLine" class="meta">{{ card.progressLine }}</p>
+      <div class="actions">
+        <button v-if="isDesktop && !rootName" type="button" class="settings-btn-primary" @click="choose">连接本地资料库</button>
+        <button v-if="card.connected" type="button" class="settings-btn-primary" @click="emit('openAiJournal')">查看周度洞察</button>
+        <a
+          v-if="card.showDesktopDownload"
+          class="text-link"
+          href="https://github.com/rainhuang0220/PlainList/releases/latest"
+          target="_blank"
+          rel="noreferrer"
+        >下载 Desktop</a>
+        <button v-if="isDesktop && rootName" type="button" class="settings-btn-secondary" :disabled="status !== 'enabled'" @click="checkNow">立即检查</button>
+        <button v-if="isDesktop && rootName" type="button" class="settings-btn-secondary" @click="choose">重新选择资料库</button>
+        <button v-if="isDesktop && status === 'enabled'" type="button" class="settings-btn-secondary" @click="pause">暂停</button>
+        <button v-if="isDesktop && status === 'paused'" type="button" class="settings-btn-secondary" @click="resume">继续同步</button>
+      </div>
+      <p v-if="error" class="error">同步暂不可用，请稍后重试。</p>
     </div>
-
-    <div class="actions">
-      <button v-if="isDesktop && !rootName" type="button" class="settings-btn-primary" @click="choose">连接本地资料库</button>
-      <button v-if="card.connected" type="button" class="settings-btn-primary" @click="emit('openAiJournal')">查看周度洞察</button>
-      <a
-        v-if="card.showDesktopDownload"
-        class="text-link"
-        href="https://github.com/rainhuang0220/PlainList/releases/latest"
-        target="_blank"
-        rel="noreferrer"
-      >下载 Desktop</a>
-      <button v-if="isDesktop && rootName" type="button" class="settings-btn-secondary" :disabled="status !== 'enabled'" @click="checkNow">立即检查</button>
-      <button v-if="isDesktop && rootName" type="button" class="settings-btn-secondary" @click="choose">重新选择资料库</button>
-      <button v-if="isDesktop && status === 'enabled'" type="button" class="settings-btn-secondary" @click="pause">暂停</button>
-      <button v-if="isDesktop && status === 'paused'" type="button" class="settings-btn-secondary" @click="resume">继续同步</button>
-    </div>
-    <p v-if="error" class="error">同步暂不可用，请稍后重试。</p>
-  </section>
+  </div>
 </template>
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';

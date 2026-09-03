@@ -22,7 +22,17 @@ describe('AiJournalHistoryPanel reader', () => {
     expect(source).toContain('renderSafeMarkdown');
   });
 
+  it('resets the right reader to the top when the selected week changes', () => {
+    expect(source).toContain('ref="readerRef"');
+    expect(source).toContain('watch(selectedWeek');
+    expect(source).toContain('applyWeeklyReaderScrollReset');
+    expect(source).toContain('readerRef.value');
+    expect(source).not.toContain('window.scrollTo');
+  });
+
   it('fills the settings body with a week rail and a stretching article', () => {
+    expect(source).not.toContain('<section');
+    expect(source).not.toContain('<nav');
     expect(source).toContain('class="weekly-insight"');
     expect(source).toContain('class="frame"');
     expect(source).toContain('class="weeks"');
@@ -36,6 +46,10 @@ describe('AiJournalHistoryPanel reader', () => {
     expect(source).not.toContain('journal-shell');
     expect(source).not.toContain('!important');
     expect(source).not.toContain('height: calc');
+    expect(source).not.toContain('us-modal--reader');
+    expect(source).not.toContain('us-modal--activity');
+    expect(source).not.toContain('us-modal--compact');
+    expect(source).not.toContain('--journal');
     expect(source).toContain('@media (max-width: 768px)');
   });
 });
