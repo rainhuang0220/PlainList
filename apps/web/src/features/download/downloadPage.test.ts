@@ -18,12 +18,11 @@ describe('v2.5.2 download distribution', () => {
     expect(page).toContain('适合这台设备');
     expect(page).toContain('Windows — 暂未提供');
     expect(page).toContain('IBM Plex Mono');
-    expect(page).toContain('button(arm');
-    expect(page).toContain('button(intel');
+    expect(page).not.toContain('button(arm');
+    expect(page).not.toContain('button(intel');
     expect(page).toContain('button(android');
     expect(page).toContain("'下载 v' + manifest.version");
-    expect(page).toContain('打开磁盘映像，然后双击「安装 PlainList」');
-    expect(page).not.toContain('macOS 版本正在更新，请稍后');
+    expect(page).toContain('macOS 版本正在更新，请稍后');
     expect(page).not.toContain('仍要打开');
     expect(page).not.toContain('xattr');
     expect(page).not.toContain('拖入');
@@ -43,13 +42,13 @@ describe('v2.5.2 download distribution', () => {
     expect(desktop).toContain('verify-macos-app.sh');
   });
 
-  it('ships a fail-closed helper and restores Mac download CTAs', () => {
+  it('ships a fail-closed helper and pauses public Mac downloads', () => {
     expect(dmg).toContain('SCRIPT_DIR=');
     expect(dmg).toContain('macos-install.command');
     expect(dmg).toContain('① 双击我安装并打开.command');
-    expect(page).toContain('button(arm');
-    expect(page).toContain('button(intel');
-    expect(page).not.toContain('macOS 版本正在更新，请稍后');
+    expect(page).toContain('macOS 版本正在更新，请稍后');
+    expect(page).not.toContain('button(arm');
+    expect(page).not.toContain('button(intel');
   });
 
   it('keeps a single canonical download page and short-caches the manifest', () => {
