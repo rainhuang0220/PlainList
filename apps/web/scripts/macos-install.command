@@ -6,22 +6,67 @@ DEST="${PLAINLIST_INSTALL_DEST:-/Applications/PlainList.app}"
 NONINTERACTIVE="${PLAINLIST_INSTALL_NONINTERACTIVE:-}"
 SUDO="${PLAINLIST_INSTALL_SUDO:-/usr/bin/sudo}"
 REQUIRE_AUTH="${PLAINLIST_INSTALL_REQUIRE_AUTH:-}"
-PASSWORD_STDIN="${PLAINLIST_INSTALL_PASSWORD_STDIN:-}"
 SKIP_LAUNCH="${PLAINLIST_INSTALL_SKIP_LAUNCH:-}"
-PRODUCT_VERSION="2.5.2"
-AUTH_TRIES=3
+PRODUCT_VERSION="2.5.3"
 USE_SUDO=""
 
-pause() {
+# macOS sudo already owns password entry and retries (passwd_tries, typically 3).
+# This script must never read, echo, store, or log a password.
+
+wait_for_enter() {
+  [[ -z "$NONINTERACTIVE" && -c /dev/tty ]] || return 0
+  local _line
+  while IFS= read -r _line </dev/tty; do
+    [[ -z "$_line" ]] && break
+  done || true
+}
+
+restore_tty() {
+  [[ -z "$NONINTERACTIVE" && -c /dev/tty ]] || return 0
+  /bin/stty sane </dev/tty 2>/dev/null || true
+}
+
+close_this_terminal_window() {
+  [[ -z "$NONINTERACTIVE" ]] || return 0
+  [[ "${TERM_PROGRAM:-}" == "Apple_Terminal" ]] || return 0
+  local t short
+  t="$(/usr/bin/tty 2>/dev/null || true)"
+  [[ "$t" == /dev/* ]] || return 0
+  short="${t#/dev/}"
+  /usr/bin/osascript >/dev/null 2>&1 <<APPLESCRIPT || true
+tell application "Terminal"
+  repeat with w in windows
+    try
+      set tabTty to tty of selected tab of w
+      if tabTty is "$t" or tabTty is "$short" then
+        close w
+        exit repeat
+      end if
+    end try
+  end repeat
+end tell
+APPLESCRIPT
+}
+
+hold_and_exit() {
+  local code="${1:-0}"
+  restore_tty
   if [[ -z "$NONINTERACTIVE" ]]; then
-    read -r -p "按回车退出…"
+    echo
+    if [[ "$code" -eq 0 ]]; then
+      printf '按回车关闭此窗口…'
+    else
+      printf '按回车退出…'
+    fi
+    wait_for_enter
+    close_this_terminal_window
   fi
+  exit "$code"
 }
 
 fail() {
   echo "✗ $*"
-  pause
-  exit 1
+  hold_and_exit 1
 }
 
 rollback() {
@@ -39,51 +84,36 @@ dest_run() {
   fi
 }
 
-read_password() {
-  local prompt="$1"
-  local pass=""
-  if [[ -n "$PASSWORD_STDIN" ]]; then
-    IFS= read -r pass || return 1
-  else
-    IFS= read -s -r pass </dev/tty || return 1
-    echo >/dev/tty
+dest_needs_privilege() {
+  local parent
+  parent="$(/usr/bin/dirname "$DEST")"
+  if [[ -e "$DEST" ]]; then
+    [[ -w "$DEST" ]] && return 1
+    return 0
   fi
-  REPLY_PASSWORD="$pass"
+  [[ -w "$parent" ]] && return 1
+  return 0
 }
 
 authenticate_admin() {
   if [[ -z "$REQUIRE_AUTH" && -n "$NONINTERACTIVE" ]]; then
     return 0
   fi
-  if [[ -z "$REQUIRE_AUTH" && "$DEST" != "/Applications/PlainList.app" ]]; then
+  if [[ -z "$REQUIRE_AUTH" ]] && ! dest_needs_privilege; then
     return 0
   fi
-
-  local n=1
-  local remain
-  local prompt
-  while (( n <= AUTH_TRIES )); do
-    if (( n == 1 )); then
-      prompt='需要管理员权限才能将 PlainList 安装到“应用程序”。请输入 Mac 登录密码：'
-    else
-      remain=$((AUTH_TRIES - n + 1))
-      prompt="密码不正确，请重试（剩余 ${remain} 次）。"
-    fi
-    echo "$prompt"
-    if ! read_password "$prompt"; then
-      unset REPLY_PASSWORD
-      fail "密码验证失败，安装已取消。"
-    fi
-    local pass="$REPLY_PASSWORD"
-    unset REPLY_PASSWORD
-    if printf '%s\n' "$pass" | "$SUDO" -S -v >/dev/null 2>&1; then
-      unset pass
-      USE_SUDO=1
-      return 0
-    fi
-    unset pass
-    n=$((n + 1))
-  done
+  echo "需要管理员权限才能将 PlainList 安装到“应用程序”。"
+  echo "请在系统密码提示中输入。输错可直接重试；三次失败后安装会取消。"
+  local sudo_status=0
+  if [[ -c /dev/tty ]]; then
+    "$SUDO" -v </dev/tty >/dev/tty 2>/dev/tty || sudo_status=$?
+  else
+    "$SUDO" -v || sudo_status=$?
+  fi
+  if [[ "$sudo_status" -eq 0 ]]; then
+    USE_SUDO=1
+    return 0
+  fi
   fail "密码验证失败，安装已取消。"
 }
 
@@ -121,8 +151,13 @@ if ! grep -q 'Sealed Resources version=' <<<"$info"; then
 fi
 
 exe="${DEST}/Contents/MacOS/PlainList"
-/usr/bin/pkill -f "$exe" 2>/dev/null || true
-sleep 0.5
+if [[ -x "$exe" ]]; then
+  while IFS= read -r pid; do
+    [[ -n "$pid" ]] || continue
+    /bin/kill "$pid" 2>/dev/null || true
+  done < <(/usr/bin/pgrep -f "$exe" 2>/dev/null || true)
+  sleep 0.5
+fi
 
 BACKUP=""
 if [[ -d "$DEST" ]]; then
@@ -161,9 +196,7 @@ if [[ -z "$SKIP_LAUNCH" ]]; then
   sleep 1
 fi
 echo "安装完成。"
-if [[ -z "$NONINTERACTIVE" ]]; then
-  read -r -p "按回车关闭此窗口…"
-fi
 if [[ -n "$BACKUP" ]]; then
-  rm -rf "$BACKUP"
+  rm -rf "$BACKUP" 2>/dev/null || true
 fi
+hold_and_exit 0

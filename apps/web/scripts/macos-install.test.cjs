@@ -1,5 +1,5 @@
 const { mkdtemp, mkdir, writeFile, readFile, rm, chmod } = require('node:fs/promises');
-const { existsSync } = require('node:fs');
+const { existsSync, readFileSync } = require('node:fs');
 const { tmpdir } = require('node:os');
 const { join } = require('node:path');
 const { spawn, spawnSync } = require('node:child_process');
@@ -7,7 +7,9 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
 const helper = join(__dirname, 'macos-install.command');
+const ptyHarness = join(__dirname, 'macos-install.pty-harness.py');
 const forensicBroken = '/tmp/plainlist-forensics-20260904-170327/PlainList.app';
+const PRODUCT_VERSION = '2.5.3';
 const CORRECT_PASSWORD = 'correct-password';
 
 function runHelper(env, cwd, stdinText) {
@@ -51,16 +53,26 @@ async function makeStubApp(dir, version) {
 
 async function makeFakeSudo(dir) {
   const stamp = join(dir, 'sudo-ok');
+  const log = join(dir, 'sudo-args.log');
   const bin = join(dir, 'fake-sudo');
   await writeFile(bin, `#!/bin/bash
 set -euo pipefail
 STAMP=${JSON.stringify(stamp)}
-if [[ "\${1:-}" == "-S" && "\${2:-}" == "-v" ]]; then
-  IFS= read -r pw || exit 1
-  if [[ "$pw" == ${JSON.stringify(CORRECT_PASSWORD)} ]]; then
-    printf 'ok\\n' > "$STAMP"
-    exit 0
-  fi
+LOG=${JSON.stringify(log)}
+printf 'ARGS:%s\\n' "$*" >> "$LOG"
+if [[ "\${1:-}" == "-v" ]]; then
+  tries=0
+  while (( tries < 3 )); do
+    tries=$((tries + 1))
+    printf 'Password:' >&2
+    IFS= read -r pw || exit 1
+    if [[ "$pw" == ${JSON.stringify(CORRECT_PASSWORD)} ]]; then
+      : > "$STAMP"
+      exit 0
+    fi
+    echo 'Sorry, try again.' >&2
+  done
+  echo 'sudo: 3 incorrect password attempts' >&2
   exit 1
 fi
 if [[ -f "$STAMP" ]]; then
@@ -72,21 +84,46 @@ exit 1
   return bin;
 }
 
-function authEnv(overrides) {
+function runPtyCase(name, extraEnv, sends) {
+  const env = {
+    ...process.env,
+    PLAINLIST_PTY_CASE: name,
+    ...extraEnv,
+  };
+  delete env.PLAINLIST_INSTALL_NONINTERACTIVE;
+  delete env.PLAINLIST_INSTALL_PASSWORD_STDIN;
+  env.TERM_PROGRAM = 'test-harness';
+  const result = spawnSync('/usr/bin/python3', [ptyHarness, JSON.stringify(sends)], {
+    encoding: 'utf8',
+    env,
+    timeout: 25000,
+  });
   return {
-    PLAINLIST_INSTALL_REQUIRE_AUTH: '1',
-    PLAINLIST_INSTALL_PASSWORD_STDIN: '1',
-    PLAINLIST_INSTALL_SKIP_LAUNCH: '1',
-    ...overrides,
+    status: result.status,
+    stdout: result.stdout || '',
+    stderr: result.stderr || '',
   };
 }
 
-test('helper file exists for the DMG installer', () => {
+test('helper file exists and uses OS-owned sudo, not a custom password parser', () => {
   assert.equal(existsSync(helper), true);
-  const text = require('node:fs').readFileSync(helper, 'utf8');
+  const text = readFileSync(helper, 'utf8');
   assert.match(text, /CFBundleShortVersionString/);
-  assert.match(text, /2\.5\.2/);
-  const authAt = text.indexOf('请输入 Mac 登录密码');
+  assert.match(text, /2\.5\.3/);
+  assert.match(text, /PLAINLIST_INSTALL_DEST/);
+  assert.match(text, /密码验证失败，安装已取消/);
+  assert.match(text, /dest_needs_privilege/);
+  assert.match(text, /"\$SUDO" -v/);
+  assert.match(text, /wait_for_enter/);
+  assert.match(text, /close_this_terminal_window/);
+  assert.doesNotMatch(text, /sudo -S/);
+  assert.doesNotMatch(text, /read -s/);
+  assert.doesNotMatch(text, /PASSWORD_STDIN/);
+  assert.doesNotMatch(text, /AUTH_TRIES/);
+  assert.doesNotMatch(text, /read_password/);
+  assert.doesNotMatch(text, /echo "\$pass"/);
+  assert.doesNotMatch(text, /剩余 \$\{remain\} 次/);
+  const authAt = text.indexOf('authenticate_admin');
   const verifyAt = text.indexOf('codesign --verify --deep --strict');
   const copyAt = text.indexOf('正在复制');
   const replaceAt = text.indexOf('rm -rf "$DEST"', copyAt);
@@ -94,14 +131,16 @@ test('helper file exists for the DMG installer', () => {
   assert.ok(verifyAt > authAt);
   assert.ok(copyAt > verifyAt);
   assert.ok(replaceAt > copyAt);
-  assert.match(text, /PLAINLIST_INSTALL_DEST/);
-  assert.match(text, /密码验证失败，安装已取消/);
-  assert.match(text, /剩余 \$\{remain\} 次/);
-  assert.match(text, /read -s/);
-  assert.doesNotMatch(text, /echo "\$pass"/);
-  assert.doesNotMatch(text, /^完成/m);
   const successAt = text.indexOf('安装完成');
   assert.ok(successAt > replaceAt);
+});
+
+test('DMG builder ships the download-page installer name as an alias', () => {
+  const text = readFileSync(join(__dirname, 'build-dmg.sh'), 'utf8');
+  assert.match(text, /① 双击我安装并打开\.command/);
+  assert.match(text, /安装并打开\.command/);
+  assert.match(text, /安装 PlainList\.command/);
+  assert.match(text, /请先双击安装\.txt/);
 });
 
 test('fail-closed: linker-signed 2.5.0 does not replace an existing destination', async () => {
@@ -117,7 +156,7 @@ test('fail-closed: linker-signed 2.5.0 does not replace an existing destination'
       PLAINLIST_INSTALL_DEST: dest,
     }, work);
     assert.notEqual(result.code, 0);
-    assert.match(`${result.stdout}\n${result.stderr}`, /已损坏|2\.5\.0|linker-signed|校验失败/);
+    assert.match(`${result.stdout}\n${result.stderr}`, /已损坏|2\.5\.0|linker-signed|校验失败|版本必须是/);
     assert.doesNotMatch(result.stdout, /安装完成/);
     assert.equal(await readFile(join(dest, 'SENTINEL'), 'utf8'), 'keep-me\n');
   } finally {
@@ -126,79 +165,130 @@ test('fail-closed: linker-signed 2.5.0 does not replace an existing destination'
   }
 });
 
-test('auth case A: correct first attempt installs', async () => {
-  const work = await mkdtemp(join(tmpdir(), 'pl-auth-a-'));
-  const src = await makeStubApp(join(work, 'src'), '2.5.2');
-  const dest = join(work, 'dest', 'PlainList.app');
-  const sudo = await makeFakeSudo(work);
+test('writable dest skips sudo and installs', async () => {
+  const work = await mkdtemp(join(tmpdir(), 'pl-helper-writable-'));
   try {
-    const result = await runHelper(authEnv({
+    const src = await makeStubApp(join(work, 'src'), PRODUCT_VERSION);
+    const dest = join(work, 'dest', 'PlainList.app');
+    const sudo = await makeFakeSudo(work);
+    const result = await runHelper({
       PLAINLIST_INSTALL_SRC: src,
       PLAINLIST_INSTALL_DEST: dest,
       PLAINLIST_INSTALL_SUDO: sudo,
-    }), work, `${CORRECT_PASSWORD}\n`);
+      PLAINLIST_INSTALL_SKIP_LAUNCH: '1',
+    }, work);
     assert.equal(result.code, 0, result.stdout + result.stderr);
     assert.match(result.stdout, /安装完成/);
+    assert.equal(existsSync(join(dest, 'Contents', 'Info.plist')), true);
+    assert.equal(existsSync(join(work, 'sudo-ok')), false);
+  } finally {
+    await rm(work, { recursive: true, force: true });
+  }
+});
+
+test('PTY auth case A: correct first attempt installs', async () => {
+  const work = await mkdtemp(join(tmpdir(), 'pl-auth-a-'));
+  try {
+    const src = await makeStubApp(join(work, 'src'), PRODUCT_VERSION);
+    const dest = join(work, 'dest', 'PlainList.app');
+    const sudo = await makeFakeSudo(work);
+    const result = runPtyCase('A', {
+      PLAINLIST_INSTALL_SRC: src,
+      PLAINLIST_INSTALL_DEST: dest,
+      PLAINLIST_INSTALL_SUDO: sudo,
+      PLAINLIST_INSTALL_REQUIRE_AUTH: '1',
+      PLAINLIST_INSTALL_SKIP_LAUNCH: '1',
+      PLAINLIST_PTY_PARENT: '0',
+    }, [
+      { wait: 'Password:', send: `${CORRECT_PASSWORD}\n` },
+      { wait: '按回车关闭此窗口', send: '\n' },
+    ]);
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.match(result.stdout, /安装完成/);
+    assert.match(result.stdout, /Password:/);
+    assert.doesNotMatch(result.stdout, /请输入 Mac 登录密码/);
     assert.equal(existsSync(join(dest, 'Contents', 'Info.plist')), true);
   } finally {
     await rm(work, { recursive: true, force: true });
   }
 });
 
-test('auth case B: wrong then correct retries and installs', async () => {
+test('PTY auth case B: wrong then correct stays in OS auth and installs', async () => {
   const work = await mkdtemp(join(tmpdir(), 'pl-auth-b-'));
-  const src = await makeStubApp(join(work, 'src'), '2.5.2');
-  const dest = join(work, 'dest', 'PlainList.app');
-  const sudo = await makeFakeSudo(work);
   try {
-    const result = await runHelper(authEnv({
+    const src = await makeStubApp(join(work, 'src'), PRODUCT_VERSION);
+    const dest = join(work, 'dest', 'PlainList.app');
+    const sudo = await makeFakeSudo(work);
+    const result = runPtyCase('B', {
       PLAINLIST_INSTALL_SRC: src,
       PLAINLIST_INSTALL_DEST: dest,
       PLAINLIST_INSTALL_SUDO: sudo,
-    }), work, `nope\n${CORRECT_PASSWORD}\n`);
-    assert.equal(result.code, 0, result.stdout + result.stderr);
-    assert.match(result.stdout, /剩余 2 次/);
+      PLAINLIST_INSTALL_REQUIRE_AUTH: '1',
+      PLAINLIST_INSTALL_SKIP_LAUNCH: '1',
+      PLAINLIST_PTY_PARENT: '0',
+    }, [
+      { wait: 'Password:', send: 'nope\n' },
+      { wait: 'Sorry, try again.', send: `${CORRECT_PASSWORD}\n` },
+      { wait: '按回车关闭此窗口', send: '\n' },
+    ]);
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.match(result.stdout, /Sorry, try again/);
     assert.match(result.stdout, /安装完成/);
+    assert.doesNotMatch(result.stdout, /command not found|检测不到当前指令|找不到命令|找不到指令/);
   } finally {
     await rm(work, { recursive: true, force: true });
   }
 });
 
-test('auth case C: two wrong then correct installs', async () => {
+test('PTY auth case C: two wrong then correct installs', async () => {
   const work = await mkdtemp(join(tmpdir(), 'pl-auth-c-'));
-  const src = await makeStubApp(join(work, 'src'), '2.5.2');
-  const dest = join(work, 'dest', 'PlainList.app');
-  const sudo = await makeFakeSudo(work);
   try {
-    const result = await runHelper(authEnv({
+    const src = await makeStubApp(join(work, 'src'), PRODUCT_VERSION);
+    const dest = join(work, 'dest', 'PlainList.app');
+    const sudo = await makeFakeSudo(work);
+    const result = runPtyCase('C', {
       PLAINLIST_INSTALL_SRC: src,
       PLAINLIST_INSTALL_DEST: dest,
       PLAINLIST_INSTALL_SUDO: sudo,
-    }), work, `bad1\nbad2\n${CORRECT_PASSWORD}\n`);
-    assert.equal(result.code, 0, result.stdout + result.stderr);
-    assert.match(result.stdout, /剩余 2 次/);
-    assert.match(result.stdout, /剩余 1 次/);
+      PLAINLIST_INSTALL_REQUIRE_AUTH: '1',
+      PLAINLIST_INSTALL_SKIP_LAUNCH: '1',
+      PLAINLIST_PTY_PARENT: '0',
+    }, [
+      { wait: 'Password:', send: 'bad1\n' },
+      { wait: 'Sorry, try again.', send: 'bad2\n' },
+      { wait: 'Sorry, try again.', send: `${CORRECT_PASSWORD}\n`, occurrence: 2 },
+      { wait: '按回车关闭此窗口', send: '\n' },
+    ]);
+    assert.equal(result.status, 0, result.stdout + result.stderr);
     assert.match(result.stdout, /安装完成/);
   } finally {
     await rm(work, { recursive: true, force: true });
   }
 });
 
-test('auth case D: three wrong passwords fail closed', async () => {
+test('PTY auth case D: three wrong passwords fail closed', async () => {
   const work = await mkdtemp(join(tmpdir(), 'pl-auth-d-'));
-  const src = await makeStubApp(join(work, 'src'), '2.5.2');
-  const destRoot = join(work, 'dest');
-  const dest = join(destRoot, 'PlainList.app');
-  await mkdir(dest, { recursive: true });
-  await writeFile(join(dest, 'SENTINEL'), 'keep-me\n');
-  const sudo = await makeFakeSudo(work);
   try {
-    const result = await runHelper(authEnv({
+    const src = await makeStubApp(join(work, 'src'), PRODUCT_VERSION);
+    const destRoot = join(work, 'dest');
+    const dest = join(destRoot, 'PlainList.app');
+    await mkdir(dest, { recursive: true });
+    await writeFile(join(dest, 'SENTINEL'), 'keep-me\n');
+    const sudo = await makeFakeSudo(work);
+    const result = runPtyCase('D', {
       PLAINLIST_INSTALL_SRC: src,
       PLAINLIST_INSTALL_DEST: dest,
       PLAINLIST_INSTALL_SUDO: sudo,
-    }), work, 'bad1\nbad2\nbad3\n');
-    assert.notEqual(result.code, 0);
+      PLAINLIST_INSTALL_REQUIRE_AUTH: '1',
+      PLAINLIST_INSTALL_SKIP_LAUNCH: '1',
+      PLAINLIST_PTY_PARENT: '0',
+    }, [
+      { wait: 'Password:', send: 'bad1\n' },
+      { wait: 'Sorry, try again.', send: 'bad2\n' },
+      { wait: 'Sorry, try again.', send: 'bad3\n', occurrence: 2 },
+      { wait: '按回车退出', send: '\n' },
+    ]);
+    assert.notEqual(result.status, 0);
     assert.match(result.stdout, /密码验证失败，安装已取消/);
     assert.doesNotMatch(result.stdout, /安装完成/);
     assert.doesNotMatch(result.stdout, /正在复制/);
@@ -208,46 +298,61 @@ test('auth case D: three wrong passwords fail closed', async () => {
   }
 });
 
-test('auth case E: password-looking input is never executed as a command', async () => {
+test('PTY auth case E: leftover password is not executed as a parent shell command', async () => {
   const work = await mkdtemp(join(tmpdir(), 'pl-auth-e-'));
-  const src = await makeStubApp(join(work, 'src'), '2.5.2');
-  const dest = join(work, 'dest', 'PlainList.app');
-  await mkdir(dest, { recursive: true });
-  await writeFile(join(dest, 'SENTINEL'), 'keep-me\n');
-  const pwned = join(work, 'pwned');
-  const sudo = await makeFakeSudo(work);
-  const bomb = `touch ${pwned}`;
   try {
-    const result = await runHelper(authEnv({
+    const src = await makeStubApp(join(work, 'src'), PRODUCT_VERSION);
+    const dest = join(work, 'dest', 'PlainList.app');
+    await mkdir(dest, { recursive: true });
+    await writeFile(join(dest, 'SENTINEL'), 'keep-me\n');
+    const sudo = await makeFakeSudo(work);
+    const pwned = join(work, 'pwned');
+    const result = runPtyCase('E', {
       PLAINLIST_INSTALL_SRC: src,
       PLAINLIST_INSTALL_DEST: dest,
       PLAINLIST_INSTALL_SUDO: sudo,
-    }), work, `${bomb}\nabc123\n${bomb}\n`);
-    assert.notEqual(result.code, 0);
-    assert.equal(existsSync(pwned), false, 'password must not be executed as a shell command');
+      PLAINLIST_INSTALL_REQUIRE_AUTH: '1',
+      PLAINLIST_INSTALL_SKIP_LAUNCH: '1',
+      PLAINLIST_PTY_PARENT: '1',
+      PLAINLIST_PTY_PWNED: pwned,
+    }, [
+      { wait: 'Password:', send: 'bad1\n' },
+      { wait: 'Sorry, try again.', send: 'bad2\n' },
+      { wait: 'Sorry, try again.', send: 'bad3\n', occurrence: 2 },
+      { wait: '按回车退出', send: `hello123\ntouch ${pwned}\n\n` },
+    ]);
+    assert.notEqual(result.status, 0);
+    assert.equal(existsSync(pwned), false, 'password/leftover must not be executed as a shell command');
     assert.match(result.stdout, /密码验证失败，安装已取消/);
-    assert.doesNotMatch(result.stdout, /command not found|检测不到当前指令|未知命令/);
+    assert.doesNotMatch(result.stdout, /PARENT_COMMAND_NOT_FOUND|command not found|检测不到当前指令|找不到命令|找不到指令/);
     assert.equal(await readFile(join(dest, 'SENTINEL'), 'utf8'), 'keep-me\n');
   } finally {
     await rm(work, { recursive: true, force: true });
   }
 });
 
-test('auth case F: EOF cancels without touching destination', async () => {
+test('PTY auth case F: EOF cancels without touching destination', async () => {
   const work = await mkdtemp(join(tmpdir(), 'pl-auth-f-'));
-  const src = await makeStubApp(join(work, 'src'), '2.5.2');
-  const dest = join(work, 'dest', 'PlainList.app');
-  await mkdir(dest, { recursive: true });
-  await writeFile(join(dest, 'SENTINEL'), 'keep-me\n');
-  const sudo = await makeFakeSudo(work);
   try {
-    const result = await runHelper(authEnv({
+    const src = await makeStubApp(join(work, 'src'), PRODUCT_VERSION);
+    const dest = join(work, 'dest', 'PlainList.app');
+    await mkdir(dest, { recursive: true });
+    await writeFile(join(dest, 'SENTINEL'), 'keep-me\n');
+    const sudo = await makeFakeSudo(work);
+    const result = runPtyCase('F', {
       PLAINLIST_INSTALL_SRC: src,
       PLAINLIST_INSTALL_DEST: dest,
       PLAINLIST_INSTALL_SUDO: sudo,
-    }), work, '');
-    assert.notEqual(result.code, 0);
+      PLAINLIST_INSTALL_REQUIRE_AUTH: '1',
+      PLAINLIST_INSTALL_SKIP_LAUNCH: '1',
+      PLAINLIST_PTY_PARENT: '0',
+      PLAINLIST_PTY_EOF_ON_PASSWORD: '1',
+    }, [
+      { wait: '按回车退出', send: '\n' },
+    ]);
+    assert.notEqual(result.status, 0);
     assert.doesNotMatch(result.stdout, /安装完成/);
+    assert.match(result.stdout, /密码验证失败，安装已取消/);
     assert.equal(await readFile(join(dest, 'SENTINEL'), 'utf8'), 'keep-me\n');
   } finally {
     await rm(work, { recursive: true, force: true });

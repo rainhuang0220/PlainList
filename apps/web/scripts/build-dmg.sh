@@ -41,8 +41,17 @@ ln -s /Applications "${WORK}/Applications"
 cp "${SCRIPT_DIR}/macos-install.command" "${WORK}/① 双击我安装并打开.command"
 chmod +x "${WORK}/① 双击我安装并打开.command"
 
-# Keep a short alias name too (some users already know the old name)
+# Keep short aliases (download page and older notes use these names)
 ln -sf "① 双击我安装并打开.command" "${WORK}/安装并打开.command"
+ln -sf "① 双击我安装并打开.command" "${WORK}/安装 PlainList.command"
+
+cat > "${WORK}/请先双击安装.txt" <<'EOF'
+请双击「安装 PlainList」或「① 双击我安装并打开」。
+
+不要直接打开 PlainList.app。
+从浏览器下载后，直接打开应用会被系统隔离并立即退出。
+安装脚本会复制到“应用程序”并清除隔离标记。
+EOF
 
 # Layout the dmg in a way that shows a "drag to Applications" hint
 TMP_DMG="${WORK}-rw.dmg"
