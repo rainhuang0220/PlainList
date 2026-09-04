@@ -20,6 +20,8 @@ for arch in arm64 x64; do
   fi
   if [[ -d "$app_path" ]]; then
     node scripts/verify-packaged-api-bundle.cjs "$app_path"
+    bash scripts/sign-adhoc.sh "$app_path"
+    bash scripts/verify-macos-app.sh "$app_path"
     bash scripts/build-dmg.sh "$arch"
   fi
 done

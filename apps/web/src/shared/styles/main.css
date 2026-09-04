@@ -333,15 +333,12 @@
     html.pl-desktop .nav-right {
       -webkit-app-region: no-drag;
     }
+    /* hiddenInset traffic lights occupy ~16–68px. Inset side clusters only. */
     html.pl-desktop-darwin .nav-logo {
-      grid-column: 3;
-      justify-self: end;
-      z-index: 2;
+      padding-left: 40px;
     }
     html.pl-desktop-darwin .nav-right {
-      grid-column: 3;
-      justify-self: end;
-      padding-right: 2.75rem;
+      padding-right: 20px;
     }
     .nav-links {
       justify-self: center;
