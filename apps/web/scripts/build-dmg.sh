@@ -36,86 +36,8 @@ trap 'rm -rf "$WORK" "${WORK}-rw.dmg" "${WORK}-ro.dmg"' EXIT
 cp -R "${APP_DIR}/${APP_NAME}.app" "${WORK}/"
 ln -s /Applications "${WORK}/Applications"
 
-# Installer helper: clear Gatekeeper quarantine + open the app.
-# Without Apple Developer ID notarization, a downloaded ad-hoc app is
-# blocked by macOS until quarantine is removed. Dragging alone leaves
-# the quarantine xattr, which forces the "无法验证 / 去设置里打开" flow.
-cat > "${WORK}/① 双击我安装并打开.command" <<'EOF'
-#!/bin/bash
-set -euo pipefail
-DIR="$(cd "$(dirname "$0")" && pwd)"
-SRC="${DIR}/PlainList.app"
-DEST="/Applications/PlainList.app"
-
-echo "========================================"
-echo "  PlainList 安装（会自动清除隔离标记）"
-echo "========================================"
-if [[ ! -d "$SRC" ]]; then
-  echo "找不到 PlainList.app，请从 DMG 根目录运行本脚本。"
-  read -r -p "按回车退出…"
-  exit 1
-fi
-
-echo "→ 正在检查签名（拒绝已损坏的旧包）…"
-if ! /usr/bin/codesign --verify --deep --strict "$SRC"; then
-  echo "✗ 这个磁盘映像里的 PlainList 已损坏（典型是旧版 2.5.0 的 linker-signed 包）。"
-  echo "  不要把它拖进 /Applications。请改用 2.5.1 映像，再运行本脚本。"
-  read -r -p "按回车退出…"
-  exit 1
-fi
-info="$(/usr/bin/codesign -dv --verbose=2 "$SRC" 2>&1)"
-if grep -q 'linker-signed' <<<"$info"; then
-  echo "✗ 检测到 linker-signed 签名。这就是系统提示「已损坏，无法打开」的原因。"
-  echo "  这不是 2.5.1。请丢弃该映像，下载新的 2.5.1 后再运行「双击我安装并打开」。"
-  read -r -p "按回车退出…"
-  exit 1
-fi
-if ! grep -q 'Identifier=com.plainlist.app' <<<"$info"; then
-  echo "✗ Identifier 必须是 com.plainlist.app，不能是 Electron。"
-  read -r -p "按回车退出…"
-  exit 1
-fi
-if ! grep -q 'Sealed Resources version=' <<<"$info"; then
-  echo "✗ 缺少 Sealed Resources。该包不能安装。"
-  read -r -p "按回车退出…"
-  exit 1
-fi
-echo "✓ 签名可用"
-
-# Quit any running instance
-pkill -f '/Applications/PlainList.app/Contents/MacOS/PlainList' 2>/dev/null || true
-sleep 0.5
-
-echo "→ 正在复制到 /Applications …"
-rm -rf "$DEST"
-ditto "$SRC" "$DEST"
-
-echo "→ 正在清除 Gatekeeper 隔离属性…"
-# Chrome/Safari downloads stamp com.apple.quarantine; that is exactly
-# what forces "去设置里仍要打开". Strip it from the whole bundle.
-/usr/bin/xattr -cr "$DEST" 2>/dev/null || true
-/usr/bin/find "$DEST" -exec /usr/bin/xattr -d com.apple.quarantine {} \; 2>/dev/null || true
-
-if /usr/bin/xattr -l "$DEST" 2>/dev/null | grep -q quarantine; then
-  echo "⚠ 仍检测到隔离属性。请在「终端」再执行一次："
-  echo "   xattr -cr /Applications/PlainList.app"
-else
-  echo "✓ 隔离属性已清除"
-fi
-
-if ! /usr/bin/codesign --verify --deep --strict "$DEST"; then
-  echo "✗ 复制后签名校验失败，未启动。请不要打开 /Applications/PlainList.app。"
-  read -r -p "按回车退出…"
-  exit 1
-fi
-
-echo "→ 正在启动…"
-# open from a cleared path — should not bounce to Settings
-/usr/bin/open "$DEST"
-sleep 1
-echo "完成。若仍弹出无法验证，请右键 PlainList → 打开（只需一次）。"
-read -r -p "按回车关闭此窗口…"
-EOF
+# Fail-closed installer: verify 2.5.1 + sealed ad-hoc before replacing /Applications.
+cp "${SCRIPT_DIR}/macos-install.command" "${WORK}/① 双击我安装并打开.command"
 chmod +x "${WORK}/① 双击我安装并打开.command"
 
 # Keep a short alias name too (some users already know the old name)
