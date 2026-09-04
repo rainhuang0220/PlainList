@@ -21,7 +21,6 @@
           data-1p-ignore="true"
           data-lpignore="true"
           data-form-type="other"
-          :readonly="passwordInputLocked"
           @keydown="onKeyDown"
         >
         <button
@@ -45,6 +44,15 @@ import {
   createPasswordPromptGate,
   isPasswordEditKey,
 } from '@/features/auth/lib/passwordPromptGate';
+import {
+  beginAuthenticating,
+  beginLoginPassword,
+  createTerminalLoginSession,
+  loginPasswordRejected,
+  loginSucceeded,
+  ownsLoginPassword,
+  type TerminalLoginSession,
+} from '@/features/auth/lib/terminalLoginFlow';
 import { advanceRegisterPass } from '@/features/auth/lib/terminalRegisterFlow';
 import { useAuthStore } from '@/features/auth/model/useAuthStore';
 import { useApi } from '@/shared/api/useApi';
@@ -77,33 +85,28 @@ const history = ref<string[]>([]);
 const historyIndex = ref(-1);
 const isPasswordState = ref(false);
 const revealPassphrase = ref(false);
-const passwordInputLocked = ref(false);
 const isNarrow = ref(typeof window !== 'undefined' && window.innerWidth < 640);
-const passwordGate = createPasswordPromptGate({ minArmMs: 350 });
-let passwordUnlockTimer: number | null = null;
+const passwordGate = createPasswordPromptGate();
+const loginSession = ref<TerminalLoginSession>(createTerminalLoginSession());
 
 function syncNarrow() {
   isNarrow.value = window.innerWidth < 640;
 }
 
-function clearPasswordUnlockTimer() {
-  if (passwordUnlockTimer !== null) {
-    window.clearTimeout(passwordUnlockTimer);
-    passwordUnlockTimer = null;
-  }
+function passwordRoutingActive(): boolean {
+  return ownsLoginPassword(loginSession.value) || isPasswordState.value;
 }
 
-/** Arm anti-autofill gate and briefly lock the field so managers cannot instant-submit. */
+/**
+ * Arm autofill Enter-gate only. Never lock or wipe the field — keystrokes
+ * that arrive before the prompt paints must stay in the password buffer.
+ */
 function armPasswordPrompt() {
   passwordGate.arm();
-  clearPasswordUnlockTimer();
-  passwordInputLocked.value = true;
-  inputValue.value = '';
-  passwordUnlockTimer = window.setTimeout(() => {
-    passwordInputLocked.value = false;
-    passwordUnlockTimer = null;
-    nextTick(() => focusInput());
-  }, 350);
+  if (inputValue.value.length > 0) {
+    passwordGate.markTouched();
+  }
+  nextTick(() => focusInput());
 }
 
 function print(text = '', type: LineType = '') {
@@ -248,10 +251,9 @@ function resetState() {
   pendingUser.value = null;
   pendingName.value = null;
   pendingPass.value = null;
+  loginSession.value = createTerminalLoginSession();
   setPasswordMode(false);
   passwordGate.reset();
-  clearPasswordUnlockTimer();
-  passwordInputLocked.value = false;
 }
 
 function startPasswordPrompt(nextState: Extract<TerminalState, 'passphrase' | 'new-pass' | 'new-pass-confirm'>) {
@@ -282,18 +284,28 @@ async function handlePassphrase(value: string) {
     return;
   }
 
+  loginSession.value = beginAuthenticating(loginSession.value);
   try {
     const response = await post<AuthSuccessResponse>('/auth/login', {
       username: pendingUser.value,
       password: value,
     });
+    loginSession.value = loginSucceeded();
     await completeAuth(response, pendingUser.value, [
       `  welcome back, ${pendingUser.value}.`,
     ]);
   } catch (caught) {
+    const result = loginPasswordRejected(loginSession.value);
+    loginSession.value = result.session;
     print(`  ${caught instanceof Error ? caught.message : 'incorrect passphrase.'}`, 'err');
-    print('  try again or type cd <name>.', 'out');
-    resetState();
+    if (result.exhausted) {
+      print('  authentication failed.', 'err');
+      print('  returning to command mode.', 'out');
+      resetState();
+      return;
+    }
+    print(`  try again (${result.remaining} left).`, 'out');
+    startPasswordPrompt('passphrase');
   }
 }
 
@@ -304,16 +316,18 @@ async function handleNameEntry(value: string) {
     return;
   }
 
-  const accounts = await listAccounts();
-  if (!accounts) return;
-  if (accounts.some((account) => account.username === normalized)) {
-    print(`  "${normalized}" is already taken.`, 'err');
-    return;
-  }
-
   pendingName.value = normalized;
   startPasswordPrompt('new-pass');
   print('  set a passphrase (at least 3 chars):', 'out');
+
+  const accounts = await listAccounts({ quiet: true });
+  if (state.value !== 'new-pass' && state.value !== 'new-pass-confirm') {
+    return;
+  }
+  if (accounts?.some((account) => account.username === normalized)) {
+    print(`  "${normalized}" is already taken.`, 'err');
+    resetState();
+  }
 }
 
 async function loginDemoAccount() {
@@ -366,7 +380,10 @@ async function handleRegistration(value: string) {
 async function executeCommand(rawValue: string) {
   const value = rawValue.startsWith('pl ') ? rawValue.slice(3).trim() : rawValue;
 
-  if (state.value === 'passphrase') {
+  if (ownsLoginPassword(loginSession.value) || state.value === 'passphrase') {
+    if (loginSession.value.phase === 'authenticating') {
+      return;
+    }
     await handlePassphrase(value);
     return;
   }
@@ -463,7 +480,7 @@ async function executeCommand(rawValue: string) {
     return;
   }
 
-  // Handle "cd <name>" command
+  // Handle "cd <name>" command. Password routing MUST flip before any await.
   if (value.startsWith('cd ')) {
     const arg = value.slice(3).trim();
     if (!arg) {
@@ -471,14 +488,8 @@ async function executeCommand(rawValue: string) {
       return;
     }
 
-    const accounts = await listAccounts();
-    if (!accounts) return;
-    if (!accounts.some((account) => account.username === arg)) {
-      print(`  account "${arg}" not found.`, 'err');
-      return;
-    }
-
     pendingUser.value = arg;
+    loginSession.value = beginLoginPassword(arg);
     startPasswordPrompt('passphrase');
     print(`  passphrase for ${arg}:`, 'out');
     return;
@@ -516,7 +527,7 @@ async function executeCommand(rawValue: string) {
 }
 
 async function onKeyDown(event: KeyboardEvent) {
-  if (isPasswordState.value && isPasswordEditKey(event)) {
+  if (passwordRoutingActive() && isPasswordEditKey(event)) {
     passwordGate.markTouched();
   }
 
@@ -541,7 +552,7 @@ async function onKeyDown(event: KeyboardEvent) {
     return;
   }
 
-  if (event.key === 'Tab' && isPasswordState.value) {
+  if (event.key === 'Tab' && passwordRoutingActive()) {
     event.preventDefault();
     revealPassphrase.value = !revealPassphrase.value;
     return;
@@ -551,7 +562,7 @@ async function onKeyDown(event: KeyboardEvent) {
     return;
   }
 
-  if (passwordInputLocked.value) {
+  if (loginSession.value.phase === 'authenticating') {
     event.preventDefault();
     return;
   }
@@ -561,7 +572,7 @@ async function onKeyDown(event: KeyboardEvent) {
     return;
   }
 
-  if (isPasswordState.value && !passwordGate.canSubmit()) {
+  if (passwordRoutingActive() && !passwordGate.canSubmit()) {
     // Block password-manager autofill that fills + synthesizes Enter without typing.
     event.preventDefault();
     print('  type the passphrase (autofill submit ignored).', 'out');
@@ -571,7 +582,7 @@ async function onKeyDown(event: KeyboardEvent) {
   }
 
   freezeInput(value);
-  if (!isPasswordState.value) {
+  if (!passwordRoutingActive()) {
     history.value.unshift(value);
     historyIndex.value = -1;
   }
@@ -589,6 +600,5 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', syncNarrow);
-  clearPasswordUnlockTimer();
 });
 </script>

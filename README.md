@@ -18,7 +18,7 @@ PlainList 是一个前后端分离的单仓库 TypeScript 项目。围绕「时�
 - 下载：https://plainlist.space/download
 - GitHub Release：https://github.com/rainhuang0220/PlainList/releases
 
-Android 为侧载 APK：下载后需允许安装未知应用。macOS：打开磁盘映像，然后双击「安装 PlainList」。Release 签名 keystore 须离线备份，详见 [apps/web/android-signing/README.md](apps/web/android-signing/README.md)。
+Android 为侧载 APK：下载后需允许安装未知应用。macOS：打开下载的 DMG，将 PlainList 拖入“应用程序”。首次打开若被 macOS 阻止，请前往“系统设置 → 隐私与安全性 → 仍要打开”。Release 签名 keystore 须离线备份，详见 [apps/web/android-signing/README.md](apps/web/android-signing/README.md)。
 
 ## 核心特性
 - **多尺度时间视图**：当下时钟 · 今日计划 · 周回顾 · 月度追踪 · 年度日历，滚动切换
