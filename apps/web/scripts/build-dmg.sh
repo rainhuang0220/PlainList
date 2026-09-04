@@ -8,7 +8,8 @@
 set -euo pipefail
 
 ARCH="${1:-arm64}"
-WEB_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+WEB_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 ROOT_DIR="$(cd "${WEB_DIR}/../.." && pwd)"
 STAGE_DIR="${WEB_DIR}/.electron-stage"
 RELEASE_DIR="${STAGE_DIR}/release"
