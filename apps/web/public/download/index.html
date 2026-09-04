@@ -251,21 +251,24 @@
       })
       .then((manifest) => {
         const rec = recommend(navigator.userAgent);
+        const arm = find(manifest, 'macos', 'arm64');
+        const intel = find(manifest, 'macos', 'x64');
         const android = find(manifest, 'android');
         const hero = document.getElementById('hero');
-        const macHold = 'macOS 版本正在更新，请稍后';
+        const macHint = '打开磁盘映像，然后双击「安装 PlainList」。';
+        const downloadLabel = '下载 v' + manifest.version;
         if (rec === 'android' && android) {
-          hero.innerHTML = '<p class="kicker"><span>01</span> 适合这台设备</p><div class="hero"><div class="hero-title">Android</div><p class="hero-meta">APK</p><div class="hero-actions">' + button(android, '下载', true) + '</div></div>';
+          hero.innerHTML = '<p class="kicker"><span>01</span> 适合这台设备</p><div class="hero"><div class="hero-title">Android</div><p class="hero-meta">APK</p><div class="hero-actions">' + button(android, downloadLabel, true) + '</div></div>';
         } else if (rec === 'macos') {
-          hero.innerHTML = '<p class="kicker"><span>01</span> 适合这台设备</p><div class="hero"><div class="hero-title">macOS</div><p class="hero-meta">' + macHold + '</p></div>';
+          hero.innerHTML = '<p class="kicker"><span>01</span> 适合这台设备</p><div class="hero"><div class="hero-title">macOS</div><p class="hero-meta">无法从浏览器可靠区分芯片，请按电脑选择。<br>' + macHint + '</p><div class="hero-actions">' + button(arm, 'Apple Silicon · M1 / M2 / M3 / M4 等', true) + button(intel, 'Intel Mac', false) + '</div></div>';
         } else {
           hero.innerHTML = '<p class="kicker"><span>01</span> 适合这台设备</p><div class="hero"><div class="hero-title">打开 Web 版</div><p class="hero-meta">浏览器即可使用。需要安装包时选择下方版本。</p><div class="hero-actions"><a class="btn btn-primary" href="https://plainlist.space">打开 PlainList</a></div></div>';
         }
 
         document.getElementById('grid').innerHTML = [
-          '<div class="card"><h3>macOS · Apple Silicon</h3><p>' + macHold + '</p></div>',
-          '<div class="card"><h3>macOS · Intel</h3><p>' + macHold + '</p></div>',
-          '<div class="card"><h3>Android</h3><p>APK</p>' + button(android, '下载', true) + '</div>',
+          '<div class="card"><h3>macOS · Apple Silicon</h3><p>M1 / M2 / M3 / M4 等</p>' + button(arm, downloadLabel, true) + '</div>',
+          '<div class="card"><h3>macOS · Intel</h3><p>Intel Mac</p>' + button(intel, downloadLabel, true) + '</div>',
+          '<div class="card"><h3>Android</h3><p>APK</p>' + button(android, downloadLabel, true) + '</div>',
           '<div class="card"><h3>Web</h3><p>浏览器</p><a class="btn btn-primary" href="https://plainlist.space">打开 PlainList</a></div>',
         ].join('');
 
