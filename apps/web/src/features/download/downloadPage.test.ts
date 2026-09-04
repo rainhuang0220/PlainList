@@ -19,6 +19,8 @@ describe('v2.5.1 download distribution', () => {
     expect(page).toContain('Windows — 暂未提供');
     expect(page).toContain('IBM Plex Mono');
     expect(page).toContain('双击我安装并打开');
+    expect(page).toContain('已损坏');
+    expect(page).toContain('2.5.0');
     expect(page).not.toContain('175.24.134.228');
     expect(page).not.toContain('PlainList-2.4.0');
     expect(page).toContain('iPhone|iPad|iPod');
@@ -33,6 +35,19 @@ describe('v2.5.1 download distribution', () => {
     expect(android).not.toContain('PLAINLIST_VERSION:-2.4.0');
     expect(desktop).toContain('sign-adhoc.sh');
     expect(desktop).toContain('verify-macos-app.sh');
+  });
+
+  it('refuses to install a linker-signed 2.5.0 app before replacing /Applications', () => {
+    const helperStart = dmg.indexOf("cat > \"${WORK}/① 双击我安装并打开.command\"");
+    const helper = dmg.slice(helperStart, dmg.indexOf('chmod +x', helperStart));
+    const verifyAt = helper.indexOf('codesign --verify --deep --strict');
+    const replaceAt = helper.indexOf('rm -rf "$DEST"');
+    expect(verifyAt).toBeGreaterThan(0);
+    expect(replaceAt).toBeGreaterThan(verifyAt);
+    expect(helper).toContain('linker-signed');
+    expect(helper).toContain('Identifier=com.plainlist.app');
+    expect(helper).toContain('Sealed Resources version=');
+    expect(helper).toContain('已损坏');
   });
 
   it('keeps a single canonical download page and short-caches the manifest', () => {

@@ -255,7 +255,7 @@
         const intel = find(manifest, 'macos', 'x64');
         const android = find(manifest, 'android');
         const hero = document.getElementById('hero');
-        const macHint = '打开磁盘映像后，运行「双击我安装并打开」。不要只把图标拖进应用程序。';
+        const macHint = '打开磁盘映像后，运行「双击我安装并打开」。不要只把图标拖进应用程序。若提示「已损坏」，那是旧版 2.5.0，请改用本页当前版本并运行该脚本。';
         if (rec === 'android' && android) {
           hero.innerHTML = '<p class="kicker"><span>01</span> 适合这台设备</p><div class="hero"><div class="hero-title">Android</div><p class="hero-meta">APK</p><div class="hero-actions">' + button(android, '下载', true) + '</div></div>';
         } else if (rec === 'macos') {
