@@ -16,6 +16,10 @@ import {
   type WeeklySummaryResponse,
   WEEKLY_SUMMARY_PROMPT_VERSION,
 } from '@plainlist/shared';
+import {
+  isStaleCurrentWeekSnapshot,
+  reviewProgressForWindow,
+} from './currentWeekProgress';
 import { env } from '../../config/env';
 import { pool } from '../../db/pool';
 import { listChecks } from '../checks/service';
@@ -24,9 +28,6 @@ import { aiProviderConfigured, chatComplete } from '../ai-shared/llm';
 import { listUserProfile } from '../user-profile/service';
 import {
   assembleReviewSnapshotEvidence,
-  buildWeeklySummarySystemPrompt,
-  buildWeeklySummaryUserPrompt,
-  composeDeterministicWeeklyContent,
   parseWeeklySummaryContent,
   reviewSourceDataCount,
   sourceHash,
@@ -126,8 +127,9 @@ const coordinator = createReviewSnapshotCoordinator({
     if (reviewSourceDataCount(evidence) === 0) {
       throw new Error('NO_SOURCE_DATA');
     }
+    const writer = reviewProgressForWindow(snapshot.windowStartDate, snapshot.windowEndDate);
     const fallback = () => {
-      const content = composeDeterministicWeeklyContent(evidence);
+      const content = writer.compose(evidence);
       if (!content) throw new Error('NO_SOURCE_DATA');
       return {
         content,
@@ -135,15 +137,15 @@ const coordinator = createReviewSnapshotCoordinator({
         provider: 'deterministic',
         evidence,
         evidenceHash: sourceHash(evidence),
-        promptVersion: WEEKLY_SUMMARY_PROMPT_VERSION,
+        promptVersion: writer.promptVersion,
       };
     };
     const config = await resolveAiConfigForUser(user.id);
     if (!config || !aiProviderConfigured(config)) return fallback();
     try {
       const result = await chatComplete(config, {
-        system: buildWeeklySummarySystemPrompt(),
-        user: buildWeeklySummaryUserPrompt(evidence),
+        system: writer.systemPrompt(),
+        user: writer.userPrompt(evidence),
         temperature: 0.2,
         maxTokens: 2500,
         jsonResponse: false,
@@ -158,7 +160,7 @@ const coordinator = createReviewSnapshotCoordinator({
         provider: result.provider,
         evidence,
         evidenceHash: sourceHash(evidence),
-        promptVersion: WEEKLY_SUMMARY_PROMPT_VERSION,
+        promptVersion: writer.promptVersion,
       };
     } catch {
       return fallback();
@@ -275,6 +277,14 @@ export async function generateCurrentWeeklyReviewSnapshot(user: AuthenticatedUse
   const asOf = clock.currentDateKey();
   const page = weeklyReviewPageFor(asOf);
   const closed = await generateWindowIfPossible(user, page.currentWeekStart);
+  let forceCurrent = false;
+  if (!page.isMonday) {
+    const existing = await coordinator.read(user.id, asOf);
+    if (existing && isStaleCurrentWeekSnapshot(existing)) {
+      await repository.markDirty(user.id, asOf);
+      forceCurrent = true;
+    }
+  }
   if (page.isMonday) {
     return closed ? response(closed) : {
       status: 'no_data' as const,
@@ -285,7 +295,7 @@ export async function generateCurrentWeeklyReviewSnapshot(user: AuthenticatedUse
       notice: 'no_data' as const,
     };
   }
-  const current = await generateWindowIfPossible(user, asOf);
+  const current = await generateWindowIfPossible(user, asOf, forceCurrent);
   return current ? response(current) : {
     status: 'no_data' as const,
     weekStart: page.currentCompletedStart ?? page.currentWeekStart,
@@ -431,7 +441,7 @@ async function composeWeekSection(user: AuthenticatedUser, weekStart: string, we
     profile: profile.traits,
     chatgptJournals,
   });
-  const content = composeDeterministicWeeklyContent(evidence);
+  const content = reviewProgressForWindow(weekStart, weekEnd).compose(evidence);
   if (!content) return null;
   return sectionFromSnapshot({
     weekStart,
@@ -484,6 +494,9 @@ export async function attachWeeklyReviewPage(
   );
 
   let currentSection = snapshotSection(currentSnapshot);
+  if (currentSnapshot && isStaleCurrentWeekSnapshot(currentSnapshot)) {
+    currentSection = null;
+  }
   if (!pageWindow.isMonday && !(currentSection?.content || currentSection?.narrativeMarkdown)) {
     const composedCurrent = await composeWeekSection(
       user,
