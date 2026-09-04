@@ -11,7 +11,7 @@ const nginx = readFileSync(resolve(__dirname, '../../../../../deploy/nginx-downl
 const getHost = readFileSync(resolve(__dirname, '../../../../../deploy/nginx-get.plainlist.space.conf'), 'utf8');
 const ipRedirect = readFileSync(resolve(__dirname, '../../../../../deploy/nginx-ip-root-redirect.inc'), 'utf8');
 
-describe('v2.5.1 download distribution', () => {
+describe('v2.5.2 download distribution', () => {
   it('does not hardcode artifact URLs on the public download page', () => {
     expect(page).toContain('下载 PlainList');
     expect(page).toContain('/releases/latest.json');
