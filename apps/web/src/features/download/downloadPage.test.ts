@@ -39,6 +39,7 @@ describe('v2.5.1 download distribution', () => {
   });
 
   it('ships a fail-closed helper and does not offer current macOS DMGs', () => {
+    expect(dmg).toContain('SCRIPT_DIR=');
     expect(dmg).toContain('macos-install.command');
     expect(dmg).toContain('① 双击我安装并打开.command');
     expect(page).toContain('macOS 版本正在更新，请稍后');
