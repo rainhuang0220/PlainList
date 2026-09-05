@@ -11,35 +11,35 @@ const outDir = '/tmp/plainlist-download-qa';
 mkdirSync(outDir, { recursive: true });
 
 const manifest = {
-  version: '2.5.2',
+  version: '3.0.0',
   commit: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   publishedAt: '2026-09-03T00:00:00.000Z',
-  githubRelease: 'https://github.com/rainhuang0220/PlainList/releases/tag/v2.5.2',
+  githubRelease: 'https://github.com/rainhuang0220/PlainList/releases/tag/v3.0.0',
   artifacts: [
     {
       platform: 'macos',
       arch: 'arm64',
-      filename: 'PlainList-2.5.2-macos-arm64.dmg',
-      url: 'https://github.com/rainhuang0220/PlainList/releases/download/v2.5.2/PlainList-2.5.2-macos-arm64.dmg',
-      mirrorUrl: '/downloads/PlainList-2.5.2-macos-arm64.dmg',
+      filename: 'PlainList-3.0.0-macos-arm64.dmg',
+      url: 'https://github.com/rainhuang0220/PlainList/releases/download/v3.0.0/PlainList-3.0.0-macos-arm64.dmg',
+      mirrorUrl: '/downloads/PlainList-3.0.0-macos-arm64.dmg',
       sha256: 'a'.repeat(64),
       size: 1,
     },
     {
       platform: 'macos',
       arch: 'x64',
-      filename: 'PlainList-2.5.2-macos-x64.dmg',
-      url: 'https://github.com/rainhuang0220/PlainList/releases/download/v2.5.2/PlainList-2.5.2-macos-x64.dmg',
-      mirrorUrl: '/downloads/PlainList-2.5.2-macos-x64.dmg',
+      filename: 'PlainList-3.0.0-macos-x64.dmg',
+      url: 'https://github.com/rainhuang0220/PlainList/releases/download/v3.0.0/PlainList-3.0.0-macos-x64.dmg',
+      mirrorUrl: '/downloads/PlainList-3.0.0-macos-x64.dmg',
       sha256: 'b'.repeat(64),
       size: 1,
     },
     {
       platform: 'android',
       arch: 'universal',
-      filename: 'PlainList-2.5.2-android.apk',
-      url: 'https://github.com/rainhuang0220/PlainList/releases/download/v2.5.2/PlainList-2.5.2-android.apk',
-      mirrorUrl: '/downloads/PlainList-2.5.2-android.apk',
+      filename: 'PlainList-3.0.0-android.apk',
+      url: 'https://github.com/rainhuang0220/PlainList/releases/download/v3.0.0/PlainList-3.0.0-android.apk',
+      mirrorUrl: '/downloads/PlainList-3.0.0-android.apk',
       sha256: 'c'.repeat(64),
       size: 1,
     },
@@ -124,7 +124,7 @@ try {
       if (!snapshot.hasExpectedHero) sceneFail.push(`hero:${snapshot.hero}`);
       if (!snapshot.hasWindowsNote) sceneFail.push('windows');
       if (!snapshot.hasChecksums) sceneFail.push('checksums');
-      if (!snapshot.version.includes('v2.5.2')) sceneFail.push('version');
+      if (!snapshot.version.includes('v3.0.0')) sceneFail.push('version');
       if (snapshot.overflow) sceneFail.push('overflow');
       if (viewport.width <= 390 && snapshot.gridColumns !== 1) sceneFail.push(`grid:${snapshot.gridColumns}`);
       if (viewport.width >= 1280 && snapshot.gridColumns !== 2) sceneFail.push(`grid:${snapshot.gridColumns}`);
