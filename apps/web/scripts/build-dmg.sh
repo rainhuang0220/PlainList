@@ -37,12 +37,7 @@ trap 'rm -rf "$WORK" "${WORK}-rw.dmg" "${WORK}-ro.dmg"' EXIT
 cp -R "${APP_DIR}/${APP_NAME}.app" "${WORK}/"
 ln -s /Applications "${WORK}/Applications"
 
-# Fail-closed installer: verify 2.5.1 + sealed ad-hoc before replacing /Applications.
-cp "${SCRIPT_DIR}/macos-install.command" "${WORK}/① 双击我安装并打开.command"
-chmod +x "${WORK}/① 双击我安装并打开.command"
-
-# Keep a short alias name too (some users already know the old name)
-ln -sf "① 双击我安装并打开.command" "${WORK}/安装并打开.command"
+# Official layout: PlainList.app + Applications symlink. No installer helpers.
 
 # Layout the dmg in a way that shows a "drag to Applications" hint
 TMP_DMG="${WORK}-rw.dmg"
