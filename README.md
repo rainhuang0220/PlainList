@@ -7,7 +7,7 @@ PlainList 是一个前后端分离的单仓库 TypeScript 项目。围绕「时�
 
 | 工具 | 状态 | 简介 |
 |------|------|------|
-| <u>***PlainList***</u> | 🔨 进行中 (40%) | 计划清单 |
+| <u>***PlainList***</u> | 稳定发布 (v3.0.0) | 计划清单 |
 | Flow | 🔨 进行中 (10%) | 会议 |
 | Untitled | 🔨幻想中 (0%) | 网盘 |
 | docxEditor(TBD) | 🔨进行中 (25%) | 文档编辑器 |
@@ -18,7 +18,13 @@ PlainList 是一个前后端分离的单仓库 TypeScript 项目。围绕「时�
 - 下载：https://plainlist.space/download
 - GitHub Release：https://github.com/rainhuang0220/PlainList/releases
 
-Android 为侧载 APK：下载后需允许安装未知应用。macOS：打开下载的 DMG，将 PlainList 拖入“应用程序”。首次打开若被 macOS 阻止，请前往“系统设置 → 隐私与安全性 → 仍要打开”。Release 签名 keystore 须离线备份，详见 [apps/web/android-signing/README.md](apps/web/android-signing/README.md)。
+当前稳定版本为 **v3.0.0**，覆盖 Web、macOS（Apple Silicon / Intel）与 Android。Windows 暂未提供。
+
+- Web：直接打开 https://plainlist.space
+- macOS：下载 DMG，将 PlainList 拖入“应用程序”。当前构建尚未 Developer ID / 公证；首次打开若被 macOS 阻止，请前往“系统设置 → 隐私与安全性 → 仍要打开”
+- Android：从官方下载页安装 APK（侧载，需允许安装未知应用）
+
+Android Release 签名 keystore 须离线备份，详见 [apps/web/android-signing/README.md](apps/web/android-signing/README.md)。
 
 ## 核心特性
 - **多尺度时间视图**：当下时钟 · 今日计划 · 周回顾 · 月度追踪 · 年度日历，滚动切换

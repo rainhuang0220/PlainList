@@ -41,8 +41,8 @@ function verifyReleaseTree({ allowDirty = process.env.RELEASE_ALLOW_DIRTY === '1
   const versionName = gradle.match(/versionName\s+"([^"]+)"/)?.[1];
   const versionCode = Number(gradle.match(/versionCode\s+(\d+)/)?.[1] || 0);
   if (versionName !== version) fail(`android versionName ${versionName} != ${version}`);
-  if (!Number.isInteger(versionCode) || versionCode < 25001) {
-    fail(`android versionCode ${versionCode} must be >= 25001`);
+  if (!Number.isInteger(versionCode) || versionCode < 30000) {
+    fail(`android versionCode ${versionCode} must be >= 30000`);
   }
 
   const dmg = readText('apps/web/scripts/build-dmg.sh');
